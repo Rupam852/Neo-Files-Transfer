@@ -40,11 +40,33 @@ export function AuthProvider({ children }) {
   async function loadProfile(authUser) {
     try {
       // Load user profile
-      const { data: profileData } = await supabase
+      let { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', authUser.id)
-        .single()
+        .maybeSingle()
+
+      if (!profileData) {
+        // Create profile on the fly if missing (e.g. if the user was previously blocked but now logged in)
+        const newProfile = {
+          id: authUser.id,
+          email: authUser.email,
+          name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || '',
+          avatar_url: authUser.user_metadata?.avatar_url || '',
+        }
+        const { data: insertedData, error: insertError } = await supabase
+          .from('user_profiles')
+          .insert(newProfile)
+          .select()
+          .maybeSingle()
+
+        if (!insertError && insertedData) {
+          profileData = insertedData
+        } else {
+          // Fallback to local profile info if insert fails
+          profileData = { ...newProfile, is_folder_verified: false, drive_folder_id: null }
+        }
+      }
 
       setProfile(profileData)
 
@@ -53,7 +75,7 @@ export function AuthProvider({ children }) {
         .from('admins')
         .select('*')
         .eq('user_id', authUser.id)
-        .single()
+        .maybeSingle()
 
       setIsAdmin(!!adminData)
     } catch (err) {
