@@ -126,7 +126,7 @@ export default function VersionPage() {
   if (!file) {
     return (
       <div className="card text-center py-12">
-        <p className="text-gray-500">File not found.</p>
+        <p className="text-gray-400">File not found.</p>
         <button onClick={() => navigate('/dashboard/files')} className="btn-primary mt-4 text-sm">
           Back to Files
         </button>
@@ -140,13 +140,13 @@ export default function VersionPage() {
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate('/dashboard/files')}
-          className="p-2 hover:bg-gray-100 rounded-lg"
+          className="p-2 hover:bg-dark-500 rounded-lg"
         >
-          <ArrowLeft size={20} className="text-gray-600" />
+          <ArrowLeft size={20} className="text-gray-400" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Version History</h1>
-          <p className="text-sm text-gray-500">{file.file_name}</p>
+          <h1 className="text-2xl font-bold text-gray-50">Version History</h1>
+          <p className="text-sm text-gray-400">{file.file_name}</p>
         </div>
       </div>
 
@@ -154,8 +154,8 @@ export default function VersionPage() {
       <div className="card">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-gray-800">Upload New Version</h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <h3 className="font-semibold text-gray-100">Upload New Version</h3>
+            <p className="text-sm text-gray-400 mt-1">
               The share link stays the same. Users always get the latest version.
             </p>
           </div>
@@ -177,13 +177,13 @@ export default function VersionPage() {
       </div>
 
       {/* Version List */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
-          <h3 className="text-sm font-medium text-gray-700">
+      <div className="bg-dark-600 rounded-xl border border-dark-300 overflow-hidden">
+        <div className="bg-dark-500 border-b border-dark-300 px-4 py-3">
+          <h3 className="text-sm font-medium text-gray-200">
             {versions.length} Version{versions.length !== 1 ? 's' : ''}
           </h3>
         </div>
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-dark-400">
           {versions.length === 0 ? (
             <div className="py-8 text-center text-gray-400 text-sm">
               No versions yet
@@ -192,18 +192,18 @@ export default function VersionPage() {
             versions.map(version => {
               const isCurrent = version.version_number === file.current_version_num
               return (
-                <div key={version.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+                <div key={version.id} className="flex items-center justify-between px-4 py-3 hover:bg-dark-500">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                      isCurrent ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500'
+                      isCurrent ? 'bg-primary-600/20 text-primary-400' : 'bg-gray-100 text-gray-400'
                     }`}>
                       {isCurrent ? <Check size={16} /> : <Clock size={16} />}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-800">
+                      <p className="text-sm font-medium text-gray-100">
                         Version {version.version_number}
                         {isCurrent && (
-                          <span className="ml-2 text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">
+                          <span className="ml-2 text-xs bg-primary-600/20 text-primary-400 px-2 py-0.5 rounded-full">
                             Active
                           </span>
                         )}

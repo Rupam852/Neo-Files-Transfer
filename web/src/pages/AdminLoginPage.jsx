@@ -41,8 +41,8 @@ export default function AdminLoginPage() {
           <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <Shield size={24} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Admin Portal</h1>
-          <p className="text-gray-500 text-sm mt-2">
+          <h1 className="text-2xl font-bold text-gray-50">Admin Portal</h1>
+          <p className="text-gray-400 text-sm mt-2">
             Neo Files Transfer Administration
           </p>
         </div>
@@ -60,7 +60,7 @@ export default function AdminLoginPage() {
           <button
             onClick={handleAdminLogin}
             disabled={loggingIn}
-            className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-3 bg-dark-500 border border-dark-300 hover:bg-dark-400 text-gray-200 font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -72,7 +72,7 @@ export default function AdminLoginPage() {
           </button>
         </div>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="text-center text-sm text-gray-400 mt-6">
           <a href="/" className="text-primary-600 hover:underline">Back to Home</a>
         </p>
       </div>

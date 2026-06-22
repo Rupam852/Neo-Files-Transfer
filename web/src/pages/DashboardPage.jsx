@@ -45,21 +45,21 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-2xl font-bold text-gray-50">
           Welcome, {profile?.name || 'User'}
         </h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="text-gray-400 text-sm mt-1">
           Manage your files and share links from your dashboard.
         </p>
       </div>
 
       {/* Folder Warning */}
       {showFolderWarning && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-          <FolderOpen size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
+        <div className="bg-amber-900/30 border border-amber-600/30 rounded-xl p-4 flex items-start gap-3">
+          <FolderOpen size={20} className="text-amber-400 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800">Google Drive folder not configured</p>
-            <p className="text-xs text-amber-600 mt-0.5">
+            <p className="text-sm font-medium text-amber-200">Google Drive folder not configured</p>
+            <p className="text-xs text-amber-400 mt-0.5">
               Please connect your Google Drive folder in Settings to start uploading files.
             </p>
           </div>
@@ -106,46 +106,46 @@ export default function DashboardPage() {
 
       {/* Quick Actions */}
       <div className="card">
-        <h2 className="font-semibold text-gray-800 mb-4">Quick Actions</h2>
+        <h2 className="font-semibold text-gray-100 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <button
             onClick={() => navigate('/dashboard/files')}
-            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-dark-400 hover:bg-dark-500 transition-colors"
           >
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Files size={20} className="text-blue-600" />
+            <div className="w-10 h-10 bg-dark-500 border-dark-400 hover:bg-dark-400 rounded-lg flex items-center justify-center">
+              <Files size={20} className="text-blue-400" />
             </div>
-            <span className="text-sm font-medium text-gray-700">My Files</span>
+            <span className="text-sm font-medium text-gray-200">My Files</span>
           </button>
           <button
             onClick={() => navigate('/dashboard/shared')}
-            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-dark-400 hover:bg-dark-500 transition-colors"
           >
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Share2 size={20} className="text-purple-600" />
+            <div className="w-10 h-10 bg-dark-500 border-dark-400 rounded-lg flex items-center justify-center">
+              <Share2 size={20} className="text-purple-400" />
             </div>
-            <span className="text-sm font-medium text-gray-700">Shared</span>
+            <span className="text-sm font-medium text-gray-200">Shared</span>
           </button>
           <button
             onClick={() => {
               navigate('/dashboard/files')
               window.dispatchEvent(new CustomEvent('trigger-upload'))
             }}
-            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-dark-400 hover:bg-dark-500 transition-colors"
           >
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <Download size={20} className="text-green-600" />
+            <div className="w-10 h-10 bg-dark-500 border-dark-400 rounded-lg flex items-center justify-center">
+              <Download size={20} className="text-green-400" />
             </div>
-            <span className="text-sm font-medium text-gray-700">Upload</span>
+            <span className="text-sm font-medium text-gray-200">Upload</span>
           </button>
           <button
             onClick={() => navigate('/dashboard/settings')}
-            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-dark-400 hover:bg-dark-500 transition-colors"
           >
-            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-              <FolderOpen size={20} className="text-gray-600" />
+            <div className="w-10 h-10 bg-dark-500 border-dark-400 rounded-lg flex items-center justify-center">
+              <FolderOpen size={20} className="text-gray-400" />
             </div>
-            <span className="text-sm font-medium text-gray-700">Settings</span>
+            <span className="text-sm font-medium text-gray-200">Settings</span>
           </button>
         </div>
       </div>
@@ -155,10 +155,10 @@ export default function DashboardPage() {
 
 function StatCard({ icon: Icon, label, value, color, loading }) {
   const colors = {
-    blue: 'bg-blue-50 text-blue-600',
-    purple: 'bg-purple-50 text-purple-600',
-    green: 'bg-green-50 text-green-600',
-    orange: 'bg-amber-50 text-amber-600',
+    blue: 'bg-blue-600/20 text-blue-400',
+    purple: 'bg-purple-600/20 text-purple-400',
+    green: 'bg-green-600/20 text-green-400',
+    orange: 'bg-amber-50 text-amber-400',
   }
   return (
     <div className="card flex items-center gap-4">
@@ -166,10 +166,10 @@ function StatCard({ icon: Icon, label, value, color, loading }) {
         <Icon size={20} />
       </div>
       <div>
-        <p className="text-2xl font-bold text-gray-800">
+        <p className="text-2xl font-bold text-gray-100">
           {loading ? '—' : value}
         </p>
-        <p className="text-xs text-gray-500">{label}</p>
+        <p className="text-xs text-gray-400">{label}</p>
       </div>
     </div>
   )

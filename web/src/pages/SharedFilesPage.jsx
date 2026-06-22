@@ -60,14 +60,14 @@ export default function SharedFilesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Shared Files</h1>
+      <h1 className="text-2xl font-bold text-gray-50">Shared Files</h1>
       <p className="text-gray-500 text-sm">
         Manage your file share links. Toggle between public and private access.
       </p>
 
       {files.length === 0 ? (
         <div className="card text-center py-12">
-          <Link2 size={48} className="mx-auto text-gray-300 mb-4" />
+          <Link2 size={48} className="mx-auto text-gray-500 mb-4" />
           <p className="text-gray-500">No shared files yet. Upload a file to generate a share link.</p>
         </div>
       ) : (
@@ -76,22 +76,22 @@ export default function SharedFilesPage() {
             <div key={file.id} className="card flex flex-col sm:flex-row sm:items-center gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-sm font-medium text-gray-800 truncate">{file.file_name}</h3>
+                  <h3 className="text-sm font-medium text-gray-100 truncate">{file.file_name}</h3>
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                     file.sharing_status === 'public'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-gray-100 text-gray-600'
+                      ? 'bg-green-900/30 text-green-400'
+                      : 'bg-dark-500 text-gray-500'
                   }`}>
                     {file.sharing_status === 'public' ? <Globe size={12} /> : <Lock size={12} />}
                     {file.sharing_status}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <code className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded truncate max-w-xs">
+                  <code className="text-xs text-gray-500 bg-dark-500 px-2 py-1 rounded truncate max-w-xs">
                     {generateShareUrl(file.unique_share_hash)}
                   </code>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   Created {formatDate(file.created_at)} · v{file.current_version_num}
                 </p>
               </div>
@@ -106,8 +106,8 @@ export default function SharedFilesPage() {
                   onClick={() => toggleStatus(file)}
                   className={`text-sm flex items-center gap-1.5 py-2 px-4 rounded-lg font-medium transition-colors ${
                     file.sharing_status === 'public'
-                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      : 'bg-green-100 text-green-700 hover:bg-green-200'
+                      ? 'bg-dark-500 text-gray-500 hover:bg-dark-400'
+                      : 'bg-green-900/30 text-green-400 hover:bg-green-200'
                   }`}
                 >
                   {file.sharing_status === 'public' ? (

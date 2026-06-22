@@ -74,10 +74,10 @@ export default function DownloadPage() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-dark-800">
         <div className="text-center">
           <div className="w-10 h-10 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-500">Resolving file...</p>
+          <p className="text-gray-400">Resolving file...</p>
         </div>
       </div>
     )
@@ -85,13 +85,13 @@ export default function DownloadPage() {
 
   if (status === 'downloading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-dark-800">
         <div className="text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Download size={32} className="text-green-600" />
+          <div className="w-16 h-16 bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Download size={32} className="text-green-400" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Download Started</h2>
-          <p className="text-gray-500 text-sm">{fileInfo?.file_name}</p>
+          <h2 className="text-xl font-semibold text-gray-100 mb-2">Download Started</h2>
+          <p className="text-gray-400 text-sm">{fileInfo?.file_name}</p>
           <Link to="/" className="text-primary-600 hover:underline text-sm mt-4 inline-block">
             Go to Neo Files Home
           </Link>
@@ -102,14 +102,14 @@ export default function DownloadPage() {
 
   if (status === 'denied') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-dark-800 px-4">
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <ShieldX size={32} className="text-red-500" />
+          <div className="w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+            <ShieldX size={32} className="text-red-400" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">403</h1>
-          <h2 className="text-xl font-semibold text-gray-800 mb-3">Access Denied</h2>
-          <p className="text-gray-500 mb-8">
+          <h1 className="text-4xl font-bold text-gray-50 mb-2">403</h1>
+          <h2 className="text-xl font-semibold text-gray-100 mb-3">Access Denied</h2>
+          <p className="text-gray-400 mb-8">
             This file is private and cannot be downloaded.
           </p>
           <Link to="/" className="btn-primary inline-flex items-center gap-2">
@@ -122,13 +122,13 @@ export default function DownloadPage() {
 
   if (status === 'maintenance') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-dark-800 px-4">
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertTriangle size={32} className="text-amber-500" />
+          <div className="w-16 h-16 bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle size={32} className="text-amber-400" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-3">Service Temporarily Busy</h2>
-          <p className="text-gray-500 mb-4">
+          <h2 className="text-xl font-semibold text-gray-100 mb-3">Service Temporarily Busy</h2>
+          <p className="text-gray-400 mb-4">
             Downloads are currently disabled. Please try again later.
           </p>
         </div>
@@ -138,14 +138,14 @@ export default function DownloadPage() {
 
   // Not found
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-dark-800 px-4">
       <div className="text-center max-w-md">
-        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <FileX size={32} className="text-gray-500" />
+        <div className="w-16 h-16 bg-dark-500 rounded-full flex items-center justify-center mx-auto mb-6">
+          <FileX size={32} className="text-gray-400" />
         </div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">404</h1>
-        <h2 className="text-xl font-semibold text-gray-800 mb-3">File Not Found</h2>
-        <p className="text-gray-500 mb-8">
+        <h1 className="text-4xl font-bold text-gray-50 mb-2">404</h1>
+        <h2 className="text-xl font-semibold text-gray-100 mb-3">File Not Found</h2>
+        <p className="text-gray-400 mb-8">
           The requested file does not exist or has been removed.
         </p>
         <Link to="/" className="btn-primary inline-flex items-center gap-2">

@@ -146,20 +146,20 @@ export default function AdminDashboardPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-dark-800">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 lg:px-6">
+      <header className="bg-dark-700 border-b border-dark-400 h-16 flex items-center justify-between px-4 lg:px-6">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
             <ShieldCheck size={16} className="text-white" />
           </div>
-          <span className="font-semibold text-gray-800">Admin Dashboard</span>
+          <span className="font-semibold text-gray-100">Admin Dashboard</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500 hidden sm:block">{profile?.email}</span>
+          <span className="text-sm text-gray-400 hidden sm:block">{profile?.email}</span>
           <button
             onClick={handleSignOut}
-            className="text-gray-400 hover:text-red-500 p-2"
+            className="text-gray-400 hover:text-red-400 p-2"
             title="Sign Out"
           >
             <LogOut size={18} />
@@ -177,11 +177,11 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-200 p-1 mb-6 w-fit">
+        <div className="flex items-center gap-1 bg-dark-600 rounded-lg border border-dark-400 p-1 mb-6 w-fit">
           <button
             onClick={() => setActiveTab('pending')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'pending' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+              activeTab === 'pending' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
             }`}
           >
             Pending ({pendingUsers.filter(u => u.status === 'pending').length})
@@ -189,7 +189,7 @@ export default function AdminDashboardPage() {
           <button
             onClick={() => setActiveTab('approved')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'approved' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+              activeTab === 'approved' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
             }`}
           >
             Approved ({approvedUsers.length})
@@ -197,7 +197,7 @@ export default function AdminDashboardPage() {
           <button
             onClick={() => setActiveTab('settings')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'settings' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+              activeTab === 'settings' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
             }`}
           >
             <Settings size={16} className="inline mr-1" />
@@ -230,20 +230,20 @@ export default function AdminDashboardPage() {
           <>
             {/* Pending Tab */}
             {activeTab === 'pending' && (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="bg-dark-600 rounded-xl border border-dark-300 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Name</th>
-                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Email</th>
-                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Phone</th>
-                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Status</th>
-                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Submitted</th>
-                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Actions</th>
+                      <tr className="bg-dark-500 border-b border-dark-300">
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Name</th>
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Email</th>
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Phone</th>
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Status</th>
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Submitted</th>
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-dark-400">
                       {filteredPending.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="text-center py-8 text-gray-400 text-sm">
@@ -252,34 +252,34 @@ export default function AdminDashboardPage() {
                         </tr>
                       ) : (
                         filteredPending.map(user => (
-                          <tr key={user.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-800">{user.name}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{user.email}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{user.phone}</td>
+                          <tr key={user.id} className="hover:bg-dark-500">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-100">{user.name}</td>
+                            <td className="px-4 py-3 text-sm text-gray-400">{user.email}</td>
+                            <td className="px-4 py-3 text-sm text-gray-400">{user.phone}</td>
                             <td className="px-4 py-3">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                user.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                                user.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                'bg-red-100 text-red-700'
+                                user.status === 'pending' ? 'bg-amber-900/30 text-amber-400' :
+                                user.status === 'approved' ? 'bg-green-900/30 text-green-400' :
+                                'bg-red-900/30 text-red-400'
                               }`}>
                                 {user.status}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-500">{formatDate(user.submitted_at)}</td>
+                            <td className="px-4 py-3 text-sm text-gray-400">{formatDate(user.submitted_at)}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-1">
                                 {user.status === 'pending' && (
                                   <>
                                     <button
                                       onClick={() => approveUser(user)}
-                                      className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg"
+                                      className="p-1.5 text-green-400 hover:bg-dark-500 rounded-lg"
                                       title="Approve"
                                     >
                                       <Check size={16} />
                                     </button>
                                     <button
                                       onClick={() => rejectUser(user)}
-                                      className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                                      className="p-1.5 text-red-400 hover:bg-dark-500 rounded-lg"
                                       title="Reject"
                                     >
                                       <X size={16} />
@@ -288,21 +288,21 @@ export default function AdminDashboardPage() {
                                 )}
                                 <button
                                   onClick={() => deleteUser(user.id)}
-                                  className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg"
+                                  className="p-1.5 text-gray-400 hover:bg-dark-500 rounded-lg"
                                   title="Delete"
                                 >
                                   <Trash2 size={16} />
                                 </button>
                                 <a
                                   href={`mailto:${user.email}`}
-                                  className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"
+                                  className="p-1.5 text-blue-400 hover:bg-dark-500 rounded-lg"
                                   title="Email"
                                 >
                                   <Mail size={16} />
                                 </a>
                                 <a
                                   href={`tel:${user.phone}`}
-                                  className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg"
+                                  className="p-1.5 text-gray-400 hover:bg-dark-500 rounded-lg"
                                   title="Call"
                                 >
                                   <Phone size={16} />
@@ -320,17 +320,17 @@ export default function AdminDashboardPage() {
 
             {/* Approved Tab */}
             {activeTab === 'approved' && (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="bg-dark-600 rounded-xl border border-dark-300 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Email</th>
-                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Approved At</th>
-                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Actions</th>
+                      <tr className="bg-dark-500 border-b border-dark-300">
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Email</th>
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Approved At</th>
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-dark-400">
                       {filteredApproved.length === 0 ? (
                         <tr>
                           <td colSpan={3} className="text-center py-8 text-gray-400 text-sm">
@@ -339,13 +339,13 @@ export default function AdminDashboardPage() {
                         </tr>
                       ) : (
                         filteredApproved.map(user => (
-                          <tr key={user.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-800">{user.email}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">{formatDate(user.approved_at)}</td>
+                          <tr key={user.id} className="hover:bg-dark-500">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-100">{user.email}</td>
+                            <td className="px-4 py-3 text-sm text-gray-400">{formatDate(user.approved_at)}</td>
                             <td className="px-4 py-3">
                               <a
                                 href={`mailto:${user.email}`}
-                                className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"
+                                className="p-1.5 text-blue-400 hover:bg-dark-500 rounded-lg"
                                 title="Email"
                               >
                                 <Mail size={16} />
@@ -363,7 +363,7 @@ export default function AdminDashboardPage() {
             {/* Settings Tab */}
             {activeTab === 'settings' && (
               <div className="card max-w-lg space-y-4">
-                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                <h3 className="font-semibold text-gray-100 flex items-center gap-2">
                   <Activity size={18} /> System Controls
                 </h3>
                 <SettingToggle
@@ -395,10 +395,10 @@ export default function AdminDashboardPage() {
 
 function StatCard({ icon: Icon, label, value, color }) {
   const colors = {
-    blue: 'bg-blue-50 text-blue-600',
-    orange: 'bg-amber-50 text-amber-600',
-    green: 'bg-green-50 text-green-600',
-    primary: 'bg-primary-50 text-primary-600',
+    blue: 'bg-blue-600/20 text-blue-400',
+    orange: 'bg-amber-600/20 text-amber-400',
+    green: 'bg-green-600/20 text-green-400',
+    primary: 'bg-primary-600/20 text-primary-400',
   }
   return (
     <div className="card flex items-center gap-4">
@@ -406,8 +406,8 @@ function StatCard({ icon: Icon, label, value, color }) {
         <Icon size={20} />
       </div>
       <div>
-        <p className="text-2xl font-bold text-gray-800">{value}</p>
-        <p className="text-xs text-gray-500">{label}</p>
+        <p className="text-2xl font-bold text-gray-100">{value}</p>
+        <p className="text-xs text-gray-400">{label}</p>
       </div>
     </div>
   )
@@ -415,15 +415,15 @@ function StatCard({ icon: Icon, label, value, color }) {
 
 function SettingToggle({ label, description, checked, onChange }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-3 border-b border-gray-100 last:border-0">
+    <div className="flex items-start justify-between gap-4 py-3 border-b border-dark-400 last:border-0">
       <div>
-        <p className="text-sm font-medium text-gray-800">{label}</p>
-        <p className="text-xs text-gray-500 mt-0.5">{description}</p>
+        <p className="text-sm font-medium text-gray-100">{label}</p>
+        <p className="text-xs text-gray-400 mt-0.5">{description}</p>
       </div>
       <button
         onClick={onChange}
         className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-          checked ? 'bg-primary-600' : 'bg-gray-300'
+          checked ? 'bg-primary-600' : 'bg-dark-200'
         }`}
       >
         <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${

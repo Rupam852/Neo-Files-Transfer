@@ -304,7 +304,7 @@ export default function FilesPage() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">My Files</h1>
+        <h1 className="text-2xl font-bold text-gray-50">My Files</h1>
         <div className="flex items-center gap-3">
           <input
             ref={fileInputRef}
@@ -366,54 +366,54 @@ export default function FilesPage() {
       ) : filteredFiles.length === 0 ? (
         <div className="card text-center py-12">
           <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">No files yet. Upload your first file to get started.</p>
+          <p className="text-gray-400">No files yet. Upload your first file to get started.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-dark-600 rounded-xl border border-dark-300 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">File</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3 hidden sm:table-cell">Size</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Version</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Status</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Date</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Actions</th>
+                <tr className="bg-dark-500 border-b border-dark-300">
+                  <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">File</th>
+                  <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3 hidden sm:table-cell">Size</th>
+                  <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Version</th>
+                  <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Status</th>
+                  <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Date</th>
+                  <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredFiles.map(file => {
                   const Icon = getIconComponent(file.mime_type)
                   return (
-                    <tr key={file.id} className="hover:bg-gray-50">
+                    <tr key={file.id} className="hover:bg-dark-500">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <Icon size={16} className="text-gray-500" />
+                            <Icon size={16} className="text-gray-400" />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-800 truncate">{file.file_name}</p>
+                            <p className="text-sm font-medium text-gray-100 truncate">{file.file_name}</p>
                             <p className="text-xs text-gray-400">{getExtension(file.file_name)}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 hidden sm:table-cell">
+                      <td className="px-4 py-3 text-sm text-gray-400 hidden sm:table-cell">
                         {formatFileSize(file.file_size || 0)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 hidden md:table-cell">
+                      <td className="px-4 py-3 text-sm text-gray-400 hidden md:table-cell">
                         v{file.current_version_num}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                           file.sharing_status === 'public'
                             ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-600'
+                            : 'bg-gray-100 text-gray-400'
                         }`}>
                           {file.sharing_status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 hidden lg:table-cell">
+                      <td className="px-4 py-3 text-sm text-gray-400 hidden lg:table-cell">
                         {formatDate(file.created_at)}
                       </td>
                       <td className="px-4 py-3">
@@ -425,10 +425,10 @@ export default function FilesPage() {
                             <MoreVertical size={16} />
                           </button>
                           {activeMenu === file.id && (
-                            <div ref={menuRef} className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
+                            <div ref={menuRef} className="absolute right-0 mt-1 w-48 bg-dark-600 rounded-lg shadow-xl border border-dark-400 py-1 z-50">
                               <button
                                 onClick={() => { toggleSharing(file); setActiveMenu(null) }}
-                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
                               >
                                 <Share2 size={16} />
                                 {file.sharing_status === 'public' ? 'Make Private' : 'Make Public'}
@@ -439,7 +439,7 @@ export default function FilesPage() {
                                   toast.success('Share link copied!')
                                   setActiveMenu(null)
                                 }}
-                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
                               >
                                 <Download size={16} />
                                 Copy Share Link
@@ -450,7 +450,7 @@ export default function FilesPage() {
                                   setNewName(file.file_name.replace(/\.[^/.]+$/, ''))
                                   setActiveMenu(null)
                                 }}
-                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
                               >
                                 <Pencil size={16} />
                                 Rename
@@ -460,12 +460,12 @@ export default function FilesPage() {
                                   navigate(`/dashboard/files/${file.id}/versions`)
                                   setActiveMenu(null)
                                 }}
-                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
                               >
                                 <History size={16} />
                                 Manage Versions
                               </button>
-                              <hr className="my-1 border-gray-100" />
+                              <hr className="my-1 border-dark-400" />
                               <button
                                 onClick={() => {
                                   setDeleteConfirm(file)
@@ -492,7 +492,7 @@ export default function FilesPage() {
       {/* Rename Modal */}
       {renameModal && (
         <Modal onClose={() => setRenameModal(null)}>
-          <h3 className="font-semibold text-gray-800 mb-4">Rename File</h3>
+          <h3 className="font-semibold text-gray-100 mb-4">Rename File</h3>
           <input
             type="text"
             className="input-field mb-4"
@@ -510,8 +510,8 @@ export default function FilesPage() {
       {/* Delete Confirm Modal */}
       {deleteConfirm && (
         <Modal onClose={() => setDeleteConfirm(null)}>
-          <h3 className="font-semibold text-gray-800 mb-2">Delete File</h3>
-          <p className="text-sm text-gray-500 mb-4">
+          <h3 className="font-semibold text-gray-100 mb-2">Delete File</h3>
+          <p className="text-sm text-gray-400 mb-4">
             Are you sure you want to delete <strong>{deleteConfirm.file_name}</strong>?
             This action cannot be undone.
           </p>
@@ -528,7 +528,7 @@ export default function FilesPage() {
 function Modal({ children, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+      <div className="bg-dark-600 rounded-xl shadow-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
         {children}
       </div>
     </div>

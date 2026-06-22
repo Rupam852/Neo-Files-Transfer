@@ -104,16 +104,16 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+      <h1 className="text-2xl font-bold text-gray-50">Settings</h1>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-200 p-1 w-fit">
+      <div className="flex items-center gap-1 bg-dark-600 rounded-lg border border-dark-400 p-1 w-fit">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === tab.id ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+              activeTab === tab.id ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
             }`}
           >
             <tab.icon size={16} />
@@ -125,19 +125,19 @@ export default function SettingsPage() {
       {/* Profile Tab */}
       {activeTab === 'profile' && (
         <div className="card max-w-lg space-y-4">
-          <div className="flex items-center gap-4 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-4 pb-4 border-b border-dark-400">
             <img
               src={profile?.avatar_url || '/favicon.svg'}
               alt="Avatar"
               className="w-16 h-16 rounded-full object-cover"
             />
             <div>
-              <p className="font-medium text-gray-800">{profile?.name}</p>
+              <p className="font-medium text-gray-100">{profile?.name}</p>
               <p className="text-sm text-gray-500">{profile?.email}</p>
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+            <label className="block text-sm font-medium text-gray-200 mb-1">Display Name</label>
             <input
               type="text"
               className="input-field"
@@ -146,10 +146,10 @@ export default function SettingsPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-gray-200 mb-1">Email</label>
             <input
               type="email"
-              className="input-field bg-gray-50 cursor-not-allowed"
+              className="input-field bg-dark-500 cursor-not-allowed"
               value={profile?.email || ''}
               disabled
             />
@@ -167,23 +167,23 @@ export default function SettingsPage() {
       {/* Drive Tab */}
       {activeTab === 'drive' && (
         <div className="card max-w-lg space-y-4">
-          <h3 className="font-semibold text-gray-800">Google Drive Folder</h3>
+          <h3 className="font-semibold text-gray-100">Google Drive Folder</h3>
           <p className="text-sm text-gray-500">
             Connect your Google Drive folder where Neo Files will store your uploaded files.
           </p>
 
           {profile?.drive_folder_id && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
-              <Check size={16} className="text-green-500" />
+            <div className="bg-green-900/30 border border-green-600/30 rounded-lg p-3 flex items-center gap-2">
+              <Check size={16} className="text-green-400" />
               <div>
-                <p className="text-sm font-medium text-green-800">Folder Connected</p>
-                <p className="text-xs text-green-600">ID: {profile.drive_folder_id}</p>
+                <p className="text-sm font-medium text-green-200">Folder Connected</p>
+                <p className="text-xs text-green-400">ID: {profile.drive_folder_id}</p>
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-200 mb-1">
               Google Drive Folder Link
             </label>
             <input
@@ -193,14 +193,14 @@ export default function SettingsPage() {
               value={folderUrl}
               onChange={e => setFolderUrl(e.target.value)}
             />
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               The folder must be set to "Anyone with the link" in Google Drive.
             </p>
           </div>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
-            <AlertTriangle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-amber-700">
+          <div className="bg-amber-900/30 border border-amber-600/30 rounded-lg p-3 flex items-start gap-2">
+            <AlertTriangle size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-amber-300">
               Make sure the folder sharing setting is "Anyone with the link can view" before connecting.
             </p>
           </div>
@@ -218,25 +218,25 @@ export default function SettingsPage() {
       {/* Security Tab */}
       {activeTab === 'security' && (
         <div className="card max-w-lg space-y-4">
-          <h3 className="font-semibold text-gray-800">Security</h3>
+          <h3 className="font-semibold text-gray-100">Security</h3>
           <p className="text-sm text-gray-500">
             Your account is secured with Google OAuth. Sessions are managed by Supabase Authentication.
           </p>
-          <div className="space-y-2 text-sm text-gray-600">
+          <div className="space-y-2 text-sm text-gray-300">
             <div className="flex items-center gap-2">
-              <Check size={16} className="text-green-500" />
+              <Check size={16} className="text-green-400" />
               Google OAuth Authentication
             </div>
             <div className="flex items-center gap-2">
-              <Check size={16} className="text-green-500" />
+              <Check size={16} className="text-green-400" />
               JWT Session Management
             </div>
             <div className="flex items-center gap-2">
-              <Check size={16} className="text-green-500" />
+              <Check size={16} className="text-green-400" />
               Row Level Security (RLS)
             </div>
           </div>
-          <hr className="border-gray-100" />
+          <hr className="border-dark-400" />
           <button
             onClick={handleSignOut}
             className="btn-danger flex items-center gap-2 text-sm"
