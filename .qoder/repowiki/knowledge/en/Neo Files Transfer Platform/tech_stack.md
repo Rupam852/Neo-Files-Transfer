@@ -1,0 +1,1 @@
+Supabase (Auth, Storage, Edge Functions, PostgreSQL) integrated with a React/Vite frontend.

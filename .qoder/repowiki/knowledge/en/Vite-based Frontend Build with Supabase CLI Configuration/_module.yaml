@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: build_system
+title: Vite-based Frontend Build with Supabase CLI Configuration
+scope: []
+source_files:
+    - web/package.json
+    - web/vite.config.js
+    - web/postcss.config.js
+    - supabase/config.toml
+    - .gitignore
+depends_on: []
+related_to: []

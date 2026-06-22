@@ -1,0 +1,1 @@
+Orchestrates a React-based single-page application for secure file management, integrating authentication, admin controls, and file operations through a unified Supabase backend.

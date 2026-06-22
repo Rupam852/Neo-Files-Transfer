@@ -1,0 +1,1 @@
+Supabase Edge Functions (Deno Runtime), PostgreSQL with Row Level Security (RLS), Google Drive API v3 for storage backend.

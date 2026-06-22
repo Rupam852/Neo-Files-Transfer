@@ -1,0 +1,1 @@
+Provides administrative authentication, user registration approval workflows, and system configuration controls.

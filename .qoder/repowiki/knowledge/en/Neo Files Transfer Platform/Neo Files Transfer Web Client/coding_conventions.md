@@ -1,0 +1,3 @@
+- Page components are organized by feature domain within `src/pages/` and imported directly into the central router.
+- Layout components (`MainLayout`, `DashboardLayout`, `AdminLayout`) wrap route groups to provide consistent UI chrome and context scoping.
+- Authentication state is accessed exclusively via the `useAuth` hook from `AuthContext`, avoiding direct Supabase client calls for user status.

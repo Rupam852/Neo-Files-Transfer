@@ -1,0 +1,4 @@
+- Centralized state management via `AuthContext.jsx` using React Context API, exposing `user`, `profile`, `isAdmin`, and auth actions.
+- OAuth flow initiated in `LoginPage.jsx` and resolved in `AuthCallback.jsx`, which handles session validation, profile creation, and role-based redirection.
+- Access control enforced by checking `approved_users` and `admins` tables in Supabase during callback.
+- `AccessDeniedPage.jsx` serves as a static fallback for unauthorized access attempts.

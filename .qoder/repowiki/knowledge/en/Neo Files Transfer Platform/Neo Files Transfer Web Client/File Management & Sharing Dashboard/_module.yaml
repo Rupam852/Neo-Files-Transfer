@@ -1,0 +1,14 @@
+schema_version: 1
+module_path: web_frontend/file_management
+title: File Management & Sharing Dashboard
+scope:
+    - web/src/pages/DashboardPage.jsx
+    - web/src/pages/FilesPage.jsx
+    - web/src/pages/DownloadPage.jsx
+    - web/src/pages/VersionPage.jsx
+    - web/src/pages/SettingsPage.jsx
+    - web/src/layouts/DashboardLayout.jsx
+source_files: []
+depends_on: []
+related_to:
+    - path: supabase_backend

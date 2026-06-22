@@ -1,0 +1,2 @@
+- Edge Functions enforce JWT verification via supabase/config.toml settings for all sensitive operations except public downloads.
+- React components utilize a centralized AuthContext to access user session data and administrative privileges.

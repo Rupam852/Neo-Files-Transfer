@@ -1,0 +1,1 @@
+Orchestrates the React application entry point, global providers, and top-level route definitions for public, protected, and admin sections.

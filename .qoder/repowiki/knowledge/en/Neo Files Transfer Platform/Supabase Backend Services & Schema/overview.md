@@ -1,0 +1,1 @@
+Manages file transfer operations via Edge Functions and defines the PostgreSQL schema with Row Level Security for user profiles, shared files, and administrative controls.

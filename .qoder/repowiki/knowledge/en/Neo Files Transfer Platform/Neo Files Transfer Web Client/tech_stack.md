@@ -1,0 +1,1 @@
+React 19, Vite, Tailwind CSS, Supabase JS Client, TanStack Query, React Router DOM

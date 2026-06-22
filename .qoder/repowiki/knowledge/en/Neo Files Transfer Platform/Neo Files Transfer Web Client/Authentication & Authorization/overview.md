@@ -1,0 +1,1 @@
+Manages user authentication via Google OAuth, session state, and role-based access control using Supabase.

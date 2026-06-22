@@ -1,0 +1,3 @@
+- Async auth operations (signIn, signOut, profile loading) are wrapped in try/catch blocks with error logging or toast notifications.
+- Role-based redirection logic is centralized in the auth callback handler rather than distributed across components.
+- Loading states are managed locally in components and globally in the AuthProvider to prevent UI flicker during session checks.

@@ -1,0 +1,4 @@
+- Entry point: `AdminLayout.jsx` uses `react-router-dom`'s `<Outlet />` to render nested admin routes within a minimal shell.
+- Authentication gate: `AdminLoginPage.jsx` leverages `useAuth` context and `supabase` client to enforce Google Sign-In for admin roles, redirecting authorized users to the dashboard.
+- Dashboard logic: `AdminDashboardPage.jsx` implements a tabbed interface (Pending, Approved, Settings) that directly interacts with Supabase tables (`pending_registrations`, `approved_users`, `system_settings`) for CRUD operations and audit logging via `admin_activity_logs`.
+- Dependency direction: Pages depend on shared `../services/supabase` for data access and `../contexts/AuthContext` for session state, maintaining a clear separation between UI components and backend integration.

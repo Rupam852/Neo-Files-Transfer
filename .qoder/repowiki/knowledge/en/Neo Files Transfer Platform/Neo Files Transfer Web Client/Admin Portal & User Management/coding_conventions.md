@@ -1,0 +1,3 @@
+- Direct Supabase queries are executed within component effects or event handlers rather than through a dedicated service layer abstraction.
+- Audit logging is performed by manually inserting records into `admin_activity_logs` immediately following successful state-changing operations.
+- Optimistic UI updates are avoided; instead, `fetchData()` is called after every mutation to refresh the entire dataset from the backend.

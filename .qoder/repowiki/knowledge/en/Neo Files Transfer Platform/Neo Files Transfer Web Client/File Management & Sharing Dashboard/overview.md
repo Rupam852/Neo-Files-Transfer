@@ -1,0 +1,1 @@
+Provides a comprehensive interface for users to upload, organize, version, and share files stored in Google Drive via Supabase.

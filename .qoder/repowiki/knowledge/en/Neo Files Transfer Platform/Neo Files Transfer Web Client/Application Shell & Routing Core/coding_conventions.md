@@ -1,0 +1,3 @@
+- Functional components with explicit default exports are used for all pages and layouts.
+- Route protection is implemented via wrapper components (`ProtectedRoute`, `AdminRoute`) that check authentication state before rendering children.
+- Global UI feedback is handled by a single `<Toaster />` instance configured in the main entry file.

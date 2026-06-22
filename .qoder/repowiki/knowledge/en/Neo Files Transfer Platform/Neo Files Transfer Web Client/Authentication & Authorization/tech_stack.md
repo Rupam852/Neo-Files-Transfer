@@ -1,0 +1,1 @@
+Supabase Auth for Google OAuth and session management; React Context for global auth state.

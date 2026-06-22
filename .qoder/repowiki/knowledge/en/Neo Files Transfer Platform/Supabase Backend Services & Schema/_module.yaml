@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: supabase_backend
+title: Supabase Backend Services & Schema
+scope:
+    - supabase/
+source_files: []
+depends_on: []
+related_to:
+    - path: web_frontend/admin
+    - path: web_frontend/auth
+    - path: web_frontend/file_management

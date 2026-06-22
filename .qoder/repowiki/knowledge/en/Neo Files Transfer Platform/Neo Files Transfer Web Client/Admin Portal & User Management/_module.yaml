@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: web_frontend/admin
+title: Admin Portal & User Management
+scope:
+    - web/src/pages/AdminLoginPage.jsx
+    - web/src/pages/AdminDashboardPage.jsx
+    - web/src/layouts/AdminLayout.jsx
+source_files: []
+depends_on: []
+related_to:
+    - path: supabase_backend

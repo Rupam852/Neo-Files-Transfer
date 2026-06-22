@@ -1,0 +1,4 @@
+- **Layout-Driven Routing**: Uses `DashboardLayout.jsx` as the primary shell for authenticated routes (`/dashboard/*`), featuring a responsive sidebar and top navigation bar with global actions like 'Upload'.
+- **Page-Level Responsibility**: Each page component (`FilesPage`, `VersionPage`, `SettingsPage`) acts as a self-contained feature module, handling its own state, data fetching from Supabase, and direct interaction with Edge Functions.
+- **Public Access Handling**: `DownloadPage.jsx` operates outside the protected layout, resolving public share hashes to initiate downloads or enforce access policies (403/404 states).
+- **Integration Boundary**: The module bridges the React frontend with backend services by directly calling Supabase clients for metadata and `fetch` for Edge Functions (upload, rename, delete) using session tokens.

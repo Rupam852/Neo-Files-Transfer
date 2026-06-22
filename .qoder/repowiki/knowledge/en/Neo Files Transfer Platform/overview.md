@@ -1,0 +1,1 @@
+Orchestrates a secure file management system by wiring a React frontend to Supabase Edge Functions and PostgreSQL, enforcing JWT-based access control and role-specific UI routing.

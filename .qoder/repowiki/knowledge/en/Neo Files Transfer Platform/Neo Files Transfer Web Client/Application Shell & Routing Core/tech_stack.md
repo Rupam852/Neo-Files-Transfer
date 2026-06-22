@@ -1,0 +1,1 @@
+React 19 with Vite 6 build tooling; TanStack Query v5 for server-state management; React Router v7 for client-side routing; Supabase JS client for backend integration.

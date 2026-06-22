@@ -1,0 +1,1 @@
+Supabase client for direct database interaction and Google OAuth; Lucide React for iconography; Tailwind CSS for styling.

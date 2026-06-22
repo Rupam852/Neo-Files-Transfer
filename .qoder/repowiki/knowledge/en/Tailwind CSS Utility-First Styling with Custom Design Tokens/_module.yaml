@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: frontend_style
+title: Tailwind CSS Utility-First Styling with Custom Design Tokens
+scope: []
+source_files:
+    - web/tailwind.config.js
+    - web/src/index.css
+    - web/postcss.config.js
+    - web/package.json
+    - web/src/pages/LandingPage.jsx
+depends_on: []
+related_to: []

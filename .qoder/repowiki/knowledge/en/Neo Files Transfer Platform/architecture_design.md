@@ -1,0 +1,3 @@
+- The web frontend consumes a single Supabase client instance, relying on the backend's Row Level Security (RLS) and Edge Function JWT verification for all data integrity.
+- Authentication state is managed centrally in the React context, which synchronizes with Supabase Auth sessions to drive conditional rendering of admin versus user layouts.
+- File operations are decoupled from the UI, executed via dedicated Edge Functions that enforce strict JWT validation before interacting with the storage bucket or database schema.

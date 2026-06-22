@@ -1,0 +1,207 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: en-US
+branch: Q0DeR-MaG1C-BrAnCh-Fo2-NoN-GiT-Or-No-C0MmIt
+nodes_managed: true
+exported_at: "2026-06-22T20:38:27Z"
+modules:
+    "":
+        dir_name: Neo Files Transfer Platform
+        title: Neo Files Transfer Platform
+        scope:
+            - .gitignore
+            - NEO FILES TRANSFER.docx
+            - supabase\config.toml
+            - supabase\functions\delete-file\index.ts
+            - supabase\functions\download-file\index.ts
+            - supabase\functions\generate-share-link\index.ts
+            - supabase\functions\rename-file\index.ts
+            - supabase\functions\upload-file\index.ts
+            - supabase\functions\upload-version\index.ts
+            - supabase\functions\validate-folder\index.ts
+            - supabase\migrations\001_initial_schema.sql
+            - web\.env
+            - web\.gitignore
+            - web\index.html
+            - web\package-lock.json
+            - web\package.json
+            - web\postcss.config.js
+            - web\public\favicon.svg
+            - web\src\App.jsx
+            - web\src\assets\hero.png
+            - web\src\contexts\AuthContext.jsx
+            - web\src\index.css
+            - web\src\layouts\AdminLayout.jsx
+            - web\src\layouts\DashboardLayout.jsx
+            - web\src\layouts\MainLayout.jsx
+            - web\src\main.jsx
+            - web\src\pages\AccessDeniedPage.jsx
+            - web\src\pages\AdminDashboardPage.jsx
+            - web\src\pages\AdminLoginPage.jsx
+            - web\src\pages\AuthCallback.jsx
+            - web\src\pages\DashboardPage.jsx
+            - web\src\pages\DownloadPage.jsx
+            - web\src\pages\FileNotFoundPage.jsx
+            - web\src\pages\FilesPage.jsx
+            - web\src\pages\LandingPage.jsx
+            - web\src\pages\LoginPage.jsx
+            - web\src\pages\SettingsPage.jsx
+            - web\src\pages\SharedFilesPage.jsx
+            - web\src\pages\VersionPage.jsx
+            - web\src\services\supabase.js
+            - web\src\utils\helpers.js
+            - web\tailwind.config.js
+            - web\vite.config.js
+        source_files: []
+        children:
+            - supabase_backend
+            - web_frontend
+        depends_on: []
+        related_to: []
+    build_system:
+        dir_name: Vite-based Frontend Build with Supabase CLI Configuration
+        title: Vite-based Frontend Build with Supabase CLI Configuration
+        scope: []
+        source_files:
+            - web/package.json
+            - web/vite.config.js
+            - web/postcss.config.js
+            - supabase/config.toml
+            - .gitignore
+        children: []
+        depends_on: []
+        related_to: []
+    configuration_system:
+        dir_name: Configuration System
+        title: Configuration System
+        scope: []
+        source_files:
+            - supabase/config.toml
+            - web/.env
+            - web/vite.config.js
+            - web/src/services/supabase.js
+            - web/src/utils/helpers.js
+        children: []
+        depends_on: []
+        related_to: []
+    dependency_management:
+        dir_name: Dependency Management Strategy
+        title: Dependency Management Strategy
+        scope: []
+        source_files:
+            - web/package.json
+            - web/package-lock.json
+            - supabase/functions/upload-file/index.ts
+        children: []
+        depends_on: []
+        related_to: []
+    error_handling:
+        dir_name: Error Handling — Try_Catch with Generic Error Responses
+        title: Error Handling — Try/Catch with Generic Error Responses
+        scope: []
+        source_files:
+            - supabase/functions/upload-file/index.ts
+            - supabase/functions/download-file/index.ts
+            - supabase/functions/generate-share-link/index.ts
+            - supabase/functions/validate-folder/index.ts
+            - supabase/functions/delete-file/index.ts
+            - supabase/functions/rename-file/index.ts
+            - web/src/contexts/AuthContext.jsx
+            - web/src/App.jsx
+            - web/src/pages/AccessDeniedPage.jsx
+            - web/src/pages/FileNotFoundPage.jsx
+            - web/src/pages/AuthCallback.jsx
+        children: []
+        depends_on: []
+        related_to: []
+    frontend_style:
+        dir_name: Tailwind CSS Utility-First Styling with Custom Design Tokens
+        title: Tailwind CSS Utility-First Styling with Custom Design Tokens
+        scope: []
+        source_files:
+            - web/tailwind.config.js
+            - web/src/index.css
+            - web/postcss.config.js
+            - web/package.json
+            - web/src/pages/LandingPage.jsx
+        children: []
+        depends_on: []
+        related_to: []
+    supabase_backend:
+        dir_name: Supabase Backend Services & Schema
+        title: Supabase Backend Services & Schema
+        scope:
+            - supabase/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: web_frontend/admin
+            - path: web_frontend/auth
+            - path: web_frontend/file_management
+    web_frontend:
+        dir_name: Neo Files Transfer Web Client
+        title: Neo Files Transfer Web Client
+        scope:
+            - web/
+        source_files: []
+        children:
+            - web_frontend/admin
+            - web_frontend/auth
+            - web_frontend/core
+            - web_frontend/file_management
+        depends_on: []
+        related_to: []
+    web_frontend/admin:
+        dir_name: Admin Portal & User Management
+        title: Admin Portal & User Management
+        scope:
+            - web/src/pages/AdminLoginPage.jsx
+            - web/src/pages/AdminDashboardPage.jsx
+            - web/src/layouts/AdminLayout.jsx
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: supabase_backend
+    web_frontend/auth:
+        dir_name: Authentication & Authorization
+        title: Authentication & Authorization
+        scope:
+            - web/src/pages/LoginPage.jsx
+            - web/src/pages/AuthCallback.jsx
+            - web/src/pages/AccessDeniedPage.jsx
+            - web/src/contexts/AuthContext.jsx
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: supabase_backend
+    web_frontend/core:
+        dir_name: Application Shell & Routing Core
+        title: Application Shell & Routing Core
+        scope:
+            - web/src/App.jsx
+            - web/src/main.jsx
+            - web/src/layouts/MainLayout.jsx
+            - web/src/pages/LandingPage.jsx
+            - web/src/pages/FileNotFoundPage.jsx
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    web_frontend/file_management:
+        dir_name: File Management & Sharing Dashboard
+        title: File Management & Sharing Dashboard
+        scope:
+            - web/src/pages/DashboardPage.jsx
+            - web/src/pages/FilesPage.jsx
+            - web/src/pages/DownloadPage.jsx
+            - web/src/pages/VersionPage.jsx
+            - web/src/pages/SettingsPage.jsx
+            - web/src/layouts/DashboardLayout.jsx
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: supabase_backend

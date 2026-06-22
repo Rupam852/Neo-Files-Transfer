@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: web_frontend/auth
+title: Authentication & Authorization
+scope:
+    - web/src/pages/LoginPage.jsx
+    - web/src/pages/AuthCallback.jsx
+    - web/src/pages/AccessDeniedPage.jsx
+    - web/src/contexts/AuthContext.jsx
+source_files: []
+depends_on: []
+related_to:
+    - path: supabase_backend

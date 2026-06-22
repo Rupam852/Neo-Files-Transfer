@@ -1,0 +1,4 @@
+- Entry Point: `web/src/main.jsx` initializes the React root and wraps the application with `QueryClientProvider` (TanStack Query), `BrowserRouter` (React Router), and `AuthProvider` (custom context).
+- Routing Strategy: `web/src/App.jsx` serves as the central routing hub, defining nested routes for different user roles (Public via `MainLayout`, Admin via `AdminLayout`, Protected via `DashboardLayout`).
+- Layout Composition: Uses React Router's `<Outlet />` pattern in layout components like `web/src/layouts/MainLayout.jsx` to render child routes dynamically.
+- Error Handling: Includes a catch-all route (`*`) rendering `FileNotFoundPage` and specific error routes like `AccessDeniedPage`.

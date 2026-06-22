@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: configuration_system
+title: Configuration System
+scope: []
+source_files:
+    - supabase/config.toml
+    - web/.env
+    - web/vite.config.js
+    - web/src/services/supabase.js
+    - web/src/utils/helpers.js
+depends_on: []
+related_to: []

@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: web_frontend/core
+title: Application Shell & Routing Core
+scope:
+    - web/src/App.jsx
+    - web/src/main.jsx
+    - web/src/layouts/MainLayout.jsx
+    - web/src/pages/LandingPage.jsx
+    - web/src/pages/FileNotFoundPage.jsx
+source_files: []
+depends_on: []
+related_to: []

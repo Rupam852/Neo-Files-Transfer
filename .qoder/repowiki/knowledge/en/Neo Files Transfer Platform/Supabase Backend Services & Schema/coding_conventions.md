@@ -1,0 +1,3 @@
+- All Edge Functions implement standard CORS headers and handle HTTP OPTIONS preflight requests explicitly before processing business logic.
+- Edge Functions consistently initialize the Supabase client using `SUPABASE_URL` and `SUPABASE_ANON_KEY` environment variables, injecting the request's Authorization header for context.
+- Error handling in Edge Functions follows a uniform pattern: catching exceptions and returning a JSON response with an 'error' field and a 400 status code.

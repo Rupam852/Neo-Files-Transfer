@@ -1,0 +1,3 @@
+- Centralized routing in `App.jsx` segments the UI into public, protected (user), and admin namespaces, enforcing access control via `ProtectedRoute` and `AdminRoute` wrappers that consume the global `AuthContext`.
+- Global state and side-effects are managed at the root (`main.jsx`) using `AuthProvider` for session identity and `QueryClient` for server-state caching, ensuring consistent data flow across all child modules.
+- A singleton Supabase client (`services/supabase.js`) serves as the exclusive data gateway for all child modules, abstracting backend interactions for auth, file storage, and admin queries.

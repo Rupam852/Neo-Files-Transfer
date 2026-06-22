@@ -1,0 +1,50 @@
+schema_version: 1
+module_path: ""
+title: Neo Files Transfer Platform
+scope:
+    - .gitignore
+    - NEO FILES TRANSFER.docx
+    - supabase\config.toml
+    - supabase\functions\delete-file\index.ts
+    - supabase\functions\download-file\index.ts
+    - supabase\functions\generate-share-link\index.ts
+    - supabase\functions\rename-file\index.ts
+    - supabase\functions\upload-file\index.ts
+    - supabase\functions\upload-version\index.ts
+    - supabase\functions\validate-folder\index.ts
+    - supabase\migrations\001_initial_schema.sql
+    - web\.env
+    - web\.gitignore
+    - web\index.html
+    - web\package-lock.json
+    - web\package.json
+    - web\postcss.config.js
+    - web\public\favicon.svg
+    - web\src\App.jsx
+    - web\src\assets\hero.png
+    - web\src\contexts\AuthContext.jsx
+    - web\src\index.css
+    - web\src\layouts\AdminLayout.jsx
+    - web\src\layouts\DashboardLayout.jsx
+    - web\src\layouts\MainLayout.jsx
+    - web\src\main.jsx
+    - web\src\pages\AccessDeniedPage.jsx
+    - web\src\pages\AdminDashboardPage.jsx
+    - web\src\pages\AdminLoginPage.jsx
+    - web\src\pages\AuthCallback.jsx
+    - web\src\pages\DashboardPage.jsx
+    - web\src\pages\DownloadPage.jsx
+    - web\src\pages\FileNotFoundPage.jsx
+    - web\src\pages\FilesPage.jsx
+    - web\src\pages\LandingPage.jsx
+    - web\src\pages\LoginPage.jsx
+    - web\src\pages\SettingsPage.jsx
+    - web\src\pages\SharedFilesPage.jsx
+    - web\src\pages\VersionPage.jsx
+    - web\src\services\supabase.js
+    - web\src\utils\helpers.js
+    - web\tailwind.config.js
+    - web\vite.config.js
+source_files: []
+depends_on: []
+related_to: []

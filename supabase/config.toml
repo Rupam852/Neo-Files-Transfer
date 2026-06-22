@@ -1,0 +1,20 @@
+[functions.validate-folder]
+verify_jwt = true
+
+[functions.upload-file]
+verify_jwt = true
+
+[functions.rename-file]
+verify_jwt = true
+
+[functions.delete-file]
+verify_jwt = true
+
+[functions.generate-share-link]
+verify_jwt = true
+
+[functions.download-file]
+verify_jwt = false
+
+[functions.upload-version]
+verify_jwt = true

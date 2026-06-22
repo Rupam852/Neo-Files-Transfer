@@ -1,0 +1,3 @@
+- **React Router v6**: Manages nested routing and protected route wrappers (`ProtectedRoute`, `AdminRoute`) in `App.jsx`.
+- **Supabase Client**: Used for authentication state (`useAuth`), database queries (`shared_files`, `file_versions`), and real-time potential.
+- **Lucide React**: Provides consistent iconography across the dashboard UI.

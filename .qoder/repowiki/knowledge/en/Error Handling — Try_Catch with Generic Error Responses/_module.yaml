@@ -1,0 +1,18 @@
+schema_version: 1
+module_path: error_handling
+title: Error Handling — Try/Catch with Generic Error Responses
+scope: []
+source_files:
+    - supabase/functions/upload-file/index.ts
+    - supabase/functions/download-file/index.ts
+    - supabase/functions/generate-share-link/index.ts
+    - supabase/functions/validate-folder/index.ts
+    - supabase/functions/delete-file/index.ts
+    - supabase/functions/rename-file/index.ts
+    - web/src/contexts/AuthContext.jsx
+    - web/src/App.jsx
+    - web/src/pages/AccessDeniedPage.jsx
+    - web/src/pages/FileNotFoundPage.jsx
+    - web/src/pages/AuthCallback.jsx
+depends_on: []
+related_to: []

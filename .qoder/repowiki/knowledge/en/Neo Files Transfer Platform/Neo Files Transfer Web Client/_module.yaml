@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: web_frontend
+title: Neo Files Transfer Web Client
+scope:
+    - web/
+source_files: []
+depends_on: []
+related_to: []

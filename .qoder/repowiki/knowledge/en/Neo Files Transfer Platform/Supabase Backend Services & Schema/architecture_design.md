@@ -1,0 +1,4 @@
+- **Edge Function Layer**: Implements serverless business logic in TypeScript (Deno) for file lifecycle management (upload, download, rename, delete) and Google Drive integration. Each function resides in an isolated directory under `supabase/functions/`.
+- **Data Persistence Layer**: Utilizes a single migration script (`001_initial_schema.sql`) to define the PostgreSQL schema, including tables for user profiles, file versions, activity logs, and system settings.
+- **Security Boundary**: Enforces access control through Supabase Row Level Security (RLS) policies directly in the database layer, complemented by JWT verification toggles in `config.toml` for specific Edge Functions.
+- **Configuration**: Centralized service configuration in `config.toml` dictates authentication requirements (`verify_jwt`) for each function endpoint.

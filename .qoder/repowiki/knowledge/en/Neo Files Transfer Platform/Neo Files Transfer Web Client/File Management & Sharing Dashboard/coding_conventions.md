@@ -1,0 +1,4 @@
+- Direct Edge Function Invocation: Complex file operations (upload, rename, delete) bypass the Supabase client in favor of direct `fetch` calls to Supabase Edge Functions, passing the session token in the `Authorization` header.
+- Local State-Driven Modals: UI interactions like renaming, deleting, or sharing are managed via local component state (e.g., `renameModal`, `deleteConfirm`) that conditionally renders inline modal components rather than using a global store.
+- Custom Event Triggers: Cross-component actions, such as triggering the upload dialog from the dashboard or layout, are coordinated using `window.dispatchEvent` with custom events (e.g., `trigger-upload`).
+- Optimistic UI Updates with Reloads: After successful mutations (upload, rename, versioning), the UI typically triggers a full data reload (`loadFiles()`) to ensure consistency with the backend state rather than manually patching the local array.
