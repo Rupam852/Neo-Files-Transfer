@@ -70,7 +70,7 @@ export default function AdminDashboardPage() {
       fetchData()
     } catch (err) {
       console.error(err)
-      toast.error('Failed to approve user')
+      toast.error(`Failed to approve user: ${err.message || JSON.stringify(err)}`)
     }
   }
 
