@@ -63,9 +63,9 @@ export default function AuthCallback() {
 
       // Redirect based on role
       if (admin) {
-        navigate('/admin/dashboard')
+        navigate('/')
       } else {
-        navigate('/dashboard')
+        navigate('/')
       }
     }
 

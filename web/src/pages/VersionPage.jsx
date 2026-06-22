@@ -6,10 +6,12 @@ import toast from 'react-hot-toast'
 import { ArrowLeft, Upload, Check, Clock } from 'lucide-react'
 import { formatFileSize, formatDate } from '../utils/helpers'
 
-export default function VersionPage() {
-  const { fileId } = useParams()
+export default function VersionPage({ fileId: propFileId, onBack }) {
+  const { fileId: paramFileId } = useParams()
+  const fileId = propFileId || paramFileId
   const { user, profile } = useAuth()
   const navigate = useNavigate()
+  const goBack = onBack || (() => navigate('/dashboard/files'))
   const fileInputRef = useRef(null)
   const [file, setFile] = useState(null)
   const [versions, setVersions] = useState([])
@@ -127,7 +129,7 @@ export default function VersionPage() {
     return (
       <div className="card text-center py-12">
         <p className="text-gray-400">File not found.</p>
-        <button onClick={() => navigate('/dashboard/files')} className="btn-primary mt-4 text-sm">
+        <button onClick={() => goBack()} className="btn-primary mt-4 text-sm">
           Back to Files
         </button>
       </div>
@@ -139,7 +141,7 @@ export default function VersionPage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => navigate('/dashboard/files')}
+          onClick={() => goBack()}
           className="p-2 hover:bg-dark-500 rounded-lg"
         >
           <ArrowLeft size={20} className="text-gray-400" />

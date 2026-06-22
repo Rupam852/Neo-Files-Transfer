@@ -4,9 +4,19 @@ import { supabase } from '../services/supabase'
 import { Files, Share2, Globe, Download, FolderOpen } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-export default function DashboardPage() {
+export default function DashboardPage({ onNavigate }) {
   const { profile } = useAuth()
   const navigate = useNavigate()
+  
+  function goTo(path) {
+    if (onNavigate) {
+      const tab = path.split('/').pop() || 'dashboard'
+      onNavigate(tab)
+    } else {
+      navigate(path)
+    }
+  }
+
   const [stats, setStats] = useState({
     totalFiles: 0,
     publicLinks: 0,
@@ -44,6 +54,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Welcome */}
       <div>
         <h1 className="text-2xl font-bold text-gray-50">
           Welcome, {profile?.name || 'User'}
@@ -64,7 +75,7 @@ export default function DashboardPage() {
             </p>
           </div>
           <button
-            onClick={() => navigate('/dashboard/settings')}
+            onClick={() => goTo('/dashboard/settings')}
             className="btn-primary text-xs py-1.5 px-3"
           >
             Configure
@@ -109,7 +120,7 @@ export default function DashboardPage() {
         <h2 className="font-semibold text-gray-100 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <button
-            onClick={() => navigate('/dashboard/files')}
+            onClick={() => goTo('/dashboard/files')}
             className="flex flex-col items-center gap-2 p-4 rounded-xl border border-dark-400 hover:bg-dark-500 transition-colors"
           >
             <div className="w-10 h-10 bg-dark-500 border-dark-400 hover:bg-dark-400 rounded-lg flex items-center justify-center">
@@ -118,7 +129,7 @@ export default function DashboardPage() {
             <span className="text-sm font-medium text-gray-200">My Files</span>
           </button>
           <button
-            onClick={() => navigate('/dashboard/shared')}
+            onClick={() => goTo('/dashboard/shared')}
             className="flex flex-col items-center gap-2 p-4 rounded-xl border border-dark-400 hover:bg-dark-500 transition-colors"
           >
             <div className="w-10 h-10 bg-dark-500 border-dark-400 rounded-lg flex items-center justify-center">
@@ -128,7 +139,7 @@ export default function DashboardPage() {
           </button>
           <button
             onClick={() => {
-              navigate('/dashboard/files')
+              goTo('/dashboard/files')
               window.dispatchEvent(new CustomEvent('trigger-upload'))
             }}
             className="flex flex-col items-center gap-2 p-4 rounded-xl border border-dark-400 hover:bg-dark-500 transition-colors"
@@ -139,7 +150,7 @@ export default function DashboardPage() {
             <span className="text-sm font-medium text-gray-200">Upload</span>
           </button>
           <button
-            onClick={() => navigate('/dashboard/settings')}
+            onClick={() => goTo('/dashboard/settings')}
             className="flex flex-col items-center gap-2 p-4 rounded-xl border border-dark-400 hover:bg-dark-500 transition-colors"
           >
             <div className="w-10 h-10 bg-dark-500 border-dark-400 rounded-lg flex items-center justify-center">

@@ -10,7 +10,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user && !loading) {
-      navigate('/dashboard')
+      navigate('/')
     }
   }, [user, loading, navigate])
 

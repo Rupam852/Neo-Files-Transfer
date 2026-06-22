@@ -14,31 +14,9 @@ import AccessDeniedPage from './pages/AccessDeniedPage'
 import FileNotFoundPage from './pages/FileNotFoundPage'
 import DownloadPage from './pages/DownloadPage'
 
-// Protected Pages
-import DashboardPage from './pages/DashboardPage'
-import FilesPage from './pages/FilesPage'
-import SharedFilesPage from './pages/SharedFilesPage'
-import SettingsPage from './pages/SettingsPage'
-import VersionPage from './pages/VersionPage'
-
 // Admin Pages
 import AdminLoginPage from './pages/AdminLoginPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
-
-function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth()
-  if (loading) return <LoadingScreen />
-  if (!user) return <Navigate to="/login" replace />
-  return children
-}
-
-function AdminRoute({ children }) {
-  const { user, isAdmin, loading } = useAuth()
-  if (loading) return <LoadingScreen />
-  if (!user) return <Navigate to="/admin" replace />
-  if (!isAdmin) return <Navigate to="/admin" replace />
-  return children
-}
 
 function LoadingScreen() {
   return (
@@ -51,33 +29,36 @@ function LoadingScreen() {
   )
 }
 
+// HomeRoute resolves the base URL page dynamically based on login and roles
+function HomeRoute() {
+  const { user, isAdmin, loading } = useAuth()
+
+  if (loading) return <LoadingScreen />
+
+  if (!user) {
+    return <LandingPage />
+  }
+
+  if (isAdmin) {
+    return <AdminDashboardPage />
+  }
+
+  return <DashboardLayout />
+}
+
 export default function App() {
   return (
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<MainLayout />}>
-        <Route index element={<LandingPage />} />
+        <Route index element={<HomeRoute />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="auth/callback" element={<AuthCallback />} />
       </Route>
 
-      {/* Admin Routes */}
+      {/* Admin Route */}
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminLoginPage />} />
-        <Route path="dashboard" element={
-          <AdminRoute><AdminDashboardPage /></AdminRoute>
-        } />
-      </Route>
-
-      {/* Protected Routes */}
-      <Route path="/dashboard" element={
-        <ProtectedRoute><DashboardLayout /></ProtectedRoute>
-      }>
-        <Route index element={<DashboardPage />} />
-        <Route path="files" element={<FilesPage />} />
-        <Route path="shared" element={<SharedFilesPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="files/:fileId/versions" element={<VersionPage />} />
       </Route>
 
       {/* Download Routes */}

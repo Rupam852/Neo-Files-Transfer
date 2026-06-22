@@ -32,7 +32,7 @@ const ICON_MAP = {
   'file': File,
 }
 
-export default function FilesPage() {
+export default function FilesPage({ onViewVersions }) {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
@@ -457,7 +457,11 @@ export default function FilesPage() {
                               </button>
                               <button
                                 onClick={() => {
-                                  navigate(`/dashboard/files/${file.id}/versions`)
+                                  if (onViewVersions) {
+                                    onViewVersions(file.id)
+                                  } else {
+                                    navigate(`/dashboard/files/${file.id}/versions`)
+                                  }
                                   setActiveMenu(null)
                                 }}
                                 className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"

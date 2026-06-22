@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard,
@@ -14,11 +14,18 @@ import {
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 
+// Import Dashboard Pages directly for State-based rendering
+import DashboardPage from '../pages/DashboardPage'
+import FilesPage from '../pages/FilesPage'
+import SharedFilesPage from '../pages/SharedFilesPage'
+import SettingsPage from '../pages/SettingsPage'
+import VersionPage from '../pages/VersionPage'
+
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/dashboard/files', icon: Files, label: 'Files' },
-  { to: '/dashboard/shared', icon: Share2, label: 'Shared Files' },
-  { to: '/dashboard/settings', icon: Settings, label: 'Settings' },
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { id: 'files', icon: Files, label: 'Files' },
+  { id: 'shared', icon: Share2, label: 'Shared Files' },
+  { id: 'settings', icon: Settings, label: 'Settings' },
 ]
 
 export default function DashboardLayout() {
@@ -27,6 +34,10 @@ export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const profileRef = useRef(null)
+
+  // Tab views state for clean base URL structure
+  const [currentTab, setCurrentTab] = useState(() => localStorage.getItem('activeTab') || 'dashboard')
+  const [selectedFileId, setSelectedFileId] = useState(null)
 
   useEffect(() => {
     function handleClick(e) {
@@ -44,7 +55,8 @@ export default function DashboardLayout() {
   }
 
   function handleUploadClick() {
-    navigate('/dashboard/files')
+    setCurrentTab('files')
+    localStorage.setItem('activeTab', 'files')
     window.dispatchEvent(new CustomEvent('trigger-upload'))
   }
 
@@ -81,22 +93,22 @@ export default function DashboardLayout() {
         {/* Nav */}
         <nav className="p-4 space-y-1">
           {navItems.map(item => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-primary-600/20 text-primary-400'
-                    : 'text-gray-400 hover:bg-dark-500 hover:text-gray-200'
-                }`
-              }
+            <button
+              key={item.id}
+              onClick={() => {
+                setCurrentTab(item.id)
+                localStorage.setItem('activeTab', item.id)
+                setSidebarOpen(false)
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                currentTab === item.id
+                  ? 'bg-primary-600/20 text-primary-400'
+                  : 'text-gray-400 hover:bg-dark-500 hover:text-gray-200'
+              }`}
             >
               <item.icon size={20} />
               {item.label}
-            </NavLink>
+            </button>
           ))}
         </nav>
 
@@ -169,13 +181,16 @@ export default function DashboardLayout() {
                     <p className="text-sm font-medium text-gray-200 truncate">{profile?.name}</p>
                     <p className="text-xs text-gray-400 truncate">{profile?.email}</p>
                   </div>
-                  <NavLink
-                    to="/dashboard/settings"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-dark-500"
+                  <button
+                    onClick={() => {
+                      setCurrentTab('settings')
+                      localStorage.setItem('activeTab', 'settings')
+                      setProfileOpen(false)
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-dark-500 w-full text-left"
                   >
                     <Settings size={16} /> Settings
-                  </NavLink>
+                  </button>
                   <button
                     onClick={handleSignOut}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-dark-500 w-full text-left"
@@ -190,7 +205,11 @@ export default function DashboardLayout() {
 
         {/* Page Content */}
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
-          <Outlet />
+          {currentTab === 'dashboard' && <DashboardPage onNavigate={(tab) => { setCurrentTab(tab); localStorage.setItem('activeTab', tab) }} />}
+          {currentTab === 'files' && <FilesPage onViewVersions={(fileId) => { setSelectedFileId(fileId); setCurrentTab('versions') }} />}
+          {currentTab === 'shared' && <SharedFilesPage />}
+          {currentTab === 'settings' && <SettingsPage />}
+          {currentTab === 'versions' && <VersionPage fileId={selectedFileId} onBack={() => setCurrentTab('files')} />}
         </main>
       </div>
     </div>
