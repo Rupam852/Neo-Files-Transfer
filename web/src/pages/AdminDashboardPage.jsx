@@ -171,8 +171,10 @@ export default function AdminDashboardPage() {
   }
 
   const filteredPending = pendingUsers.filter(u =>
-    u.name?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase())
+    u.status === 'pending' && (
+      u.name?.toLowerCase().includes(search.toLowerCase()) ||
+      u.email?.toLowerCase().includes(search.toLowerCase())
+    )
   )
 
   const filteredApproved = approvedUsers.filter(u =>
