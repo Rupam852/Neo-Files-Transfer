@@ -23,6 +23,7 @@ DROP POLICY IF EXISTS "Authenticated users can update registrations" ON pending_
 DROP POLICY IF EXISTS "Authenticated users can delete registrations" ON pending_registrations;
 DROP POLICY IF EXISTS "Authenticated users can read approved" ON approved_users;
 DROP POLICY IF EXISTS "Authenticated users can insert approved" ON approved_users;
+DROP POLICY IF EXISTS "Authenticated users can delete approved" ON approved_users;
 DROP POLICY IF EXISTS "Authenticated users can read admins" ON admins;
 DROP POLICY IF EXISTS "Authenticated users can insert admin logs" ON admin_activity_logs;
 DROP POLICY IF EXISTS "Authenticated users can read admin logs" ON admin_activity_logs;
@@ -140,6 +141,10 @@ CREATE POLICY "Authenticated users can read approved"
 CREATE POLICY "Authenticated users can insert approved"
   ON approved_users FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated users can delete approved"
+  ON approved_users FOR DELETE
+  USING (auth.role() = 'authenticated');
 
 -- ADMINS
 CREATE POLICY "Authenticated users can read admins"

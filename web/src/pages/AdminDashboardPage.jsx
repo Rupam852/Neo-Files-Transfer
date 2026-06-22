@@ -105,6 +105,40 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function deleteApprovedUser(email) {
+    if (!confirm(`Are you sure you want to delete and revoke approval for ${email}?`)) return
+    try {
+      // Delete from approved_users
+      const { error: approvedError } = await supabase
+        .from('approved_users')
+        .delete()
+        .eq('email', email)
+      
+      if (approvedError) throw approvedError
+
+      // Delete from pending_registrations
+      const { error: pendingError } = await supabase
+        .from('pending_registrations')
+        .delete()
+        .eq('email', email)
+
+      if (pendingError) throw pendingError
+
+      // Log admin activity
+      await supabase.from('admin_activity_logs').insert({
+        admin_id: profile?.id,
+        action: 'user_revoke_approval',
+        details: `Revoked approval and deleted registration for: ${email}`,
+      })
+
+      toast.success(`Approved user ${email} deleted`)
+      fetchData()
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to delete approved user')
+    }
+  }
+
   async function toggleSetting(key) {
     const newVal = !systemSettings[key]
     try {
@@ -343,13 +377,22 @@ export default function AdminDashboardPage() {
                             <td className="px-4 py-3 text-sm font-medium text-gray-100">{user.email}</td>
                             <td className="px-4 py-3 text-sm text-gray-400">{formatDate(user.approved_at)}</td>
                             <td className="px-4 py-3">
-                              <a
-                                href={`mailto:${user.email}`}
-                                className="p-1.5 text-blue-400 hover:bg-dark-500 rounded-lg"
-                                title="Email"
-                              >
-                                <Mail size={16} />
-                              </a>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => deleteApprovedUser(user.email)}
+                                  className="p-1.5 text-red-400 hover:bg-dark-500 rounded-lg"
+                                  title="Revoke Approval & Delete"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                                <a
+                                  href={`mailto:${user.email}`}
+                                  className="p-1.5 text-blue-400 hover:bg-dark-500 rounded-lg"
+                                  title="Email"
+                                >
+                                  <Mail size={16} />
+                                </a>
+                              </div>
                             </td>
                           </tr>
                         ))

@@ -77,7 +77,26 @@ export function AuthProvider({ children }) {
         .eq('user_id', authUser.id)
         .maybeSingle()
 
-      setIsAdmin(!!adminData)
+      const isUserAdmin = !!adminData
+      setIsAdmin(isUserAdmin)
+
+      // If the user is not an admin, check if their email is in the approved_users list
+      if (!isUserAdmin) {
+        const { data: approvedData } = await supabase
+          .from('approved_users')
+          .select('id')
+          .eq('email', authUser.email.toLowerCase())
+          .maybeSingle()
+
+        if (!approvedData) {
+          // If not approved and not admin, revoke local session immediately
+          await supabase.auth.signOut()
+          setUser(null)
+          setProfile(null)
+          setIsAdmin(false)
+          return
+        }
+      }
     } catch (err) {
       console.error('Error loading profile:', err)
     } finally {
