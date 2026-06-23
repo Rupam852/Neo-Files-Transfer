@@ -175,11 +175,11 @@ export default function SharedFilesPage() {
                     type="text"
                     readOnly
                     className="input-field text-xs bg-dark-500 py-2 border-dark-400 select-all"
-                    value={generateDirectDownloadUrl(shareModal.unique_share_hash)}
+                    value={generateDirectDownloadUrl(shareModal.unique_share_hash, shareModal.is_folder)}
                   />
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(generateDirectDownloadUrl(shareModal.unique_share_hash))
+                      navigator.clipboard.writeText(generateDirectDownloadUrl(shareModal.unique_share_hash, shareModal.is_folder))
                       toast.success('Direct download link copied!')
                     }}
                     className="btn-primary py-2 px-4 text-xs font-semibold shrink-0"

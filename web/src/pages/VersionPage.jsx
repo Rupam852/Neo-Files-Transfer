@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Upload, Check, Clock } from 'lucide-react'
+import { ArrowLeft, Upload, Check, Clock, X } from 'lucide-react'
 import { formatFileSize, formatDate, formatErrorMessage } from '../utils/helpers'
 
 export default function VersionPage({ fileId: propFileId, onBack }) {
@@ -13,7 +13,19 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
   const navigate = useNavigate()
   const goBack = onBack || (() => navigate('/dashboard/files'))
   const fileInputRef = useRef(null)
+  const activeXhrRef = useRef(null)
+  const isCancelledRef = useRef(false)
   const [file, setFile] = useState(null)
+
+  function handleCancelUpload() {
+    isCancelledRef.current = true
+    if (activeXhrRef.current) {
+      activeXhrRef.current.abort()
+      activeXhrRef.current = null
+    }
+    setUploading(false)
+    setProcessingText(null)
+  }
   const [versions, setVersions] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -68,6 +80,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
       return
     }
 
+    isCancelledRef.current = false
     setUploading(true)
     setProcessingText('Uploading version (0%)...')
     try {
@@ -139,6 +152,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
 
             // Step 2: Upload raw file stream via XHR to track progress
             const xhr = new XMLHttpRequest()
+            activeXhrRef.current = xhr
             xhr.open('PUT', uploadUrl)
             
             xhr.upload.addEventListener('progress', (e) => {
@@ -149,6 +163,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
             })
 
             xhr.onload = async () => {
+              activeXhrRef.current = null
               if (xhr.status >= 200 && xhr.status < 300) {
                 try {
                   const driveData = JSON.parse(xhr.responseText)
@@ -177,8 +192,14 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
               }
             }
 
-            xhr.onerror = () => reject(new Error('Upload failed. Connection interrupted.'))
-            xhr.onabort = () => reject(new Error('Upload aborted.'))
+            xhr.onerror = () => {
+              activeXhrRef.current = null
+              reject(new Error('Upload failed. Connection interrupted.'))
+            }
+            xhr.onabort = () => {
+              activeXhrRef.current = null
+              reject(new Error('Upload aborted.'))
+            }
 
             xhr.send(selectedFile)
           })()
@@ -186,6 +207,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
         } else {
           // Fallback to old Supabase Edge Function path (100MB limit)
           const xhr = new XMLHttpRequest()
+          activeXhrRef.current = xhr
           const uploadUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-version`
 
           xhr.open('POST', uploadUrl)
@@ -200,6 +222,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
           })
 
           xhr.onload = () => {
+            activeXhrRef.current = null
             if (xhr.status >= 200 && xhr.status < 300) {
               try {
                 resolve(JSON.parse(xhr.responseText))
@@ -216,8 +239,14 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
             }
           }
 
-          xhr.onerror = () => reject(new Error('Network error. Connection failed.'))
-          xhr.onabort = () => reject(new Error('Upload aborted.'))
+          xhr.onerror = () => {
+            activeXhrRef.current = null
+            reject(new Error('Network error. Connection failed.'))
+          }
+          xhr.onabort = () => {
+            activeXhrRef.current = null
+            reject(new Error('Upload aborted.'))
+          }
 
           const formData = new FormData()
           formData.append('file', selectedFile)
@@ -268,7 +297,11 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
       loadData()
     } catch (err) {
       console.error(err)
-      toast.error(formatErrorMessage(err))
+      if (isCancelledRef.current) {
+        toast.error('Upload cancelled')
+      } else {
+        toast.error(formatErrorMessage(err))
+      }
     } finally {
       setUploading(false)
       setProcessingText(null)
@@ -384,9 +417,21 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
       {/* Global Processing Loader Spinner */}
       {processingText && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-dark-600 border border-dark-400 rounded-2xl max-w-xs w-full p-6 space-y-4 shadow-2xl animate-scale-in text-center">
-            <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-gray-200 text-sm font-medium font-['Space_Grotesk'] tracking-wide">
+          <div className="bg-dark-600 border border-dark-400 rounded-2xl max-w-xs w-full p-6 space-y-4 shadow-2xl animate-scale-in text-center relative">
+            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+              <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+              {uploading && (
+                <button
+                  type="button"
+                  onClick={handleCancelUpload}
+                  className="absolute top-0 right-0 bg-dark-500 hover:bg-red-500/20 text-gray-400 hover:text-red-400 border border-dark-300 hover:border-red-500/30 rounded-full p-1.5 transition-all duration-200 shadow-lg cursor-pointer"
+                  title="Cancel Upload"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            <p className="text-gray-200 text-sm font-medium font-['Space_Grotesk'] tracking-wide select-none">
               {processingText}
             </p>
           </div>

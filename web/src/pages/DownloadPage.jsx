@@ -89,7 +89,7 @@ export default function DownloadPage() {
     if (!fileInfo) return
 
     try {
-      const directUrl = generateDirectDownloadUrl(hash)
+      const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder)
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
       const fileLimit = isMobile 
         ? 100 * 1024 * 1024  // 100MB limit for mobile to avoid RAM crashes
@@ -460,7 +460,7 @@ export default function DownloadPage() {
               </button>
               <button
                 onClick={() => {
-                  const directUrl = generateDirectDownloadUrl(hash)
+                  const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder)
                   window.location.href = directUrl
                 }}
                 className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-200"

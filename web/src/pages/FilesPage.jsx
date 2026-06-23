@@ -94,6 +94,19 @@ export default function FilesPage({ onViewVersions }) {
   const [moveModal, setMoveModal] = useState(false)
   const [allFolders, setAllFolders] = useState([])
   const lastSelectedIdx = useRef(null)
+  const activeXhrRef = useRef(null)
+  const isCancelledRef = useRef(false)
+
+  function handleCancelUpload() {
+    isCancelledRef.current = true
+    if (activeXhrRef.current) {
+      activeXhrRef.current.abort()
+      activeXhrRef.current = null
+    }
+    setUploading(false)
+    setProcessingText(null)
+    setUploadQueue([])
+  }
 
   function handleOpenFolder(folder) {
     setCurrentFolder(folder)
@@ -258,12 +271,14 @@ export default function FilesPage({ onViewVersions }) {
   }
 
   async function uploadBatch(batch) {
+    isCancelledRef.current = false
     setUploading(true)
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
     const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
 
     for (let i = 0; i < batch.length; i++) {
+      if (isCancelledRef.current) break
       const item = batch[i]
       const file = item.fileObj ? item.fileObj : item
       const dbParentId = item.dbParentId !== undefined ? item.dbParentId : (currentFolder ? currentFolder.id : null)
@@ -338,6 +353,7 @@ export default function FilesPage({ onViewVersions }) {
           // Step 2: Upload raw file stream via XHR to track progress
           result = await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest()
+            activeXhrRef.current = xhr
             xhr.open('PUT', uploadUrl)
             
             xhr.upload.addEventListener('progress', (e) => {
@@ -348,6 +364,7 @@ export default function FilesPage({ onViewVersions }) {
             })
 
             xhr.onload = () => {
+              activeXhrRef.current = null
               if (xhr.status >= 200 && xhr.status < 300) {
                 try {
                   const driveData = JSON.parse(xhr.responseText)
@@ -360,8 +377,14 @@ export default function FilesPage({ onViewVersions }) {
               }
             }
 
-            xhr.onerror = () => reject(new Error('Upload failed. Connection interrupted.'))
-            xhr.onabort = () => reject(new Error('Upload aborted.'))
+            xhr.onerror = () => {
+              activeXhrRef.current = null
+              reject(new Error('Upload failed. Connection interrupted.'))
+            }
+            xhr.onabort = () => {
+              activeXhrRef.current = null
+              reject(new Error('Upload aborted.'))
+            }
 
             xhr.send(file)
           })
@@ -370,6 +393,7 @@ export default function FilesPage({ onViewVersions }) {
           // Fallback to old Supabase Edge Function path (100MB limit)
           result = await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest()
+            activeXhrRef.current = xhr
             const uploadUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-file`
 
             xhr.open('POST', uploadUrl)
@@ -384,6 +408,7 @@ export default function FilesPage({ onViewVersions }) {
             })
 
             xhr.onload = () => {
+              activeXhrRef.current = null
               if (xhr.status >= 200 && xhr.status < 300) {
                 try {
                   resolve(JSON.parse(xhr.responseText))
@@ -400,8 +425,14 @@ export default function FilesPage({ onViewVersions }) {
               }
             }
 
-            xhr.onerror = () => reject(new Error('Network error. Connection failed.'))
-            xhr.onabort = () => reject(new Error('Upload aborted.'))
+            xhr.onerror = () => {
+              activeXhrRef.current = null
+              reject(new Error('Network error. Connection failed.'))
+            }
+            xhr.onabort = () => {
+              activeXhrRef.current = null
+              reject(new Error('Upload aborted.'))
+            }
 
             const formData = new FormData()
             formData.append('file', file, uniqueName)
@@ -447,6 +478,10 @@ export default function FilesPage({ onViewVersions }) {
         toast.success(`${uniqueName} uploaded successfully`)
       } catch (err) {
         console.error(err)
+        if (isCancelledRef.current) {
+          toast.error('Upload cancelled')
+          break
+        }
         toast.error(`Failed to upload ${file.name}: ${err.message}`)
       }
     }
@@ -603,6 +638,7 @@ export default function FilesPage({ onViewVersions }) {
       return
     }
 
+    isCancelledRef.current = false
     setUploading(true)
     setProcessingText('Analyzing folder structure...')
 
@@ -633,6 +669,7 @@ export default function FilesPage({ onViewVersions }) {
       const pathLookup = {}
 
       for (const path of sortedPaths) {
+        if (isCancelledRef.current) break
         const parts = path.split('/')
         const fName = parts[parts.length - 1]
 
@@ -689,6 +726,10 @@ export default function FilesPage({ onViewVersions }) {
         pathLookup[path] = { dbId: dbRow.id, driveId: result.file_id }
       }
 
+      if (isCancelledRef.current) {
+        throw new Error('Upload cancelled')
+      }
+
       const filesToUpload = filesUploaded.map(file => {
         const parts = file.webkitRelativePath.split('/')
         parts.pop()
@@ -709,6 +750,7 @@ export default function FilesPage({ onViewVersions }) {
       let currentBatchSize = 0
 
       for (const item of filesToUpload) {
+        if (isCancelledRef.current) break
         if (BLOCKED_EXTENSIONS.includes(item.fileObj.name.split('.').pop().toLowerCase())) {
           continue
         }
@@ -734,7 +776,11 @@ export default function FilesPage({ onViewVersions }) {
 
     } catch (err) {
       console.error(err)
-      toast.error(formatErrorMessage(err))
+      if (isCancelledRef.current) {
+        toast.error('Upload cancelled')
+      } else {
+        toast.error(formatErrorMessage(err))
+      }
     } finally {
       setUploading(false)
       setProcessingText(null)
@@ -1455,11 +1501,11 @@ export default function FilesPage({ onViewVersions }) {
                       type="text"
                       readOnly
                       className={`input-field text-xs bg-dark-500 py-2 border-dark-400 select-all transition-opacity ${shareModal.sharing_status === 'private' ? 'opacity-50' : ''}`}
-                      value={generateDirectDownloadUrl(shareModal.unique_share_hash)}
+                      value={generateDirectDownloadUrl(shareModal.unique_share_hash, shareModal.is_folder)}
                     />
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(generateDirectDownloadUrl(shareModal.unique_share_hash))
+                        navigator.clipboard.writeText(generateDirectDownloadUrl(shareModal.unique_share_hash, shareModal.is_folder))
                         toast.success('Direct download link copied!')
                       }}
                       className="btn-primary py-2 px-4 text-xs font-semibold shrink-0"
@@ -1547,9 +1593,21 @@ export default function FilesPage({ onViewVersions }) {
       {/* Global Processing Loader Spinner */}
       {processingText && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-dark-600 border border-dark-400 rounded-2xl max-w-xs w-full p-6 space-y-4 shadow-2xl animate-scale-in text-center">
-            <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-gray-200 text-sm font-medium font-['Space_Grotesk'] tracking-wide">
+          <div className="bg-dark-600 border border-dark-400 rounded-2xl max-w-xs w-full p-6 space-y-4 shadow-2xl animate-scale-in text-center relative">
+            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+              <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+              {uploading && (
+                <button
+                  type="button"
+                  onClick={handleCancelUpload}
+                  className="absolute top-0 right-0 bg-dark-500 hover:bg-red-500/20 text-gray-400 hover:text-red-400 border border-dark-300 hover:border-red-500/30 rounded-full p-1.5 transition-all duration-200 shadow-lg cursor-pointer"
+                  title="Cancel Upload"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            <p className="text-gray-200 text-sm font-medium font-['Space_Grotesk'] tracking-wide select-none">
               {processingText}
             </p>
           </div>
