@@ -111,7 +111,7 @@ export default function LandingPage() {
           <div className="lg:col-span-6 space-y-8 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full text-xs font-semibold uppercase tracking-wider animate-fade-in-up">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
-              v1.0 Live Proxy Storage
+              Live Proxy Storage
             </div>
             
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1] font-['Space_Grotesk'] animate-fade-in-up animation-delay-100">
@@ -352,7 +352,7 @@ export default function LandingPage() {
                 <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-xs">NF</span>
                 </div>
-                <span className="text-xs text-gray-500">Neo Files Transfer v1.0 • Built with Supabase & Google Drive</span>
+                <span className="text-xs text-gray-500">Neo Files Transfer • Built with Supabase & Google Drive</span>
               </div>
               <span className="text-[11px] text-gray-600 font-medium sm:pl-10">
                 Support & Developer: <a href="mailto:rupambairagya08@gmail.com" className="text-indigo-400 hover:text-indigo-300 hover:underline font-mono">rupambairagya08@gmail.com</a>

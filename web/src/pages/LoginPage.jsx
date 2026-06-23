@@ -83,9 +83,8 @@ export default function LoginPage() {
           </div>
 
           {/* Footer inside Left Panel */}
-          <div className="z-10 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+          <div className="z-10 flex items-center justify-center text-[11px] text-slate-500 font-medium">
             <span>Neo Files Transfer</span>
-            <span>v1.0</span>
           </div>
         </div>
 
