@@ -293,8 +293,6 @@ export default function FilesPage({ onViewVersions }) {
         const result = await res.json()
         if (!res.ok) throw new Error(result.error || 'Upload failed')
 
-        const shareHash = crypto.randomUUID().replace(/-/g, '').substring(0, 12)
-
         const { error: insertError } = await supabase.from('shared_files').insert({
           user_id: user.id,
           google_drive_file_id: result.file_id,
@@ -302,7 +300,6 @@ export default function FilesPage({ onViewVersions }) {
           file_size: file.size,
           mime_type: file.type,
           current_version_num: 1,
-          unique_share_hash: shareHash,
           sharing_status: 'private',
           parent_folder_id: dbParentId,
         })
@@ -446,7 +443,6 @@ export default function FilesPage({ onViewVersions }) {
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Failed to create folder')
 
-      const shareHash = crypto.randomUUID().replace(/-/g, '').substring(0, 12)
       const { error: insertError } = await supabase.from('shared_files').insert({
         user_id: user.id,
         google_drive_file_id: result.file_id,
@@ -454,7 +450,6 @@ export default function FilesPage({ onViewVersions }) {
         mime_type: 'application/vnd.google-apps.folder',
         is_folder: true,
         current_version_num: 1,
-        unique_share_hash: shareHash,
         sharing_status: 'private',
         parent_folder_id: currentFolder ? currentFolder.id : null,
       })
@@ -553,7 +548,6 @@ export default function FilesPage({ onViewVersions }) {
         const result = await res.json()
         if (!res.ok) throw new Error(result.error || `Failed to create folder ${fName}`)
 
-        const shareHash = crypto.randomUUID().replace(/-/g, '').substring(0, 12)
         const { data: dbRow, error: insertError } = await supabase
           .from('shared_files')
           .insert({
@@ -563,7 +557,6 @@ export default function FilesPage({ onViewVersions }) {
             mime_type: 'application/vnd.google-apps.folder',
             is_folder: true,
             current_version_num: 1,
-            unique_share_hash: shareHash,
             sharing_status: 'private',
             parent_folder_id: parentDbId,
           })
@@ -1216,63 +1209,112 @@ export default function FilesPage({ onViewVersions }) {
         <Modal onClose={() => setShareModal(null)}>
           <div className="space-y-5 font-sans">
             <div>
-              <h3 className="font-semibold text-gray-100 text-lg font-['Space_Grotesk'] mb-1">Share File</h3>
+              <h3 className="font-semibold text-gray-100 text-lg font-['Space_Grotesk'] mb-1">
+                {shareModal.is_folder ? 'Share Folder' : 'Share File'}
+              </h3>
               <p className="text-xs text-gray-400 truncate">{shareModal.file_name}</p>
             </div>
 
-            {/* Option A: Web Share Link */}
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
-                Option A: Web Download Page Link
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  className="input-field text-xs bg-dark-500 py-2 border-dark-400 select-all"
-                  value={generateShareUrl(shareModal.unique_share_hash)}
-                />
+            {!shareModal.unique_share_hash ? (
+              /* No link generated yet — show generate button */
+              <div className="space-y-4">
+                <div className="bg-dark-500 border border-dark-400 rounded-xl p-4 text-center space-y-3">
+                  <div className="w-12 h-12 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center justify-center mx-auto text-indigo-400">
+                    <Share2 size={22} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-200">No share link yet</p>
+                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                      Generate a permanent share link for this {shareModal.is_folder ? 'folder' : 'file'}.
+                      The link will be stored and can be copied anytime from this menu.
+                    </p>
+                  </div>
+                </div>
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(generateShareUrl(shareModal.unique_share_hash))
-                    toast.success('Web download link copied!')
+                  onClick={async () => {
+                    try {
+                      const newHash = crypto.randomUUID().replace(/-/g, '').substring(0, 12)
+                      const { error } = await supabase
+                        .from('shared_files')
+                        .update({ unique_share_hash: newHash, sharing_status: 'public' })
+                        .eq('id', shareModal.id)
+                      if (error) throw error
+                      // Refresh local files list and update modal state with new hash
+                      setShareModal(prev => ({ ...prev, unique_share_hash: newHash, sharing_status: 'public' }))
+                      loadFiles()
+                      toast.success('Share links generated!')
+                    } catch (err) {
+                      toast.error('Failed to generate share link: ' + err.message)
+                    }
                   }}
-                  className="btn-primary py-2 px-4 text-xs font-semibold shrink-0"
+                  className="w-full btn-primary py-3 flex items-center justify-center gap-2 font-semibold"
                 >
-                  Copy
+                  <Share2 size={16} /> Generate Share Links
                 </button>
               </div>
-              <p className="text-[11px] text-gray-400 leading-normal">
-                Opens the beautiful download page with real-time progress bar. Perfect for sharing with users.
-              </p>
-            </div>
+            ) : (
+              /* Links already generated — show permanent links */
+              <>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                  <p className="text-xs text-emerald-400 font-medium">Share links are active and permanent</p>
+                </div>
 
-            {/* Option B: Direct API Download Link */}
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-pink-400 uppercase tracking-wider">
-                Option B: Direct Download Link
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  className="input-field text-xs bg-dark-500 py-2 border-dark-400 select-all"
-                  value={generateDirectDownloadUrl(shareModal.unique_share_hash)}
-                />
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(generateDirectDownloadUrl(shareModal.unique_share_hash))
-                    toast.success('Direct download link copied!')
-                  }}
-                  className="btn-primary py-2 px-4 text-xs font-semibold shrink-0"
-                >
-                  Copy
-                </button>
-              </div>
-              <p className="text-[11px] text-gray-400 leading-normal">
-                Direct stream connection. Clicking this link in any browser or website starts downloading the file instantly in the background without redirecting.
-              </p>
-            </div>
+                {/* Option A: Web Share Link */}
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
+                    Option A: Web Download Page Link
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      className="input-field text-xs bg-dark-500 py-2 border-dark-400 select-all"
+                      value={generateShareUrl(shareModal.unique_share_hash)}
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(generateShareUrl(shareModal.unique_share_hash))
+                        toast.success('Web download link copied!')
+                      }}
+                      className="btn-primary py-2 px-4 text-xs font-semibold shrink-0"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-400 leading-normal">
+                    Opens the beautiful download page with real-time progress bar. Perfect for sharing with users.
+                  </p>
+                </div>
+
+                {/* Option B: Direct API Download Link */}
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-pink-400 uppercase tracking-wider">
+                    Option B: Direct Download Link
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      className="input-field text-xs bg-dark-500 py-2 border-dark-400 select-all"
+                      value={generateDirectDownloadUrl(shareModal.unique_share_hash)}
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(generateDirectDownloadUrl(shareModal.unique_share_hash))
+                        toast.success('Direct download link copied!')
+                      }}
+                      className="btn-primary py-2 px-4 text-xs font-semibold shrink-0"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-400 leading-normal">
+                    Direct stream connection. Clicking this link starts downloading instantly without redirecting.
+                  </p>
+                </div>
+              </>
+            )}
 
             <div className="flex justify-end pt-2">
               <button className="btn-secondary text-xs py-2 px-4" onClick={() => setShareModal(null)}>

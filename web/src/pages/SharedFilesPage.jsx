@@ -22,6 +22,7 @@ export default function SharedFilesPage() {
         .from('shared_files')
         .select('*')
         .eq('user_id', user.id)
+        .not('unique_share_hash', 'is', null)
         .order('created_at', { ascending: false })
 
       setFiles(data || [])
