@@ -397,6 +397,7 @@ export default function FilesPage({ onViewVersions }) {
     let remainingQueue = []
     const uploadLimit = import.meta.env.VITE_PROXY_URL ? 250 * 1024 * 1024 : 100 * 1024 * 1024
     const limitLabel = import.meta.env.VITE_PROXY_URL ? '250MB' : '100MB'
+    let currentBatchSize = 0
 
     for (const file of validFiles) {
       if (file.size > uploadLimit) {
