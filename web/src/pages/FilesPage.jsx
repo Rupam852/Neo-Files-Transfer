@@ -6,6 +6,7 @@ import {
   Search, Upload, MoreVertical, Download, Pencil, Trash2,
   Share2, History, FileText, Image, Video, Archive, Table,
   Presentation, File, SortAsc, Plus, Folder, ChevronRight,
+  CheckSquare, Square, FolderInput, X,
 } from 'lucide-react'
 import { formatFileSize, formatDate, getExtension, generateShareUrl, generateDirectDownloadUrl, formatErrorMessage } from '../utils/helpers'
 import { useNavigate } from 'react-router-dom'
@@ -87,9 +88,129 @@ export default function FilesPage({ onViewVersions }) {
   const [folderCreateModal, setFolderCreateModal] = useState(false)
   const [folderName, setFolderName] = useState('')
 
+  // Multi-select states
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
+  const [moveModal, setMoveModal] = useState(false)
+  const [allFolders, setAllFolders] = useState([])
+  const lastSelectedIdx = useRef(null)
+
   function handleOpenFolder(folder) {
     setCurrentFolder(folder)
     setFolderPath(prev => [...prev, folder])
+    setSelectedIds(new Set())
+  }
+
+  async function loadAllFolders() {
+    const { data } = await supabase
+      .from('shared_files')
+      .select('id, file_name, parent_folder_id')
+      .eq('user_id', user.id)
+      .eq('is_folder', true)
+    setAllFolders(data || [])
+  }
+
+  function toggleSelect(fileId, idx, e) {
+    if (e.shiftKey && lastSelectedIdx.current !== null) {
+      // Shift-click: select range
+      const idxA = Math.min(lastSelectedIdx.current, idx)
+      const idxB = Math.max(lastSelectedIdx.current, idx)
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        filteredFiles.slice(idxA, idxB + 1).forEach(f => next.add(f.id))
+        return next
+      })
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        if (next.has(fileId)) next.delete(fileId)
+        else next.add(fileId)
+        return next
+      })
+    }
+    lastSelectedIdx.current = idx
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === filteredFiles.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredFiles.map(f => f.id)))
+    }
+  }
+
+  async function handleBulkDelete() {
+    setProcessingText(`Deleting ${selectedIds.size} item(s)...`)
+    setBulkDeleteConfirm(false)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
+      const itemsToDelete = files.filter(f => selectedIds.has(f.id))
+
+      for (const item of itemsToDelete) {
+        try {
+          const res = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-file`,
+            {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ file_id: item.google_drive_file_id, provider_token: googleToken }),
+            }
+          )
+          if (!res.ok) {
+            const r = await res.json().catch(() => ({}))
+            console.warn(`Drive delete failed for ${item.file_name}:`, r.error)
+          }
+        } catch (e) {
+          console.warn(`Drive delete error for ${item.file_name}:`, e)
+        }
+        // Always remove from DB even if Drive delete partially failed
+        await supabase.from('file_versions').delete().eq('file_id', item.id)
+        await supabase.from('shared_files').delete().eq('id', item.id)
+      }
+
+      await supabase.from('activity_logs').insert({
+        user_id: user.id,
+        action: 'bulk_delete',
+        details: `Deleted ${itemsToDelete.length} item(s)`,
+      })
+
+      toast.success(`${itemsToDelete.length} item(s) deleted`)
+      setSelectedIds(new Set())
+      loadFiles()
+    } catch (err) {
+      toast.error(formatErrorMessage(err))
+    } finally {
+      setProcessingText(null)
+    }
+  }
+
+  async function handleBulkMove(targetFolderId) {
+    setProcessingText(`Moving ${selectedIds.size} item(s)...`)
+    setMoveModal(false)
+    try {
+      const { error } = await supabase
+        .from('shared_files')
+        .update({ parent_folder_id: targetFolderId })
+        .in('id', Array.from(selectedIds))
+
+      if (error) throw error
+
+      await supabase.from('activity_logs').insert({
+        user_id: user.id,
+        action: 'bulk_move',
+        details: `Moved ${selectedIds.size} item(s)`,
+      })
+
+      toast.success(`${selectedIds.size} item(s) moved successfully`)
+      setSelectedIds(new Set())
+      loadFiles()
+    } catch (err) {
+      toast.error(formatErrorMessage(err))
+    } finally {
+      setProcessingText(null)
+    }
   }
 
   useEffect(() => {
@@ -777,10 +898,51 @@ export default function FilesPage({ onViewVersions }) {
         </div>
       ) : (
         <div className="bg-dark-600 rounded-xl border border-dark-300 overflow-hidden flex-1 flex flex-col">
+          {/* Selection Toolbar */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-primary-500/10 border-b border-primary-500/20 animate-fade-in">
+              <span className="text-sm font-semibold text-primary-400 flex items-center gap-2">
+                <CheckSquare size={15} />
+                {selectedIds.size} selected
+              </span>
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  onClick={() => { loadAllFolders(); setMoveModal(true) }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/20 text-xs font-semibold hover:bg-indigo-500/25 transition-all"
+                >
+                  <FolderInput size={13} /> Move
+                </button>
+                <button
+                  onClick={() => setBulkDeleteConfirm(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-semibold hover:bg-red-500/20 transition-all"
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-dark-400 transition-all"
+                  title="Clear selection"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto flex-grow min-h-[280px]">
             <table className="w-full">
               <thead>
                 <tr className="bg-dark-500 border-b border-dark-300">
+                  <th className="px-4 py-3 w-10">
+                    <button
+                      onClick={toggleSelectAll}
+                      className="text-gray-400 hover:text-primary-400 transition-colors"
+                      title={selectedIds.size === filteredFiles.length ? 'Deselect all' : 'Select all'}
+                    >
+                      {selectedIds.size === filteredFiles.length && filteredFiles.length > 0
+                        ? <CheckSquare size={16} className="text-primary-400" />
+                        : <Square size={16} />}
+                    </button>
+                  </th>
                   <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">File</th>
                   <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3 hidden sm:table-cell">Size</th>
                   <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Version</th>
@@ -790,22 +952,36 @@ export default function FilesPage({ onViewVersions }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-400">
-                {filteredFiles.map(file => {
+                {filteredFiles.map((file, idx) => {
                   const Icon = getIconComponent(file)
+                  const isSelected = selectedIds.has(file.id)
                   return (
-                    <tr 
-                      key={file.id} 
-                      className="hover:bg-dark-500"
+                    <tr
+                      key={file.id}
+                      className={`transition-colors duration-100 ${
+                        isSelected ? 'bg-primary-500/8 hover:bg-primary-500/12' : 'hover:bg-dark-500'
+                      }`}
                       onDoubleClick={() => {
-                        if (file.is_folder) {
-                          handleOpenFolder(file)
-                        }
+                        if (file.is_folder) handleOpenFolder(file)
                       }}
                     >
+                      {/* Checkbox */}
+                      <td className="px-4 py-3 w-10">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleSelect(file.id, idx, e) }}
+                          className="text-gray-500 hover:text-primary-400 transition-colors"
+                        >
+                          {isSelected
+                            ? <CheckSquare size={16} className="text-primary-400" />
+                            : <Square size={16} />}
+                        </button>
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-dark-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <Icon size={16} className="text-gray-400" />
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                            isSelected ? 'bg-primary-500/20' : 'bg-dark-500'
+                          }`}>
+                            <Icon size={16} className={isSelected ? 'text-primary-400' : 'text-gray-400'} />
                           </div>
                           <div className="min-w-0">
                             {file.is_folder ? (
@@ -948,7 +1124,7 @@ export default function FilesPage({ onViewVersions }) {
         </Modal>
       )}
 
-      {/* Delete Confirm Modal */}
+      {/* Delete Confirm Modal (single) */}
       {deleteConfirm && (
         <Modal onClose={() => setDeleteConfirm(null)}>
           <h3 className="font-semibold text-gray-100 mb-2">Delete File</h3>
@@ -959,6 +1135,78 @@ export default function FilesPage({ onViewVersions }) {
           <div className="flex justify-end gap-2">
             <button className="btn-secondary text-sm" onClick={() => setDeleteConfirm(null)}>Cancel</button>
             <button className="btn-danger text-sm" onClick={handleDelete}>Delete</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Bulk Delete Confirm Modal */}
+      {bulkDeleteConfirm && (
+        <Modal onClose={() => setBulkDeleteConfirm(false)}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center text-red-400">
+              <Trash2 size={18} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-100">Delete {selectedIds.size} item(s)?</h3>
+              <p className="text-xs text-gray-400">This cannot be undone.</p>
+            </div>
+          </div>
+          <p className="text-sm text-gray-400 mb-5">
+            You are about to permanently delete <strong className="text-gray-200">{selectedIds.size}</strong> selected file(s) and/or folder(s). All contents and sub-files will also be deleted.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button className="btn-secondary text-sm" onClick={() => setBulkDeleteConfirm(false)}>Cancel</button>
+            <button className="btn-danger text-sm" onClick={handleBulkDelete}>Delete All</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Move To Modal */}
+      {moveModal && (
+        <Modal onClose={() => setMoveModal(false)}>
+          <h3 className="font-semibold text-gray-100 mb-1 text-lg font-['Space_Grotesk']">Move {selectedIds.size} item(s) to...</h3>
+          <p className="text-xs text-gray-400 mb-4">Select a destination folder</p>
+          <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+            {/* Root option */}
+            <button
+              onClick={() => handleBulkMove(null)}
+              disabled={currentFolder === null}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all ${
+                currentFolder === null
+                  ? 'opacity-40 cursor-not-allowed bg-dark-500'
+                  : 'hover:bg-dark-500 text-gray-200'
+              }`}
+            >
+              <Folder size={16} className="text-yellow-400 flex-shrink-0" />
+              <span className="font-medium">Root (My Files)</span>
+              {currentFolder === null && <span className="ml-auto text-xs text-gray-500">current</span>}
+            </button>
+            {/* All folders */}
+            {allFolders
+              .filter(f => !selectedIds.has(f.id))
+              .map(folder => (
+                <button
+                  key={folder.id}
+                  onClick={() => handleBulkMove(folder.id)}
+                  disabled={currentFolder?.id === folder.id}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all ${
+                    currentFolder?.id === folder.id
+                      ? 'opacity-40 cursor-not-allowed bg-dark-500'
+                      : 'hover:bg-dark-500 text-gray-200'
+                  }`}
+                >
+                  <Folder size={16} className="text-yellow-400 flex-shrink-0" />
+                  <span className="truncate">{folder.file_name}</span>
+                  {currentFolder?.id === folder.id && <span className="ml-auto text-xs text-gray-500">current</span>}
+                </button>
+              ))
+            }
+            {allFolders.filter(f => !selectedIds.has(f.id)).length === 0 && currentFolder !== null && (
+              <p className="text-xs text-gray-500 text-center py-4">No other folders available</p>
+            )}
+          </div>
+          <div className="flex justify-end pt-4">
+            <button className="btn-secondary text-sm" onClick={() => setMoveModal(false)}>Cancel</button>
           </div>
         </Modal>
       )}
