@@ -31,13 +31,15 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    // Get user's access token from session
-    const { data: { session } } = await supabaseClient.auth.getSession()
-    if (!session) {
+    // Get user using getUser to verify JWT on the server
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+    if (authError || !user) {
       throw new Error("Not authenticated")
     }
 
-    const accessToken = session.provider_token
+    // Attempt to get provider_token from session if available
+    const { data: { session } } = await supabaseClient.auth.getSession()
+    const accessToken = session?.provider_token
 
     let isValid = false
     let folderName = "Google Drive Folder"
