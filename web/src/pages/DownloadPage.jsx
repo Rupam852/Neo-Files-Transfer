@@ -91,28 +91,29 @@ export default function DownloadPage() {
       const directUrl = generateDirectDownloadUrl(hash)
       const fileLimit = 50 * 1024 * 1024 // 50MB
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-
-
-      // If file is very large or we are on mobile and file is moderately large, bypass streaming to avoid browser memory crashes
-      if (fileInfo.file_size && (fileInfo.file_size > fileLimit || (isMobile && fileInfo.file_size > 15 * 1024 * 1024))) {
-        console.log('Bypassing JS streaming due to size/mobile constraints. Initiating direct browser download.')
+      // Always bypass streaming on mobile to prevent browser memory issues, user-activation gate blocking, and edge function timeouts
+      if (isMobile || (fileInfo.file_size && fileInfo.file_size > fileLimit)) {
+        console.log(isMobile 
+          ? 'Mobile device detected. Bypassing JS streaming to use native browser download manager.'
+          : 'File size exceeds limit. Bypassing JS streaming.'
+        )
         setStatus('downloading')
         setProgress(15)
         
-        setTimeout(() => setProgress(50), 250)
-        setTimeout(() => setProgress(85), 550)
+        setTimeout(() => setProgress(50), 200)
+        setTimeout(() => setProgress(85), 400)
         setTimeout(() => {
           setProgress(100)
           setStatus('saving')
-        }, 850)
+        }, 600)
         
         setTimeout(() => {
           window.location.href = directUrl
-        }, 1500)
+        }, 800)
 
         setTimeout(() => {
           setStatus('completed')
-        }, 7500) // 1.5 seconds setup + 6 seconds saving hold
+        }, 5000) // 800ms setup + 4.2 seconds hold
         return
       }
 
