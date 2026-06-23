@@ -468,11 +468,14 @@ export default function FilesPage({ onViewVersions }) {
                         v{file.current_version_num}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
                           file.sharing_status === 'public'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-400'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                         }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            file.sharing_status === 'public' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                          }`} />
                           {file.sharing_status}
                         </span>
                       </td>

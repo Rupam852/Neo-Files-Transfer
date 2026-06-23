@@ -81,12 +81,12 @@ export default function SharedFilesPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="text-sm font-medium text-gray-100 truncate">{file.file_name}</h3>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
                     file.sharing_status === 'public'
-                      ? 'bg-green-900/30 text-green-400'
-                      : 'bg-dark-500 text-gray-500'
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                   }`}>
-                    {file.sharing_status === 'public' ? <Globe size={12} /> : <Lock size={12} />}
+                    {file.sharing_status === 'public' ? <Globe size={12} className="text-emerald-400 animate-pulse" /> : <Lock size={12} className="text-amber-400" />}
                     {file.sharing_status}
                   </span>
                 </div>
