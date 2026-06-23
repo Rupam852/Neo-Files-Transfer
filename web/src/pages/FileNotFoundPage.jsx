@@ -5,7 +5,7 @@ export default function FileNotFoundPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-dark-800 px-4">
       <div className="text-center max-w-md">
-        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+        <div className="w-16 h-16 bg-dark-500 border border-dark-400 rounded-full flex items-center justify-center mx-auto mb-6">
           <FileX size={32} className="text-gray-400" />
         </div>
         <h1 className="text-4xl font-bold text-gray-50 mb-2">404</h1>

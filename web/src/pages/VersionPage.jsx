@@ -217,7 +217,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
                 <div key={version.id} className="flex items-center justify-between px-4 py-3 hover:bg-dark-500">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                      isCurrent ? 'bg-primary-600/20 text-primary-400' : 'bg-gray-100 text-gray-400'
+                      isCurrent ? 'bg-primary-600/20 text-primary-400' : 'bg-dark-500 text-gray-400'
                     }`}>
                       {isCurrent ? <Check size={16} /> : <Clock size={16} />}
                     </div>

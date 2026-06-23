@@ -43,17 +43,6 @@ export default function DownloadPage() {
           return
         }
 
-        // Get latest version's drive file ID
-        const { data: latestVersion } = await supabase
-          .from('file_versions')
-          .select('google_drive_file_id')
-          .eq('file_id', file.id)
-          .order('version_number', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        const driveFileId = latestVersion?.google_drive_file_id || file.google_drive_file_id
-
         // Trigger download via edge function
         const { data: { session } } = await supabase.auth.getSession()
 

@@ -240,7 +240,7 @@ export default function FilesPage({ onViewVersions }) {
       const token = session?.access_token
       const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
 
-      await fetch(
+      const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rename-file`,
         {
           method: 'POST',
@@ -255,6 +255,11 @@ export default function FilesPage({ onViewVersions }) {
           }),
         }
       )
+
+      if (!res.ok) {
+        const result = await res.json().catch(() => ({}))
+        throw new Error(result.error || 'Failed to rename file in Google Drive')
+      }
 
       const ext = renameModal.file_name.split('.').pop()
       const fullName = newName.includes('.') ? newName : `${newName}.${ext}`
@@ -287,7 +292,7 @@ export default function FilesPage({ onViewVersions }) {
       const token = session?.access_token
       const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
 
-      await fetch(
+      const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-file`,
         {
           method: 'POST',
@@ -301,6 +306,11 @@ export default function FilesPage({ onViewVersions }) {
           }),
         }
       )
+
+      if (!res.ok) {
+        const result = await res.json().catch(() => ({}))
+        throw new Error(result.error || 'Failed to delete file from Google Drive')
+      }
 
       // Delete versions first
       await supabase.from('file_versions').delete().eq('file_id', deleteConfirm.id)
@@ -445,14 +455,14 @@ export default function FilesPage({ onViewVersions }) {
                   <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-dark-400">
                 {filteredFiles.map(file => {
                   const Icon = getIconComponent(file.mime_type)
                   return (
                     <tr key={file.id} className="hover:bg-dark-500">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <div className="w-8 h-8 bg-dark-500 rounded-lg flex items-center justify-center flex-shrink-0">
                             <Icon size={16} className="text-gray-400" />
                           </div>
                           <div className="min-w-0">
@@ -489,7 +499,7 @@ export default function FilesPage({ onViewVersions }) {
                               e.stopPropagation()
                               setActiveMenu(activeMenu === file.id ? null : file.id)
                             }}
-                            className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg"
+                            className="p-1.5 text-gray-400 hover:bg-dark-500 rounded-lg"
                           >
                             <MoreVertical size={16} />
                           </button>
@@ -548,7 +558,7 @@ export default function FilesPage({ onViewVersions }) {
                                   setDeleteConfirm(file)
                                   setActiveMenu(null)
                                 }}
-                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg"
                               >
                                 <Trash2 size={16} />
                                 Delete

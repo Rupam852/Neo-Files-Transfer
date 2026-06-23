@@ -5,7 +5,7 @@ export default function AccessDeniedPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-dark-800 px-4">
       <div className="text-center max-w-md">
-        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+        <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
           <ShieldX size={32} className="text-red-500" />
         </div>
         <h1 className="text-4xl font-bold text-gray-50 mb-2">403</h1>

@@ -49,9 +49,9 @@ export default function AdminLoginPage() {
 
         <div className="card">
           {user && !isAdmin && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-start gap-2">
-              <AlertTriangle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-amber-800">
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-4 flex items-start gap-2">
+              <AlertTriangle size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-amber-400">
                 This account does not have admin privileges.
               </p>
             </div>
@@ -73,7 +73,7 @@ export default function AdminLoginPage() {
         </div>
 
         <p className="text-center text-sm text-gray-400 mt-6">
-          <a href="/" className="text-primary-600 hover:underline">Back to Home</a>
+          <a href="/" className="text-primary-400 hover:text-primary-300 hover:underline">Back to Home</a>
         </p>
       </div>
     </div>

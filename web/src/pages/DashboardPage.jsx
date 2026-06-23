@@ -171,7 +171,7 @@ function StatCard({ icon: Icon, label, value, color, loading }) {
     blue: 'bg-blue-600/20 text-blue-400',
     purple: 'bg-purple-600/20 text-purple-400',
     green: 'bg-green-600/20 text-green-400',
-    orange: 'bg-amber-50 text-amber-400',
+    orange: 'bg-amber-500/20 text-amber-400',
   }
   return (
     <div className="card flex items-center gap-4">

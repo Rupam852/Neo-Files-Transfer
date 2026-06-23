@@ -108,10 +108,10 @@ export default function SharedFilesPage() {
                 </button>
                 <button
                   onClick={() => toggleStatus(file)}
-                  className={`text-sm flex items-center gap-1.5 py-2 px-4 rounded-lg font-medium transition-colors ${
+                  className={`text-sm flex items-center gap-1.5 py-2 px-4 rounded-lg font-medium transition-colors border ${
                     file.sharing_status === 'public'
-                      ? 'bg-dark-500 text-gray-500 hover:bg-dark-400'
-                      : 'bg-green-900/30 text-green-400 hover:bg-green-200'
+                      ? 'bg-dark-500 text-gray-300 border-dark-300 hover:bg-dark-400 hover:text-gray-200'
+                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
                   }`}
                 >
                   {file.sharing_status === 'public' ? (
