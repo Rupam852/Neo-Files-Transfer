@@ -92,6 +92,24 @@ export default function DownloadPage() {
       const fileLimit = 50 * 1024 * 1024 // 50MB
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 
+      // Folders are zipped on-the-fly by the Edge Function — always use direct browser download.
+      // Folders have file_size=0 in the DB so we can't use the JS streaming path (unknown size,
+      // and buffering a potentially large ZIP in memory blocks the browser thread).
+      if (fileInfo.is_folder) {
+        setStatus('downloading')
+        setProgress(15)
+        setTimeout(() => setProgress(40), 500)
+        setTimeout(() => setProgress(70), 1500)
+        setTimeout(() => {
+          setProgress(95)
+          setStatus('saving')
+        }, 2500)
+        // Trigger native browser download — Edge Function sends Content-Disposition: attachment
+        window.location.href = directUrl
+        setTimeout(() => setStatus('completed'), 6000)
+        return
+      }
+
       // If file is very large or we are on mobile and file is moderately large, bypass streaming to avoid browser memory crashes
       if (fileInfo.file_size && (fileInfo.file_size > fileLimit || (isMobile && fileInfo.file_size > 15 * 1024 * 1024))) {
         console.log('Bypassing JS streaming due to size/mobile constraints. Initiating direct browser download.')
@@ -181,13 +199,16 @@ export default function DownloadPage() {
       // Allow UI thread to update to the saving state before CPU intensive Blob parsing
       await new Promise(resolve => setTimeout(resolve, 300))
 
-      const blob = new Blob(chunks, { type: fileInfo.mime_type || 'application/octet-stream' })
+      const mimeType = fileInfo.is_folder ? 'application/zip' : (fileInfo.mime_type || 'application/octet-stream')
+      const blob = new Blob(chunks, { type: mimeType })
       const blobUrl = URL.createObjectURL(blob)
       setDownloadBlobUrl(blobUrl)
 
       const a = document.createElement('a')
       a.href = blobUrl
-      a.download = fileInfo.file_name
+      a.download = fileInfo.is_folder 
+        ? (fileInfo.file_name.endsWith('.zip') ? fileInfo.file_name : `${fileInfo.file_name}.zip`)
+        : fileInfo.file_name
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -249,7 +270,7 @@ export default function DownloadPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-white truncate leading-tight mb-1">{fileInfo?.file_name}</p>
-                <p className="text-xs text-slate-400 font-medium">{fileInfo?.is_folder ? 'Folder Archive' : formatFileSize(totalBytes)}</p>
+                <p className="text-xs text-slate-400 font-medium">{fileInfo?.is_folder ? 'Folder • Compressed as ZIP' : formatFileSize(totalBytes)}</p>
               </div>
             </div>
 
@@ -278,7 +299,7 @@ export default function DownloadPage() {
                 {status === 'saving' ? 'Finalizing Download' : 'Downloading File'}
               </h2>
               <p className="text-sm text-slate-400">
-                {status === 'saving' ? 'Writing file stream directly to your device storage...' : 'Streaming secure blocks directly from Shield node.'}
+                {status === 'saving' ? 'Preparing your download. Check your browser\'s download bar...' : fileInfo?.is_folder ? 'Compressing folder contents. Your download will start shortly...' : 'Streaming secure blocks directly from Shield node.'}
               </p>
             </div>
 
@@ -335,7 +356,9 @@ export default function DownloadPage() {
                 if (downloadBlobUrl) {
                   const a = document.createElement('a')
                   a.href = downloadBlobUrl
-                  a.download = fileInfo?.file_name || 'download'
+                  a.download = fileInfo?.is_folder 
+                    ? (fileInfo.file_name.endsWith('.zip') ? fileInfo.file_name : `${fileInfo.file_name}.zip`)
+                    : (fileInfo?.file_name || 'download')
                   a.click()
                 } else {
                   window.location.reload()
