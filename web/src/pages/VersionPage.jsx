@@ -418,18 +418,18 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
       {processingText && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-dark-600 border border-dark-400 rounded-2xl max-w-xs w-full p-6 space-y-4 shadow-2xl animate-scale-in text-center relative">
-            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+            {uploading && (
+              <button
+                type="button"
+                onClick={handleCancelUpload}
+                className="absolute top-3 right-3 bg-dark-500 hover:bg-red-500/20 text-gray-400 hover:text-red-400 border border-dark-300 hover:border-red-500/30 rounded-full p-1.5 transition-all duration-200 shadow-lg cursor-pointer"
+                title="Cancel Upload"
+              >
+                <X size={14} />
+              </button>
+            )}
+            <div className="w-16 h-16 mx-auto flex items-center justify-center">
               <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
-              {uploading && (
-                <button
-                  type="button"
-                  onClick={handleCancelUpload}
-                  className="absolute top-0 right-0 bg-dark-500 hover:bg-red-500/20 text-gray-400 hover:text-red-400 border border-dark-300 hover:border-red-500/30 rounded-full p-1.5 transition-all duration-200 shadow-lg cursor-pointer"
-                  title="Cancel Upload"
-                >
-                  <X size={14} />
-                </button>
-              )}
             </div>
             <p className="text-gray-200 text-sm font-medium font-['Space_Grotesk'] tracking-wide select-none">
               {processingText}
