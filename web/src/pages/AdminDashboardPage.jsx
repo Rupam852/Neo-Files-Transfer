@@ -15,6 +15,7 @@ export default function AdminDashboardPage() {
   const navigate = useNavigate()
   const [pendingUsers, setPendingUsers] = useState([])
   const [approvedUsers, setApprovedUsers] = useState([])
+  const [adminsList, setAdminsList] = useState([])
   const [activeTab, setActiveTab] = useState('pending')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -59,23 +60,38 @@ export default function AdminDashboardPage() {
       )
       .subscribe()
 
+    // Subscribe to realtime updates for admins
+    const adminsChannel = supabase
+      .channel('admins-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'admins' },
+        () => {
+          fetchData(false)
+        }
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(pendingChannel)
       supabase.removeChannel(approvedChannel)
       supabase.removeChannel(settingsChannel)
+      supabase.removeChannel(adminsChannel)
     }
   }, [])
 
   async function fetchData(showSpinner = false) {
     if (showSpinner) setLoading(true)
     try {
-      const [pendingRes, approvedRes, settingsRes] = await Promise.all([
+      const [pendingRes, approvedRes, settingsRes, adminsRes] = await Promise.all([
         supabase.from('pending_registrations').select('*').order('submitted_at', { ascending: false }),
         supabase.from('approved_users').select('*').order('approved_at', { ascending: false }),
         supabase.from('system_settings').select('*'),
+        supabase.from('admins').select('*'),
       ])
       setPendingUsers(pendingRes.data || [])
       setApprovedUsers(approvedRes.data || [])
+      setAdminsList(adminsRes.data || [])
       const settings = {}
       settingsRes.data?.forEach(s => { settings[s.key] = s.value })
       setSystemSettings(settings)
@@ -248,16 +264,23 @@ export default function AdminDashboardPage() {
     navigate('/')
   }
 
+  const adminEmails = new Set(adminsList.map(a => a.email.toLowerCase()))
+
   const filteredPending = pendingUsers.filter(u =>
-    u.status === 'pending' && (
+    u.status === 'pending' &&
+    !adminEmails.has(u.email?.toLowerCase()) && (
       u.name?.toLowerCase().includes(search.toLowerCase()) ||
       u.email?.toLowerCase().includes(search.toLowerCase())
     )
   )
 
   const filteredApproved = approvedUsers.filter(u =>
+    !adminEmails.has(u.email?.toLowerCase()) &&
     u.email?.toLowerCase().includes(search.toLowerCase())
   )
+
+  const pendingCount = pendingUsers.filter(u => u.status === 'pending' && !adminEmails.has(u.email?.toLowerCase())).length
+  const approvedCount = approvedUsers.filter(u => !adminEmails.has(u.email?.toLowerCase())).length
 
   return (
     <div className="min-h-screen bg-dark-800">
@@ -284,10 +307,10 @@ export default function AdminDashboardPage() {
       <div className="max-w-7xl mx-auto p-4 lg:p-6">
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard icon={Users} label="Total Registrations" value={pendingUsers.length + approvedUsers.length} color="blue" />
-          <StatCard icon={Clock} label="Pending" value={pendingUsers.filter(u => u.status === 'pending').length} color="orange" />
-          <StatCard icon={UserCheck} label="Approved" value={approvedUsers.length} color="green" />
-          <StatCard icon={ShieldCheck} label="Active Users" value={approvedUsers.length} color="primary" />
+          <StatCard icon={Users} label="Total Registrations" value={pendingCount + approvedCount} color="blue" />
+          <StatCard icon={Clock} label="Pending" value={pendingCount} color="orange" />
+          <StatCard icon={UserCheck} label="Approved" value={approvedCount} color="green" />
+          <StatCard icon={ShieldCheck} label="Administrators" value={adminsList.length} color="primary" />
         </div>
 
         {/* Tabs */}
@@ -298,7 +321,7 @@ export default function AdminDashboardPage() {
               activeTab === 'pending' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
             }`}
           >
-            Pending ({pendingUsers.filter(u => u.status === 'pending').length})
+            Pending ({pendingCount})
           </button>
           <button
             onClick={() => setActiveTab('approved')}
@@ -306,7 +329,7 @@ export default function AdminDashboardPage() {
               activeTab === 'approved' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
             }`}
           >
-            Approved ({approvedUsers.length})
+            Approved ({approvedCount})
           </button>
           <button
             onClick={() => setActiveTab('settings')}
