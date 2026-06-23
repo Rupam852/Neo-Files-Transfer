@@ -76,55 +76,149 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
       const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
 
       const result = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest()
-        const uploadUrl = proxyUrl
-          ? `${proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl}/upload-file`
-          : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-version`
-
-        xhr.open('POST', uploadUrl)
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-
         if (proxyUrl) {
-          xhr.setRequestHeader('X-File-Name', encodeURIComponent(selectedFile.name))
-          xhr.setRequestHeader('X-Folder-Id', profile.drive_folder_id)
-          xhr.setRequestHeader('X-File-Size', selectedFile.size)
-          xhr.setRequestHeader('X-File-Type', selectedFile.type || 'application/octet-stream')
-          if (file.google_drive_file_id) {
-            xhr.setRequestHeader('X-Old-File-Id', file.google_drive_file_id)
+          // Direct High-speed Upload to Google Drive using Client-side resumable stream
+          let accessToken = localStorage.getItem('google_provider_token') || ''
+          
+          const refreshGoogleAccessToken = async () => {
+            const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
+            const refreshRes = await fetch(`${cleanProxy}/refresh-token`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (!refreshRes.ok) throw new Error('Google Drive connection expired. Please reconnect in settings.')
+            const data = await refreshRes.json()
+            localStorage.setItem('google_provider_token', data.google_access_token)
+            return data.google_access_token
           }
-        }
 
-        // Track upload progress
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            const pct = Math.round((e.loaded / e.total) * 100)
-            setProcessingText(`Uploading version (${pct}%)...`)
-          }
-        })
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
+          // Step 1: Initiate session on Google Drive
+          (async () => {
+            let uploadUrl
             try {
-              resolve(JSON.parse(xhr.responseText))
-            } catch (parseErr) {
-              resolve({ success: true })
-            }
-          } else {
-            try {
-              const errJson = JSON.parse(xhr.responseText)
-              reject(new Error(errJson.error || `Server returned HTTP ${xhr.status}`))
-            } catch (parseErr) {
-              reject(new Error(`Server returned HTTP ${xhr.status}`))
-            }
-          }
-        }
+              if (!accessToken) {
+                accessToken = await refreshGoogleAccessToken()
+              }
+              
+              const startSession = async (tokenVal) => {
+                return await fetch(
+                  'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${tokenVal}`,
+                      'Content-Type': 'application/json; charset=UTF-8',
+                      'X-Upload-Content-Type': selectedFile.type || 'application/octet-stream'
+                    },
+                    body: JSON.stringify({
+                      name: selectedFile.name,
+                      parents: [profile.drive_folder_id]
+                    })
+                  }
+                )
+              }
 
-        xhr.onerror = () => reject(new Error('Network error. Connection failed.'))
-        xhr.onabort = () => reject(new Error('Upload aborted.'))
+              let initiateResponse = await startSession(accessToken)
+              if (initiateResponse.status === 401) {
+                console.log('Access token expired. Refreshing...')
+                accessToken = await refreshGoogleAccessToken()
+                initiateResponse = await startSession(accessToken)
+              }
 
-        if (proxyUrl) {
-          xhr.send(selectedFile)
+              if (!initiateResponse.ok) {
+                const errTxt = await initiateResponse.text()
+                throw new Error(`Google Drive API initiation failed: ${errTxt}`)
+              }
+
+              uploadUrl = initiateResponse.headers.get('Location')
+              if (!uploadUrl) throw new Error('Did not receive location upload header from Google.')
+
+            } catch (initErr) {
+              reject(new Error(`Failed to initiate Google Drive upload: ${initErr.message}`))
+              return
+            }
+
+            // Step 2: Upload raw file stream via XHR to track progress
+            const xhr = new XMLHttpRequest()
+            xhr.open('PUT', uploadUrl)
+            
+            xhr.upload.addEventListener('progress', (e) => {
+              if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 100)
+                setProcessingText(`Uploading version (${pct}%)...`)
+              }
+            })
+
+            xhr.onload = async () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                  const driveData = JSON.parse(xhr.responseText)
+                  
+                  // Delete old file version from Google Drive if specified
+                  if (file.google_drive_file_id) {
+                    console.log(`Deleting old file version from Google Drive: ${file.google_drive_file_id}`)
+                    try {
+                      await fetch(`https://www.googleapis.com/drive/v3/files/${file.google_drive_file_id}`, {
+                        method: 'DELETE',
+                        headers: {
+                          'Authorization': `Bearer ${accessToken}`
+                        }
+                      })
+                    } catch (delErr) {
+                      console.error(`Failed to delete old file version:`, delErr)
+                    }
+                  }
+
+                  resolve({ file_id: driveData.id, mime_type: driveData.mimeType })
+                } catch (parseErr) {
+                  reject(new Error('Failed to parse Google Drive response.'))
+                }
+              } else {
+                reject(new Error(`Google Drive upload failed with status ${xhr.status}`))
+              }
+            }
+
+            xhr.onerror = () => reject(new Error('Upload failed. Connection interrupted.'))
+            xhr.onabort = () => reject(new Error('Upload aborted.'))
+
+            xhr.send(selectedFile)
+          })()
+
         } else {
+          // Fallback to old Supabase Edge Function path (100MB limit)
+          const xhr = new XMLHttpRequest()
+          const uploadUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-version`
+
+          xhr.open('POST', uploadUrl)
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+
+          // Track upload progress
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 100)
+              setProcessingText(`Uploading version (${pct}%)...`)
+            }
+          })
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                resolve(JSON.parse(xhr.responseText))
+              } catch (parseErr) {
+                resolve({ success: true })
+              }
+            } else {
+              try {
+                const errJson = JSON.parse(xhr.responseText)
+                reject(new Error(errJson.error || `Server returned HTTP ${xhr.status}`))
+              } catch (parseErr) {
+                reject(new Error(`Server returned HTTP ${xhr.status}`))
+              }
+            }
+          }
+
+          xhr.onerror = () => reject(new Error('Network error. Connection failed.'))
+          xhr.onabort = () => reject(new Error('Upload aborted.'))
+
           const formData = new FormData()
           formData.append('file', selectedFile)
           formData.append('folder_id', profile.drive_folder_id)

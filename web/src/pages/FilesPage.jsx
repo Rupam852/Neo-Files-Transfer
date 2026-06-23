@@ -28,9 +28,9 @@ function getUniqueFileName(originalName, existingFiles) {
   const existingNames = existingFiles
     .map(f => f && f.file_name ? f.file_name.toLowerCase() : '')
     .filter(name => name !== '')
-  
+
   let name = originalName
-  
+
   if (!existingNames.includes(name.toLowerCase())) {
     return name
   }
@@ -38,7 +38,7 @@ function getUniqueFileName(originalName, existingFiles) {
   const lastDotIndex = originalName.lastIndexOf('.')
   let baseName = originalName
   let ext = ''
-  
+
   if (lastDotIndex !== -1) {
     baseName = originalName.substring(0, lastDotIndex)
     ext = originalName.substring(lastDotIndex)
@@ -219,7 +219,7 @@ export default function FilesPage({ onViewVersions }) {
 
   useEffect(() => {
     window.addEventListener('trigger-upload', () => fileInputRef.current?.click())
-    return () => window.removeEventListener('trigger-upload', () => {})
+    return () => window.removeEventListener('trigger-upload', () => { })
   }, [])
 
   useEffect(() => {
@@ -274,61 +274,142 @@ export default function FilesPage({ onViewVersions }) {
       try {
         const uniqueName = getUniqueFileName(file.name, files)
         const proxyUrl = import.meta.env.VITE_PROXY_URL
+        let result
 
-        const result = await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest()
-          const uploadUrl = proxyUrl
-            ? `${proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl}/upload-file`
-            : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-file`
-
-          xhr.open('POST', uploadUrl)
-          xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-
-          if (proxyUrl) {
-            xhr.setRequestHeader('X-File-Name', encodeURIComponent(uniqueName))
-            xhr.setRequestHeader('X-Folder-Id', driveParentId)
-            xhr.setRequestHeader('X-File-Size', file.size)
-            xhr.setRequestHeader('X-File-Type', file.type || 'application/octet-stream')
+        if (proxyUrl) {
+          // Direct High-speed Upload to Google Drive using Client-side resumable stream
+          let accessToken = localStorage.getItem('google_provider_token') || ''
+          
+          const refreshGoogleAccessToken = async () => {
+            const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
+            const refreshRes = await fetch(`${cleanProxy}/refresh-token`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (!refreshRes.ok) throw new Error('Google Drive connection expired. Please reconnect in settings.')
+            const data = await refreshRes.json()
+            localStorage.setItem('google_provider_token', data.google_access_token)
+            return data.google_access_token
           }
 
-          // Track upload progress
-          xhr.upload.addEventListener('progress', (e) => {
-            if (e.lengthComputable) {
-              const pct = Math.round((e.loaded / e.total) * 100)
-              setProcessingText(`Uploading file ${i + 1} of ${batch.length}: ${file.name} (${pct}%)`)
+          // Step 1: Initiate session on Google Drive
+          let uploadUrl
+          try {
+            if (!accessToken) {
+              accessToken = await refreshGoogleAccessToken()
             }
+            
+            const startSession = async (tokenVal) => {
+              return await fetch(
+                'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${tokenVal}`,
+                    'Content-Type': 'application/json; charset=UTF-8',
+                    'X-Upload-Content-Type': file.type || 'application/octet-stream'
+                  },
+                  body: JSON.stringify({
+                    name: uniqueName,
+                    parents: [driveParentId]
+                  })
+                }
+              )
+            }
+
+            let initiateResponse = await startSession(accessToken)
+            if (initiateResponse.status === 401) {
+              console.log('Access token expired. Refreshing...')
+              accessToken = await refreshGoogleAccessToken()
+              initiateResponse = await startSession(accessToken)
+            }
+
+            if (!initiateResponse.ok) {
+              const errTxt = await initiateResponse.text()
+              throw new Error(`Google Drive API initiation failed: ${errTxt}`)
+            }
+
+            uploadUrl = initiateResponse.headers.get('Location')
+            if (!uploadUrl) throw new Error('Did not receive location upload header from Google.')
+
+          } catch (initErr) {
+            throw new Error(`Failed to initiate Google Drive upload: ${initErr.message}`)
+          }
+
+          // Step 2: Upload raw file stream via XHR to track progress
+          result = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest()
+            xhr.open('PUT', uploadUrl)
+            
+            xhr.upload.addEventListener('progress', (e) => {
+              if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 100)
+                setProcessingText(`Uploading file ${i + 1} of ${batch.length}: ${file.name} (${pct}%)`)
+              }
+            })
+
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                  const driveData = JSON.parse(xhr.responseText)
+                  resolve({ file_id: driveData.id, mime_type: driveData.mimeType })
+                } catch (parseErr) {
+                  reject(new Error('Failed to parse Google Drive response.'))
+                }
+              } else {
+                reject(new Error(`Google Drive upload failed with status ${xhr.status}`))
+              }
+            }
+
+            xhr.onerror = () => reject(new Error('Upload failed. Connection interrupted.'))
+            xhr.onabort = () => reject(new Error('Upload aborted.'))
+
+            xhr.send(file)
           })
 
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              try {
-                resolve(JSON.parse(xhr.responseText))
-              } catch (parseErr) {
-                resolve({ success: true })
+        } else {
+          // Fallback to old Supabase Edge Function path (100MB limit)
+          result = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest()
+            const uploadUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-file`
+
+            xhr.open('POST', uploadUrl)
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+
+            // Track upload progress
+            xhr.upload.addEventListener('progress', (e) => {
+              if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 100)
+                setProcessingText(`Uploading file ${i + 1} of ${batch.length}: ${file.name} (${pct}%)`)
               }
-            } else {
-              try {
-                const errJson = JSON.parse(xhr.responseText)
-                reject(new Error(errJson.error || `Server returned HTTP ${xhr.status}`))
-              } catch (parseErr) {
-                reject(new Error(`Server returned HTTP ${xhr.status}`))
+            })
+
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                  resolve(JSON.parse(xhr.responseText))
+                } catch (parseErr) {
+                  resolve({ success: true })
+                }
+              } else {
+                try {
+                  const errJson = JSON.parse(xhr.responseText)
+                  reject(new Error(errJson.error || `Server returned HTTP ${xhr.status}`))
+                } catch (parseErr) {
+                  reject(new Error(`Server returned HTTP ${xhr.status}`))
+                }
               }
             }
-          }
 
-          xhr.onerror = () => reject(new Error('Network error. Connection failed.'))
-          xhr.onabort = () => reject(new Error('Upload aborted.'))
+            xhr.onerror = () => reject(new Error('Network error. Connection failed.'))
+            xhr.onabort = () => reject(new Error('Upload aborted.'))
 
-          if (proxyUrl) {
-            xhr.send(file)
-          } else {
             const formData = new FormData()
             formData.append('file', file, uniqueName)
             formData.append('folder_id', driveParentId)
             formData.append('provider_token', googleToken)
             xhr.send(formData)
-          }
-        })
+          })
+        }
 
         const { error: insertError } = await supabase.from('shared_files').insert({
           user_id: user.id,
@@ -527,12 +608,12 @@ export default function FilesPage({ onViewVersions }) {
 
     try {
       const pathsToCreate = new Set()
-      
+
       for (const file of filesUploaded) {
         if (!file.webkitRelativePath) continue
         const parts = file.webkitRelativePath.split('/')
         parts.pop()
-        
+
         let currentPath = ''
         for (const part of parts) {
           currentPath = currentPath ? `${currentPath}/${part}` : part
@@ -554,7 +635,7 @@ export default function FilesPage({ onViewVersions }) {
       for (const path of sortedPaths) {
         const parts = path.split('/')
         const fName = parts[parts.length - 1]
-        
+
         let parentDbId = currentFolder ? currentFolder.id : null
         let parentDriveId = currentFolder ? currentFolder.google_drive_file_id : profile.drive_folder_id
 
@@ -612,7 +693,7 @@ export default function FilesPage({ onViewVersions }) {
         const parts = file.webkitRelativePath.split('/')
         parts.pop()
         const folderPathStr = parts.join('/')
-        
+
         const folderInfo = pathLookup[folderPathStr]
         return {
           fileObj: file,
@@ -799,11 +880,11 @@ export default function FilesPage({ onViewVersions }) {
     if (file.is_folder) return Folder
     const mimeType = file.mime_type
     const type = mimeType?.startsWith('image/') ? 'image' :
-                 mimeType?.startsWith('video/') ? 'video' :
-                 mimeType?.includes('pdf') ? 'file-text' :
-                 mimeType?.includes('zip') ? 'archive' :
-                 mimeType?.includes('spreadsheet') ? 'table' :
-                 mimeType?.includes('presentation') ? 'presentation' : 'file'
+      mimeType?.startsWith('video/') ? 'video' :
+        mimeType?.includes('pdf') ? 'file-text' :
+          mimeType?.includes('zip') ? 'archive' :
+            mimeType?.includes('spreadsheet') ? 'table' :
+              mimeType?.includes('presentation') ? 'presentation' : 'file'
     const Icon = ICON_MAP[type] || File
     return Icon
   }
@@ -993,9 +1074,8 @@ export default function FilesPage({ onViewVersions }) {
                   return (
                     <tr
                       key={file.id}
-                      className={`transition-colors duration-100 ${
-                        isSelected ? 'bg-primary-500/8 hover:bg-primary-500/12' : 'hover:bg-dark-500'
-                      }`}
+                      className={`transition-colors duration-100 ${isSelected ? 'bg-primary-500/8 hover:bg-primary-500/12' : 'hover:bg-dark-500'
+                        }`}
                       onDoubleClick={() => {
                         if (file.is_folder) handleOpenFolder(file)
                       }}
@@ -1013,9 +1093,8 @@ export default function FilesPage({ onViewVersions }) {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
-                            isSelected ? 'bg-primary-500/20' : 'bg-dark-500'
-                          }`}>
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-primary-500/20' : 'bg-dark-500'
+                            }`}>
                             <Icon size={16} className={isSelected ? 'text-primary-400' : 'text-gray-400'} />
                           </div>
                           <div className="min-w-0">
@@ -1042,14 +1121,12 @@ export default function FilesPage({ onViewVersions }) {
                         {file.is_folder ? '—' : `v${file.current_version_num}`}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                          file.sharing_status === 'public'
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${file.sharing_status === 'public'
                             ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                             : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            file.sharing_status === 'public' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                          }`} />
+                          }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${file.sharing_status === 'public' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                            }`} />
                           {file.sharing_status}
                         </span>
                       </td>
@@ -1068,8 +1145,8 @@ export default function FilesPage({ onViewVersions }) {
                             <MoreVertical size={16} />
                           </button>
                           {activeMenu === file.id && (
-                            <div 
-                              ref={menuRef} 
+                            <div
+                              ref={menuRef}
                               onClick={(e) => e.stopPropagation()}
                               className="absolute right-0 mt-1 w-48 bg-dark-600 rounded-lg shadow-xl border border-dark-400 py-1 z-50"
                             >
@@ -1206,11 +1283,10 @@ export default function FilesPage({ onViewVersions }) {
             <button
               onClick={() => handleBulkMove(null)}
               disabled={currentFolder === null}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all ${
-                currentFolder === null
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all ${currentFolder === null
                   ? 'opacity-40 cursor-not-allowed bg-dark-500'
                   : 'hover:bg-dark-500 text-gray-200'
-              }`}
+                }`}
             >
               <Folder size={16} className="text-yellow-400 flex-shrink-0" />
               <span className="font-medium">Root (My Files)</span>
@@ -1224,11 +1300,10 @@ export default function FilesPage({ onViewVersions }) {
                   key={folder.id}
                   onClick={() => handleBulkMove(folder.id)}
                   disabled={currentFolder?.id === folder.id}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all ${
-                    currentFolder?.id === folder.id
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all ${currentFolder?.id === folder.id
                       ? 'opacity-40 cursor-not-allowed bg-dark-500'
                       : 'hover:bg-dark-500 text-gray-200'
-                  }`}
+                    }`}
                 >
                   <Folder size={16} className="text-yellow-400 flex-shrink-0" />
                   <span className="truncate">{folder.file_name}</span>
@@ -1327,11 +1402,10 @@ export default function FilesPage({ onViewVersions }) {
                         toast.error('Failed to update: ' + err.message)
                       }
                     }}
-                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      shareModal.sharing_status === 'public'
+                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${shareModal.sharing_status === 'public'
                         ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
                         : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                    }`}
+                      }`}
                   >
                     {shareModal.sharing_status === 'public' ? '🔒 Make Private' : '🌐 Make Public'}
                   </button>

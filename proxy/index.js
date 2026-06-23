@@ -18,6 +18,44 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', service: 'neo-transfer-proxy' })
 })
 
+// Endpoint to refresh and return the Google access token to the frontend
+app.get('/refresh-token', async (req, res) => {
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase environment variables are missing on the proxy server.')
+    }
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Authenticate user via Supabase JWT
+    const user = await getAuthenticatedUser(req, supabaseAdmin)
+
+    // Get Owner's Google Tokens
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('google_access_token, google_refresh_token')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile) {
+      throw new Error('Failed to load user profile Google tokens.')
+    }
+
+    if (!profile.google_refresh_token) {
+      throw new Error('No Google refresh token is available.')
+    }
+
+    // Refresh Google access token
+    const newAccessToken = await refreshGoogleToken(user.id, profile.google_refresh_token, supabaseAdmin)
+
+    return res.status(200).json({ google_access_token: newAccessToken })
+  } catch (err) {
+    console.error('Refresh Token Proxy Error:', err)
+    return res.status(400).json({ error: err.message || 'Failed to refresh Google token.' })
+  }
+})
+
 // Main download endpoint
 app.get('/download-file', async (req, res) => {
   const hash = req.query.hash
