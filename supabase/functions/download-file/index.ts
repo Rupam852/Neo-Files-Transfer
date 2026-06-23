@@ -153,6 +153,11 @@ serve(async (req) => {
     responseHeaders.set("Content-Type", file.mime_type || driveResponse.headers.get("Content-Type") || "application/octet-stream")
     responseHeaders.set("Content-Disposition", `attachment; filename="${encodeURIComponent(file.file_name)}"`)
     
+    // Prevent browser and CDN caching of downloads to ensure latest version is always served
+    responseHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate")
+    responseHeaders.set("Pragma", "no-cache")
+    responseHeaders.set("Expires", "0")
+    
     // Add CORS headers
     for (const [key, value] of Object.entries(corsHeaders)) {
       responseHeaders.set(key, value)
