@@ -389,7 +389,7 @@ export default function FilesPage({ onViewVersions }) {
         </div>
       ) : (
         <div className="bg-dark-600 rounded-xl border border-dark-300 overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[280px]">
             <table className="w-full">
               <thead>
                 <tr className="bg-dark-500 border-b border-dark-300">
