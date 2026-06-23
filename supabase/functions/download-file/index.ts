@@ -5,6 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Expose-Headers": "content-length, content-disposition",
 }
 
 serve(async (req) => {
@@ -12,13 +13,26 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders })
   }
 
+  let isStream = false
+  let driveFileId: string | null = null
+
   try {
     // Get hash from query params
     const url = new URL(req.url)
     const hash = url.searchParams.get("hash")
+    isStream = url.searchParams.get("stream") === "true"
 
     if (!hash) {
-      return new Response("File Not Found", { status: 404 })
+      if (isStream) {
+        return new Response(
+          JSON.stringify({ error: "File Hash Required" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        )
+      }
+      return new Response("File Not Found", { status: 404, headers: corsHeaders })
     }
 
     // Use service role to query without RLS
@@ -35,22 +49,40 @@ serve(async (req) => {
       .maybeSingle()
 
     if (fileError || !file) {
+      if (isStream) {
+        return new Response(
+          JSON.stringify({ error: "The requested file does not exist or has been removed." }),
+          {
+            status: 404,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        )
+      }
       return new Response(
         "<html><body style='font-family:sans-serif;text-align:center;padding:50px'><h1>404 - File Not Found</h1><p>The requested file does not exist or has been removed.</p></body></html>",
         {
           status: 404,
-          headers: { "Content-Type": "text/html" },
+          headers: { "Content-Type": "text/html", ...corsHeaders },
         }
       )
     }
 
     // Check sharing status
     if (file.sharing_status === "private") {
+      if (isStream) {
+        return new Response(
+          JSON.stringify({ error: "This file is private and cannot be downloaded." }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        )
+      }
       return new Response(
         "<html><body style='font-family:sans-serif;text-align:center;padding:50px'><h1>403 - Access Denied</h1><p>This file is private and cannot be downloaded.</p></body></html>",
         {
           status: 403,
-          headers: { "Content-Type": "text/html" },
+          headers: { "Content-Type": "text/html", ...corsHeaders },
         }
       )
     }
@@ -63,11 +95,20 @@ serve(async (req) => {
       .maybeSingle()
 
     if (downloadSetting && downloadSetting.value === false) {
+      if (isStream) {
+        return new Response(
+          JSON.stringify({ error: "Downloads are currently disabled by the administrator." }),
+          {
+            status: 503,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        )
+      }
       return new Response(
         "<html><body style='font-family:sans-serif;text-align:center;padding:50px'><h1>Service Temporarily Busy</h1><p>Downloads are currently disabled. Please try again later.</p></body></html>",
         {
           status: 503,
-          headers: { "Content-Type": "text/html" },
+          headers: { "Content-Type": "text/html", ...corsHeaders },
         }
       )
     }
@@ -81,7 +122,7 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle()
 
-    const driveFileId = latestVersion?.google_drive_file_id || file.google_drive_file_id
+    driveFileId = latestVersion?.google_drive_file_id || file.google_drive_file_id
 
     // Get the file owner
     const { data: fileOwner } = await supabaseAdmin
@@ -145,6 +186,18 @@ serve(async (req) => {
       console.error("Failed to fetch from Drive, status:", driveResponse.status)
       // Fallback: Redirect to public Drive download link if streaming failed
       const downloadUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}`
+      if (isStream) {
+        return new Response(
+          JSON.stringify({
+            error: `Failed to fetch file content from Google Drive (HTTP ${driveResponse.status})`,
+            fallbackUrl: downloadUrl,
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        )
+      }
       return Response.redirect(downloadUrl, 302)
     }
 
@@ -171,11 +224,24 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("Download error:", error)
+    const downloadUrl = driveFileId ? `https://drive.google.com/uc?export=download&id=${driveFileId}` : null
+    if (isStream) {
+      return new Response(
+        JSON.stringify({
+          error: error.message || "An unexpected error occurred during download streaming.",
+          fallbackUrl: downloadUrl,
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      )
+    }
     return new Response(
       `<html><body style='font-family:sans-serif;text-align:center;padding:50px'><h1>Download Failed</h1><p>${error.message}</p></body></html>`,
       {
         status: 500,
-        headers: { "Content-Type": "text/html" },
+        headers: { "Content-Type": "text/html", ...corsHeaders },
       }
     )
   }

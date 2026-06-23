@@ -5,7 +5,7 @@ import {
   Download, FileX, ShieldX, AlertTriangle, FileText, Image, Video, Archive,
   Table, Presentation, File, CheckCircle2, AlertCircle
 } from 'lucide-react'
-import { formatFileSize, getFileIcon } from '../utils/helpers'
+import { formatFileSize, getFileIcon, generateDirectDownloadUrl, formatErrorMessage } from '../utils/helpers'
 
 const ICON_MAP = {
   'file-text': FileText,
@@ -72,14 +72,49 @@ export default function DownloadPage() {
           return
         }
 
+        const directUrl = generateDirectDownloadUrl(hash)
+        const fileLimit = 50 * 1024 * 1024 // 50MB
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+
+        // If file is very large or we are on mobile and file is moderately large, bypass streaming to avoid browser memory crashes
+        if (file.file_size && (file.file_size > fileLimit || (isMobile && file.file_size > 15 * 1024 * 1024))) {
+          console.log('Bypassing JS streaming due to size/mobile constraints. Initiating direct browser download.')
+          setStatus('completed')
+          window.location.href = directUrl
+          return
+        }
+
         setStatus('downloading')
 
         // Start streaming download via proxy
-        const downloadUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-file?hash=${hash}`
+        const downloadUrl = `${directUrl}&stream=true`
         
-        const response = await fetch(downloadUrl)
+        let response
+        try {
+          response = await fetch(downloadUrl)
+        } catch (fetchErr) {
+          console.warn('Initial fetch stream failed, falling back to direct browser download:', fetchErr)
+          setStatus('completed')
+          window.location.href = directUrl
+          return
+        }
+
         if (!response.ok) {
-          throw new Error(`Google Drive Proxy returned HTTP ${response.status}`)
+          // Attempt to parse JSON error details
+          try {
+            const errData = await response.json()
+            if (errData?.fallbackUrl) {
+              console.log('Stream request failed, falling back to direct download URL:', errData.fallbackUrl)
+              window.location.href = errData.fallbackUrl
+              return
+            }
+            throw new Error(errData?.error || `Server returned HTTP ${response.status}`)
+          } catch (jsonErr) {
+            if (jsonErr instanceof SyntaxError) {
+              throw new Error(`Google Drive Proxy returned HTTP ${response.status}`)
+            }
+            throw jsonErr
+          }
         }
 
         if (!response.body) {
@@ -121,7 +156,7 @@ export default function DownloadPage() {
 
       } catch (err) {
         console.error('Download stream error:', err)
-        setErrorMsg(err.message || 'Unable to stream download file.')
+        setErrorMsg(formatErrorMessage(err))
         setStatus('error')
       }
     }
@@ -305,12 +340,28 @@ export default function DownloadPage() {
                 {errorMsg}
               </p>
             </div>
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full btn-primary py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
-            >
-              Retry Download
-            </button>
+            
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setStatus('loading')
+                  window.location.reload()
+                }}
+                className="w-full btn-primary py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
+              >
+                <Download size={16} /> Retry Streaming
+              </button>
+              <button
+                onClick={() => {
+                  const directUrl = generateDirectDownloadUrl(hash)
+                  window.location.href = directUrl
+                }}
+                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-200"
+              >
+                <Download size={16} /> Download Directly (No Stream)
+              </button>
+            </div>
+
             <p className="text-xs text-slate-500">
               If the error persists, please contact the link owner.
             </p>
