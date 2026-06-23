@@ -87,14 +87,14 @@ graph TD
     G -->|Create Folder Object| I
     G -->|Save Metadata with parent_folder_id| D
     
-    A -->|2. Upload File / Folder Tree (Direct)*| I
+    A -->|2. Upload File / Folder Tree - Direct| I
     A -->|3. Register metadata| D
     
     B -->|Query metadata| D
     
     %% Downloads Decision routing
-    B -->|Download file <50MB| H
-    B -->|Download folder or file >50MB| P
+    B -->|Download file under 50MB| H
+    B -->|Download folder or file over 50MB| P
     
     H -->|Retrieve Owner Google Tokens| D
     H -->|Fetch alt=media stream| I
