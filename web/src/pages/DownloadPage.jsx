@@ -89,14 +89,14 @@ export default function DownloadPage() {
 
     try {
       const directUrl = generateDirectDownloadUrl(hash)
-      const fileLimit = 300 * 1024 * 1024 // 300MB
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      // Always bypass streaming on mobile to prevent browser memory issues, user-activation gate blocking, and edge function timeouts
-      if (isMobile || (fileInfo.file_size && fileInfo.file_size > fileLimit)) {
-        console.log(isMobile 
-          ? 'Mobile device detected. Bypassing JS streaming to use native browser download manager.'
-          : 'File size exceeds limit. Bypassing JS streaming.'
-        )
+      const fileLimit = isMobile 
+        ? 100 * 1024 * 1024  // 100MB limit for mobile to avoid RAM crashes
+        : 500 * 1024 * 1024  // 500MB limit for PC
+
+      // Bypass JS streaming only if the file size exceeds the safety limit
+      if (fileInfo.file_size && fileInfo.file_size > fileLimit) {
+        console.log('File size exceeds safety limit. Bypassing JS streaming to use native browser download manager.')
         setStatus('downloading')
         setProgress(15)
         
