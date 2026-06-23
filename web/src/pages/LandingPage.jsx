@@ -367,10 +367,9 @@ export default function LandingPage() {
                           />
                         )}
 
-                        {/* Phone Number Input */}
                         <input
                           type="tel"
-                          className="flex-1 bg-transparent px-4 py-3 text-white placeholder-slate-500 outline-none text-sm font-medium"
+                          className="flex-1 w-full min-w-0 bg-transparent px-4 py-3 text-white placeholder-slate-500 outline-none text-sm font-medium"
                           placeholder={selectedCountry.placeholder}
                           value={localPhone}
                           onChange={handlePhoneChange}
