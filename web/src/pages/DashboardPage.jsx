@@ -5,7 +5,7 @@ import { Files, Share2, Globe, Download, FolderOpen } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 export default function DashboardPage({ onNavigate }) {
-  const { profile } = useAuth()
+  const { user, profile } = useAuth()
   const navigate = useNavigate()
   
   function goTo(path) {
@@ -27,10 +27,12 @@ export default function DashboardPage({ onNavigate }) {
 
   useEffect(() => {
     async function loadStats() {
+      if (!user) return
       try {
         const { data: files } = await supabase
           .from('shared_files')
           .select('id, sharing_status')
+          .eq('user_id', user.id)
 
         if (files) {
           setStats({
@@ -47,7 +49,7 @@ export default function DashboardPage({ onNavigate }) {
       }
     }
     loadStats()
-  }, [])
+  }, [user])
 
   // Check if folder is configured
   const showFolderWarning = !profile?.drive_folder_id
