@@ -67,7 +67,7 @@ export default function LandingPage() {
 
       {/* Futuristic Background Mesh Gradients */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 blur-[130px] pointer-events-none animate-float opacity-80" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-purple-600/10 blur-[150px] pointer-events-none animate-float-delayed opacity-75" />
+      <div className="absolute bottom-0 right-0 translate-x-1/4 translate-y-1/4 w-[50%] h-[50%] rounded-full bg-purple-600/10 blur-[150px] pointer-events-none animate-float-delayed opacity-75" />
       <div className="absolute top-[30%] left-[40%] w-[300px] h-[300px] rounded-full bg-cyan-500/5 blur-[100px] pointer-events-none animate-float opacity-50" />
 
       {/* Subtle Grid Overlay */}
@@ -88,7 +88,7 @@ export default function LandingPage() {
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
             <a href="#features" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-indigo-500 hover:after:w-full after:transition-all after:duration-300">Features</a>
             <a href="#security" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-indigo-500 hover:after:w-full after:transition-all after:duration-300">Security</a>
-            <a href="#register" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-indigo-500 hover:after:w-full after:transition-all after:duration-300">Register</a>
+            <a href="#footer" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-indigo-500 hover:after:w-full after:transition-all after:duration-300">Privacy Policy</a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -344,14 +344,19 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-white/5 py-12 bg-black/40">
+      <footer id="footer" className="relative z-10 border-t border-white/5 py-12 bg-black/40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xs">NF</span>
+            <div className="flex flex-col items-center sm:items-start gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-xs">NF</span>
+                </div>
+                <span className="text-xs text-gray-500">Neo Files Transfer v1.0 • Built with Supabase & Google Drive</span>
               </div>
-              <span className="text-xs text-gray-500">Neo Files Transfer v1.0 • Built with Supabase & Google Drive</span>
+              <span className="text-[11px] text-gray-600 font-medium sm:pl-10">
+                Support & Developer: <a href="mailto:support@neofiles.com" className="text-indigo-400 hover:text-indigo-300 hover:underline font-mono">support@neofiles.com</a>
+              </span>
             </div>
             <div className="flex gap-6 text-xs text-gray-500">
               <a href="#" className="hover:text-gray-300">Privacy Policy</a>
