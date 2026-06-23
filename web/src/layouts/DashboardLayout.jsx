@@ -35,18 +35,41 @@ export default function DashboardLayout() {
   const [profileOpen, setProfileOpen] = useState(false)
   const profileRef = useRef(null)
 
-  // Tab views state for clean base URL structure
-  const [currentTab, setCurrentTab] = useState(() => localStorage.getItem('activeTab') || 'dashboard')
-  const [selectedFileId, setSelectedFileId] = useState(null)
+  const navigateTab = (tab, fileId = null, push = true) => {
+    setCurrentTab(tab)
+    setSelectedFileId(fileId)
+    localStorage.setItem('activeTab', tab)
+    if (push) {
+      window.history.pushState({ tab, fileId }, '')
+    }
+  }
 
   useEffect(() => {
+    // Set initial history state on mount
+    window.history.replaceState({ tab: currentTab, fileId: selectedFileId }, '')
+
+    const handlePopState = (event) => {
+      if (event.state && event.state.tab) {
+        setCurrentTab(event.state.tab)
+        setSelectedFileId(event.state.fileId || null)
+      } else {
+        setCurrentTab('dashboard')
+        setSelectedFileId(null)
+      }
+    }
+
     function handleClick(e) {
       if (profileRef.current && !profileRef.current.contains(e.target)) {
         setProfileOpen(false)
       }
     }
+
+    window.addEventListener('popstate', handlePopState)
     document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      document.removeEventListener('mousedown', handleClick)
+    }
   }, [])
 
   async function handleSignOut() {
@@ -55,8 +78,7 @@ export default function DashboardLayout() {
   }
 
   function handleUploadClick() {
-    setCurrentTab('files')
-    localStorage.setItem('activeTab', 'files')
+    navigateTab('files')
     window.dispatchEvent(new CustomEvent('trigger-upload'))
   }
 
@@ -98,8 +120,7 @@ export default function DashboardLayout() {
             <button
               key={item.id}
               onClick={() => {
-                setCurrentTab(item.id)
-                localStorage.setItem('activeTab', item.id)
+                navigateTab(item.id)
                 setSidebarOpen(false)
               }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -185,8 +206,7 @@ export default function DashboardLayout() {
                   </div>
                   <button
                     onClick={() => {
-                      setCurrentTab('settings')
-                      localStorage.setItem('activeTab', 'settings')
+                      navigateTab('settings')
                       setProfileOpen(false)
                     }}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-dark-500 w-full text-left"
@@ -207,11 +227,11 @@ export default function DashboardLayout() {
 
         {/* Page Content */}
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
-          {currentTab === 'dashboard' && <DashboardPage onNavigate={(tab) => { setCurrentTab(tab); localStorage.setItem('activeTab', tab) }} />}
-          {currentTab === 'files' && <FilesPage onViewVersions={(fileId) => { setSelectedFileId(fileId); setCurrentTab('versions') }} />}
+          {currentTab === 'dashboard' && <DashboardPage onNavigate={(tab) => navigateTab(tab)} />}
+          {currentTab === 'files' && <FilesPage onViewVersions={(fileId) => navigateTab('versions', fileId)} />}
           {currentTab === 'shared' && <SharedFilesPage />}
           {currentTab === 'settings' && <SettingsPage />}
-          {currentTab === 'versions' && <VersionPage fileId={selectedFileId} onBack={() => setCurrentTab('files')} />}
+          {currentTab === 'versions' && <VersionPage fileId={selectedFileId} onBack={() => window.history.back()} />}
         </main>
       </div>
     </div>

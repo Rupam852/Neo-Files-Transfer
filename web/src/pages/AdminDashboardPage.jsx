@@ -23,6 +23,29 @@ export default function AdminDashboardPage() {
   const [newAdminEmail, setNewAdminEmail] = useState('')
   const [addingAdmin, setAddingAdmin] = useState(false)
 
+  const navigateTab = (tab, push = true) => {
+    setActiveTab(tab)
+    if (push) {
+      window.history.pushState({ adminTab: tab }, '')
+    }
+  }
+
+  useEffect(() => {
+    // Set initial history state on mount
+    window.history.replaceState({ adminTab: activeTab }, '')
+
+    const handlePopState = (event) => {
+      if (event.state && event.state.adminTab) {
+        setActiveTab(event.state.adminTab)
+      } else {
+        setActiveTab('pending')
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
   useEffect(() => {
     fetchData(true)
 
@@ -424,7 +447,7 @@ export default function AdminDashboardPage() {
         {/* Tabs */}
         <div className="flex flex-wrap items-center gap-1 bg-dark-600 rounded-lg border border-dark-400 p-1 mb-6 w-fit">
           <button
-            onClick={() => setActiveTab('pending')}
+            onClick={() => navigateTab('pending')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === 'pending' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
             }`}
@@ -432,7 +455,7 @@ export default function AdminDashboardPage() {
             Pending ({pendingCount})
           </button>
           <button
-            onClick={() => setActiveTab('approved')}
+            onClick={() => navigateTab('approved')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === 'approved' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
             }`}
@@ -440,7 +463,7 @@ export default function AdminDashboardPage() {
             Approved ({approvedCount})
           </button>
           <button
-            onClick={() => setActiveTab('admins')}
+            onClick={() => navigateTab('admins')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === 'admins' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
             }`}
@@ -449,7 +472,7 @@ export default function AdminDashboardPage() {
             Admins ({adminsList.length})
           </button>
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => navigateTab('settings')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === 'settings' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
             }`}
