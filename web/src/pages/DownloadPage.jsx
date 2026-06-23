@@ -90,128 +90,36 @@ export default function DownloadPage() {
 
     try {
       const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder)
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      const fileLimit = isMobile 
-        ? 100 * 1024 * 1024  // 100MB limit for mobile to avoid RAM crashes
-        : 500 * 1024 * 1024  // 500MB limit for PC
 
-      // Bypass JS streaming only if the file size exceeds the safety limit
-      if (fileInfo.file_size && fileInfo.file_size > fileLimit) {
-        console.log('File size exceeds safety limit. Bypassing JS streaming to use native browser download manager.')
-        setStatus('downloading')
-        setProgress(15)
-        setDownloadStage('Connecting to proxy server...')
-        
-        setTimeout(() => {
-          setProgress(50)
-          setDownloadStage('Requesting file from Google Drive...')
-        }, 200)
-        
-        setTimeout(() => {
-          setProgress(85)
-          setDownloadStage('Initializing direct browser download stream...')
-        }, 450)
-        
-        setTimeout(() => {
-          setProgress(100)
-          setStatus('saving')
-          setDownloadStage('Downloading via native download manager...')
-          window.location.href = directUrl
-        }, 700)
-
-        setTimeout(() => {
-          setStatus('completed')
-          setDownloadStage('')
-        }, 2200) // Fast transition since browser handles the download stream in background
-        return
-      }
-
+      console.log('Using native browser download manager for maximum speed.')
       setStatus('downloading')
-      setProgress(0)
-      setDownloadedBytes(0)
-
-      // Start streaming download via proxy
-      const downloadUrl = `${directUrl}&stream=true`
+      setProgress(15)
+      setDownloadStage('Connecting to secure node...')
       
-      let response
-      try {
-        response = await fetch(downloadUrl)
-      } catch (fetchErr) {
-        console.warn('Initial fetch stream failed, falling back to direct browser download:', fetchErr)
-        setStatus('completed')
+      setTimeout(() => {
+        setProgress(50)
+        setDownloadStage('Requesting file stream...')
+      }, 300)
+      
+      setTimeout(() => {
+        setProgress(85)
+        setDownloadStage('Initializing direct high-speed transfer...')
+      }, 600)
+      
+      setTimeout(() => {
+        setProgress(100)
+        setStatus('saving')
+        setDownloadStage('Transfer active — downloading via browser manager...')
         window.location.href = directUrl
-        return
-      }
+      }, 900)
 
-      if (!response.ok) {
-        // Attempt to parse JSON error details
-        try {
-          const errData = await response.json()
-          if (errData?.fallbackUrl) {
-            console.log('Stream request failed, falling back to direct download URL:', errData.fallbackUrl)
-            window.location.href = errData.fallbackUrl
-            setStatus('completed')
-            return
-          }
-          throw new Error(errData?.error || `Server returned HTTP ${response.status}`)
-        } catch (jsonErr) {
-          if (jsonErr instanceof SyntaxError) {
-            throw new Error(`Google Drive Proxy returned HTTP ${response.status}`)
-          }
-          throw jsonErr
-        }
-      }
-
-      if (!response.body) {
-        throw new Error('ReadableStream not supported by proxy response.')
-      }
-
-      const reader = response.body.getReader()
-      const chunks = []
-      let receivedLength = 0
-      const totalLength = fileInfo.file_size || parseInt(response.headers.get('Content-Length') || '0', 10)
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        
-        chunks.push(value)
-        receivedLength += value.length
-        setDownloadedBytes(receivedLength)
-        
-        if (totalLength) {
-          const pct = Math.min(Math.round((receivedLength / totalLength) * 100), 100)
-          setProgress(pct)
-        }
-      }
-
-      // Trigger client-side save
-      setStatus('saving')
-      setProgress(100)
-      
-      // Allow UI thread to update to the saving state before CPU intensive Blob parsing
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const mimeType = fileInfo.is_folder ? 'application/zip' : (fileInfo.mime_type || 'application/octet-stream')
-      const blob = new Blob(chunks, { type: mimeType })
-      const blobUrl = URL.createObjectURL(blob)
-      setDownloadBlobUrl(blobUrl)
-
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = fileInfo.is_folder 
-        ? (fileInfo.file_name.endsWith('.zip') ? fileInfo.file_name : `${fileInfo.file_name}.zip`)
-        : fileInfo.file_name
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-
-      // Wait 1.5 seconds for browser's native download UI to trigger before changing status to completed
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      setStatus('completed')
+      setTimeout(() => {
+        setStatus('completed')
+        setDownloadStage('')
+      }, 2500)
 
     } catch (err) {
-      console.error('Download stream error:', err)
+      console.error('Download error:', err)
       setErrorMsg(formatErrorMessage(err))
       setStatus('error')
     }
@@ -356,16 +264,8 @@ export default function DownloadPage() {
             </div>
             <button
               onClick={() => {
-                if (downloadBlobUrl) {
-                  const a = document.createElement('a')
-                  a.href = downloadBlobUrl
-                  a.download = fileInfo?.is_folder 
-                    ? (fileInfo.file_name.endsWith('.zip') ? fileInfo.file_name : `${fileInfo.file_name}.zip`)
-                    : (fileInfo?.file_name || 'download')
-                  a.click()
-                } else {
-                  window.location.reload()
-                }
+                const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder)
+                window.location.href = directUrl
               }}
               className="w-full btn-primary py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
             >
