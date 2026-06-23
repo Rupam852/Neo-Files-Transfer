@@ -1,0 +1,16 @@
+{
+  "name": "neo-transfer-proxy",
+  "version": "1.0.0",
+  "description": "High-performance streaming proxy backend for Neo Files Transfer",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "archiver": "^6.0.2",
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
