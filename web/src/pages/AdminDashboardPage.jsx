@@ -199,6 +199,11 @@ export default function AdminDashboardPage() {
   }
 
   async function deleteApprovedUser(email) {
+    if (adminEmails.has(email.toLowerCase())) {
+      toast.error('Cannot delete or revoke approval for an Administrator.')
+      return
+    }
+
     if (!confirm(`Are you sure you want to delete and revoke approval for ${email}?`)) return
     try {
       // Delete from approved_users

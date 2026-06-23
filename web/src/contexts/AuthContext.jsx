@@ -39,6 +39,33 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  useEffect(() => {
+    if (!user) return
+
+    // Subscribe to realtime updates for the current user's entry in the admins table
+    const adminChannel = supabase
+      .channel(`admin-status-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'admins',
+          filter: `user_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          console.log('Realtime admin status change:', payload)
+          await loadProfile(user)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(adminChannel)
+    }
+  }, [user])
+
+
   async function loadProfile(authUser) {
     try {
       // Load user profile
