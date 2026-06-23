@@ -98,7 +98,7 @@ export default function FilesPage({ onViewVersions }) {
       'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
       'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',
       'mp4', 'mkv', 'mov', 'avi',
-      'zip', 'rar', 'tar', 'gz', '7z', 'apk', 'txt'
+      'zip', 'rar', 'tar', 'gz', '7z', 'apk', 'xapk', 'txt'
     ]
 
     const isAllowedType = ALLOWED_TYPES.includes(file.type) ||
@@ -323,7 +323,7 @@ export default function FilesPage({ onViewVersions }) {
             ref={fileInputRef}
             type="file"
             className="hidden"
-            accept=".pdf,.docx,.xlsx,.pptx,.jpg,.png,.mp4,.zip"
+            accept=".pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.gif,.webp,.svg,.mp4,.mkv,.mov,.avi,.zip,.rar,.tar,.gz,.7z,.apk,.xapk,.txt"
             onChange={handleUpload}
           />
           <button
