@@ -177,8 +177,6 @@ serve(async (req) => {
         .eq("email", normalizedEmail)
         .maybeSingle()
 
-      const now = new Date()
-
       // Check if user is currently blocked
       if (existing && existing.blocked_until) {
         const blockedUntil = new Date(existing.blocked_until)
