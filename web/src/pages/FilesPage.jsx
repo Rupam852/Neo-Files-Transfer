@@ -1253,12 +1253,54 @@ export default function FilesPage({ onViewVersions }) {
                 </button>
               </div>
             ) : (
-              /* Links already generated — show permanent links */
+              /* Links already generated */
               <>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-                  <p className="text-xs text-emerald-400 font-medium">Share links are active and permanent</p>
+                {/* Status row */}
+                <div className="flex items-center justify-between gap-3">
+                  {shareModal.sharing_status === 'public' ? (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                      <p className="text-xs text-emerald-400 font-medium">Public — link is active</p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg flex-1">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                      <p className="text-xs text-amber-400 font-medium">Private — link is blocked</p>
+                    </div>
+                  )}
+                  {/* Inline toggle button */}
+                  <button
+                    onClick={async () => {
+                      const newStatus = shareModal.sharing_status === 'public' ? 'private' : 'public'
+                      try {
+                        const { error } = await supabase
+                          .from('shared_files')
+                          .update({ sharing_status: newStatus })
+                          .eq('id', shareModal.id)
+                        if (error) throw error
+                        setShareModal(prev => ({ ...prev, sharing_status: newStatus }))
+                        loadFiles()
+                        toast.success(`Link is now ${newStatus}`)
+                      } catch (err) {
+                        toast.error('Failed to update: ' + err.message)
+                      }
+                    }}
+                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      shareModal.sharing_status === 'public'
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
+                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                    }`}
+                  >
+                    {shareModal.sharing_status === 'public' ? '🔒 Make Private' : '🌐 Make Public'}
+                  </button>
                 </div>
+
+                {/* Private warning */}
+                {shareModal.sharing_status === 'private' && (
+                  <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg px-3 py-2 text-xs text-amber-300/80 leading-relaxed">
+                    ⚠️ Link is currently <strong>blocked</strong>. Anyone visiting this link will see an "Access Denied" page. Click <strong>Make Public</strong> above to re-enable it. The link URL will not change.
+                  </div>
+                )}
 
                 {/* Option A: Web Share Link */}
                 <div className="space-y-1.5">
@@ -1269,7 +1311,7 @@ export default function FilesPage({ onViewVersions }) {
                     <input
                       type="text"
                       readOnly
-                      className="input-field text-xs bg-dark-500 py-2 border-dark-400 select-all"
+                      className={`input-field text-xs bg-dark-500 py-2 border-dark-400 select-all transition-opacity ${shareModal.sharing_status === 'private' ? 'opacity-50' : ''}`}
                       value={generateShareUrl(shareModal.unique_share_hash)}
                     />
                     <button
@@ -1283,7 +1325,7 @@ export default function FilesPage({ onViewVersions }) {
                     </button>
                   </div>
                   <p className="text-[11px] text-gray-400 leading-normal">
-                    Opens the beautiful download page with real-time progress bar. Perfect for sharing with users.
+                    Opens the beautiful download page with real-time progress bar.
                   </p>
                 </div>
 
@@ -1296,7 +1338,7 @@ export default function FilesPage({ onViewVersions }) {
                     <input
                       type="text"
                       readOnly
-                      className="input-field text-xs bg-dark-500 py-2 border-dark-400 select-all"
+                      className={`input-field text-xs bg-dark-500 py-2 border-dark-400 select-all transition-opacity ${shareModal.sharing_status === 'private' ? 'opacity-50' : ''}`}
                       value={generateDirectDownloadUrl(shareModal.unique_share_hash)}
                     />
                     <button
@@ -1310,7 +1352,7 @@ export default function FilesPage({ onViewVersions }) {
                     </button>
                   </div>
                   <p className="text-[11px] text-gray-400 leading-normal">
-                    Direct stream connection. Clicking this link starts downloading instantly without redirecting.
+                    Direct stream connection. Clicking this link starts downloading instantly.
                   </p>
                 </div>
               </>
