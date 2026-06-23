@@ -195,12 +195,14 @@ export default function SettingsPage() {
               Google Drive access keys are stored securely in your database profile and auto-renewed automatically. 
               {!profile?.google_refresh_token && " Please link your Google Drive below to enable file uploads."}
             </p>
-            <button
-              onClick={() => signInWithGoogle(true)}
-              className="w-full btn-secondary text-xs flex items-center justify-center gap-1.5 py-2 hover:bg-dark-400 transition-colors"
-            >
-              Link / Re-authorize Google Drive
-            </button>
+            {!profile?.google_refresh_token && (
+              <button
+                onClick={() => signInWithGoogle(true)}
+                className="w-full btn-secondary text-xs flex items-center justify-center gap-1.5 py-2 hover:bg-dark-400 transition-colors"
+              >
+                Link / Re-authorize Google Drive
+              </button>
+            )}
           </div>
 
           {profile?.drive_folder_id && (
