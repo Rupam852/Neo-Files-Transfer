@@ -39,35 +39,65 @@ serve(async (req) => {
 
     const accessToken = session.provider_token
 
-    // Validate folder using Google Drive API
-    const driveResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${folder_id}?fields=id,name,mimeType,webContentLink,webViewLink`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    )
+    let isValid = false
+    let folderName = "Google Drive Folder"
 
-    if (!driveResponse.ok) {
-      const errorData = await driveResponse.json()
-      throw new Error(errorData.error?.message || "Folder not found or not accessible")
+    if (accessToken) {
+      try {
+        const driveResponse = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${folder_id}?fields=id,name,mimeType`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        )
+        if (driveResponse.ok) {
+          const folderData = await driveResponse.json()
+          if (folderData.mimeType === "application/vnd.google-apps.folder") {
+            isValid = true
+            folderName = folderData.name
+          }
+        }
+      } catch (e) {
+        console.error("Google Drive API check failed:", e)
+      }
     }
 
-    const folderData = await driveResponse.json()
+    if (!isValid) {
+      // Fallback to checking the public folder page
+      try {
+        const publicResponse = await fetch(
+          `https://drive.google.com/drive/folders/${folder_id}`,
+          { method: "HEAD" }
+        )
+        if (publicResponse.status === 200) {
+          isValid = true
+        } else {
+          // If HEAD fails or gets blocked, try a GET request
+          const publicResponseGet = await fetch(
+            `https://drive.google.com/drive/folders/${folder_id}`
+          )
+          if (publicResponseGet.status === 200) {
+            isValid = true
+          }
+        }
+      } catch (e) {
+        console.error("Public folder check failed:", e)
+      }
+    }
 
-    // Verify it's actually a folder
-    if (folderData.mimeType !== "application/vnd.google-apps.folder") {
-      throw new Error("The provided ID is not a Google Drive folder")
+    if (!isValid) {
+      throw new Error("Folder not found or not accessible. Make sure sharing is set to 'Anyone with the link can view'.")
     }
 
     return new Response(
       JSON.stringify({
         success: true,
         folder: {
-          id: folderData.id,
-          name: folderData.name,
-          mimeType: folderData.mimeType,
+          id: folder_id,
+          name: folderName,
+          mimeType: "application/vnd.google-apps.folder",
         },
       }),
       {
