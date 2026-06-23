@@ -3,6 +3,90 @@ import cors from 'cors'
 import { createClient } from '@supabase/supabase-js'
 import archiver from 'archiver'
 import { Readable } from 'stream'
+import https from 'https'
+
+const destroyStream = (stream) => {
+  if (stream) {
+    if (typeof stream.destroy === 'function') {
+      stream.destroy()
+    } else if (typeof stream.resume === 'function') {
+      stream.resume()
+    }
+  }
+}
+
+const fetchMediaFromDriveNode = (driveId, token) => {
+  return new Promise((resolve, reject) => {
+    const req = https.get(
+      `https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        timeout: 60000 // 60s inactivity timeout
+      },
+      (res) => {
+        resolve(res)
+      }
+    )
+    req.on('error', (err) => {
+      reject(err)
+    })
+    req.on('timeout', () => {
+      req.destroy(new Error('Google Drive API connection timed out.'))
+    })
+  })
+}
+
+const appendStreamToArchive = (archiveInstance, source, name) => {
+  return new Promise((resolve, reject) => {
+    let settled = false
+
+    const cleanup = () => {
+      settled = true
+      archiveInstance.removeListener('entry', onEntry)
+      archiveInstance.removeListener('error', onError)
+      if (source && typeof source.removeListener === 'function') {
+        source.removeListener('error', onSourceError)
+      }
+    }
+
+    const onEntry = (entry) => {
+      if (!settled) {
+        cleanup()
+        resolve()
+      }
+    }
+
+    const onError = (err) => {
+      if (!settled) {
+        cleanup()
+        reject(err)
+      }
+    }
+
+    const onSourceError = (err) => {
+      if (!settled) {
+        cleanup()
+        reject(err)
+      }
+    }
+
+    if (source && typeof source.on === 'function') {
+      source.on('error', onSourceError)
+    }
+
+    archiveInstance.on('entry', onEntry)
+    archiveInstance.on('error', onError)
+
+    try {
+      archiveInstance.append(source, { name })
+    } catch (err) {
+      cleanup()
+      reject(err)
+    }
+  })
+}
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -197,9 +281,18 @@ app.get('/download-file', async (req, res) => {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
 
       const archive = archiver('zip', { zlib: { level: 5 } })
-      
+      let aborted = false
+
+      res.on('close', () => {
+        console.log('Client aborted connection. Destroying ZIP archive stream.')
+        aborted = true
+        archive.destroy()
+      })
+
       archive.on('error', (err) => {
         console.error('Archiver error:', err)
+        aborted = true
+        archive.destroy()
         if (!res.headersSent) {
           res.status(500).end('ZIP compilation aborted due to an internal error.')
         }
@@ -210,59 +303,91 @@ app.get('/download-file', async (req, res) => {
 
       // Process and append files one by one (fully streamed)
       for (const item of filesToZip) {
+        if (aborted) {
+          console.log('ZIP creation aborted before processing:', item.relativePath)
+          break
+        }
+
         if (item.is_folder) {
-          archive.append('', { name: item.relativePath + '/' })
+          try {
+            await appendStreamToArchive(archive, '', item.relativePath + '/')
+          } catch (folderErr) {
+            console.error(`Error appending folder ${item.relativePath}:`, folderErr)
+            aborted = true
+            archive.destroy()
+            break
+          }
           continue
         }
 
+        let fileResponse = null
         try {
-          let fileResponse = await fetchMediaFromDrive(item.google_drive_file_id, accessToken)
+          fileResponse = await fetchMediaFromDriveNode(item.google_drive_file_id, accessToken)
 
-          if (fileResponse.status === 401 && refreshToken) {
-            accessToken = await refreshGoogleToken(file.user_id, refreshToken, supabaseAdmin)
-            fileResponse = await fetchMediaFromDrive(item.google_drive_file_id, accessToken)
+          if (aborted) {
+            destroyStream(fileResponse)
+            break
           }
 
-          if (fileResponse.ok && fileResponse.body) {
-            // Convert Web ReadableStream to Node Readable
-            const nodeReadableStream = Readable.fromWeb(fileResponse.body)
-            archive.append(nodeReadableStream, { name: item.relativePath })
+          if (fileResponse.statusCode === 401 && refreshToken) {
+            destroyStream(fileResponse)
+            accessToken = await refreshGoogleToken(file.user_id, refreshToken, supabaseAdmin)
+            if (aborted) break
+            fileResponse = await fetchMediaFromDriveNode(item.google_drive_file_id, accessToken)
+          }
+
+          if (aborted) {
+            destroyStream(fileResponse)
+            break
+          }
+
+          if (fileResponse.statusCode === 200) {
+            await appendStreamToArchive(archive, fileResponse, item.relativePath)
           } else {
-            console.error(`Failed to fetch file ${item.file_name} from Drive during folder compilation. Status: ${fileResponse.status}`)
+            console.error(`Failed to fetch file ${item.file_name} from Drive during folder compilation. Status: ${fileResponse.statusCode}`)
+            destroyStream(fileResponse)
           }
         } catch (itemErr) {
           console.error(`Error processing file ${item.file_name} for ZIP:`, itemErr)
+          destroyStream(fileResponse)
+          aborted = true
+          archive.destroy()
+          break
         }
       }
 
-      // Increment download count in database asynchronously
-      supabaseAdmin.rpc('increment_download_count', { file_id: file.id }).catch((err) => {
-        console.error('Failed to increment download count:', err)
-      })
+      if (!aborted) {
+        // Increment download count in database asynchronously
+        supabaseAdmin.rpc('increment_download_count', { file_id: file.id }).catch((err) => {
+          console.error('Failed to increment download count:', err)
+        })
 
-      // Finalize the archive stream
-      archive.finalize()
+        // Finalize the archive stream
+        archive.finalize()
+      }
       return
     }
 
     // --- CASE B: SINGLE FILE STREAMING ---
-    let driveResponse = await fetchMediaFromDrive(driveFileId, accessToken)
+    let driveResponse = await fetchMediaFromDriveNode(driveFileId, accessToken)
 
-    if (driveResponse.status === 401 && refreshToken) {
+    if (driveResponse.statusCode === 401 && refreshToken) {
       try {
+        destroyStream(driveResponse)
         accessToken = await refreshGoogleToken(file.user_id, refreshToken, supabaseAdmin)
-        driveResponse = await fetchMediaFromDrive(driveFileId, accessToken)
+        driveResponse = await fetchMediaFromDriveNode(driveFileId, accessToken)
       } catch (refreshErr) {
         console.error('Token refresh failed during download retry:', refreshErr)
       }
     }
 
-    if (!driveResponse.ok) {
-      console.error('Google Drive alt=media fetch failed with status:', driveResponse.status)
+    if (driveResponse.statusCode !== 200) {
+      console.error('Google Drive alt=media fetch failed with status:', driveResponse.statusCode)
+      destroyStream(driveResponse)
       const downloadUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}`
       if (isStream) {
         return res.status(400).json({
-          error: `Failed to fetch file content from Google Drive (HTTP ${driveResponse.status})`,
+          error: `Failed to fetch file content from Google Drive (HTTP ${driveResponse.statusCode})`,
           fallbackUrl: downloadUrl
         })
       }
@@ -270,12 +395,12 @@ app.get('/download-file', async (req, res) => {
     }
 
     // Set correct headers
-    const contentType = file.mime_type || driveResponse.headers.get('Content-Type') || 'application/octet-stream'
+    const contentType = file.mime_type || driveResponse.headers['content-type'] || 'application/octet-stream'
     res.setHeader('Content-Type', contentType)
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.file_name)}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`)
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
     
-    const gDriveContentLength = driveResponse.headers.get('Content-Length')
+    const gDriveContentLength = driveResponse.headers['content-length']
     if (gDriveContentLength) {
       res.setHeader('Content-Length', gDriveContentLength)
     } else if (file.file_size) {
@@ -289,9 +414,14 @@ app.get('/download-file', async (req, res) => {
       console.error('Failed to increment download count:', err)
     })
 
+    // Listen for client abort to clean up stream and prevent socket leak
+    res.on('close', () => {
+      console.log('Client aborted single file download. Destroying Drive response stream.')
+      destroyStream(driveResponse)
+    })
+
     // Stream directly from Drive to Client
-    const driveStream = Readable.fromWeb(driveResponse.body)
-    driveStream.pipe(res)
+    driveResponse.pipe(res)
 
   } catch (error) {
     console.error('Download Proxy Error:', error)
