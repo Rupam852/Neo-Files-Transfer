@@ -9,6 +9,7 @@ export default function SharedFilesPage() {
   const { user } = useAuth()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
+  const [processingText, setProcessingText] = useState(null)
 
   useEffect(() => {
     loadSharedFiles()
@@ -32,6 +33,7 @@ export default function SharedFilesPage() {
 
   async function toggleStatus(file) {
     const newStatus = file.sharing_status === 'public' ? 'private' : 'public'
+    setProcessingText(newStatus === 'public' ? 'Making file public...' : 'Making file private...')
     try {
       await supabase
         .from('shared_files')
@@ -42,6 +44,8 @@ export default function SharedFilesPage() {
       loadSharedFiles()
     } catch (err) {
       toast.error('Failed to update')
+    } finally {
+      setProcessingText(null)
     }
   }
 
@@ -119,6 +123,18 @@ export default function SharedFilesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Global Processing Loader Spinner */}
+      {processingText && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-dark-600 border border-dark-400 rounded-2xl max-w-xs w-full p-6 space-y-4 shadow-2xl animate-scale-in text-center">
+            <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-gray-200 text-sm font-medium font-['Space_Grotesk'] tracking-wide">
+              {processingText}
+            </p>
+          </div>
         </div>
       )}
     </div>

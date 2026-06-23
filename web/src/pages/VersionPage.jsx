@@ -17,6 +17,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
   const [versions, setVersions] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [processingText, setProcessingText] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -64,6 +65,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
     }
 
     setUploading(true)
+    setProcessingText('Uploading version...')
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
@@ -115,6 +117,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
       toast.error(err.message || 'Version upload failed')
     } finally {
       setUploading(false)
+      setProcessingText(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
@@ -139,12 +142,12 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
           onClick={() => goBack()}
-          className="p-2 hover:bg-dark-500 rounded-lg"
+          className="p-2 hover:bg-dark-500 rounded-lg animate-fade-in"
         >
           <ArrowLeft size={20} className="text-gray-400" />
         </button>
@@ -223,6 +226,18 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
           )}
         </div>
       </div>
+
+      {/* Global Processing Loader Spinner */}
+      {processingText && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-dark-600 border border-dark-400 rounded-2xl max-w-xs w-full p-6 space-y-4 shadow-2xl animate-scale-in text-center">
+            <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-gray-200 text-sm font-medium font-['Space_Grotesk'] tracking-wide">
+              {processingText}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

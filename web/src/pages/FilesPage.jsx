@@ -64,6 +64,7 @@ export default function FilesPage({ onViewVersions }) {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [processingText, setProcessingText] = useState(null)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('created_at')
   const [sortDir, setSortDir] = useState('desc')
@@ -154,6 +155,7 @@ export default function FilesPage({ onViewVersions }) {
     }
 
     setUploading(true)
+    setProcessingText('Uploading file...')
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
@@ -224,12 +226,14 @@ export default function FilesPage({ onViewVersions }) {
       toast.error(err.message || 'Upload failed')
     } finally {
       setUploading(false)
+      setProcessingText(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
   async function handleRename() {
     if (!newName.trim()) return
+    setProcessingText('Renaming file...')
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
@@ -270,10 +274,13 @@ export default function FilesPage({ onViewVersions }) {
       loadFiles()
     } catch (err) {
       toast.error('Failed to rename file')
+    } finally {
+      setProcessingText(null)
     }
   }
 
   async function handleDelete() {
+    setProcessingText('Deleting file...')
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
@@ -311,11 +318,14 @@ export default function FilesPage({ onViewVersions }) {
       loadFiles()
     } catch (err) {
       toast.error('Failed to delete file')
+    } finally {
+      setProcessingText(null)
     }
   }
 
   async function toggleSharing(file) {
     const newStatus = file.sharing_status === 'public' ? 'private' : 'public'
+    setProcessingText(newStatus === 'public' ? 'Making file public...' : 'Making file private...')
     try {
       await supabase
         .from('shared_files')
@@ -332,6 +342,8 @@ export default function FilesPage({ onViewVersions }) {
       loadFiles()
     } catch (err) {
       toast.error('Failed to update sharing status')
+    } finally {
+      setProcessingText(null)
     }
   }
 
@@ -581,6 +593,18 @@ export default function FilesPage({ onViewVersions }) {
             <button className="btn-danger text-sm" onClick={handleDelete}>Delete</button>
           </div>
         </Modal>
+      )}
+
+      {/* Global Processing Loader Spinner */}
+      {processingText && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-dark-600 border border-dark-400 rounded-2xl max-w-xs w-full p-6 space-y-4 shadow-2xl animate-scale-in text-center">
+            <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-gray-200 text-sm font-medium font-['Space_Grotesk'] tracking-wide">
+              {processingText}
+            </p>
+          </div>
+        </div>
       )}
     </div>
   )
