@@ -15,6 +15,13 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       if (session?.user) {
+        if (session.provider_token) {
+          try {
+            localStorage.setItem('google_provider_token', session.provider_token)
+          } catch (e) {
+            console.error('Error saving provider token:', e)
+          }
+        }
         loadProfile(session.user)
       } else {
         setLoading(false)
@@ -26,8 +33,18 @@ export function AuthProvider({ children }) {
       (_event, session) => {
         setUser(session?.user ?? null)
         if (session?.user) {
+          if (session.provider_token) {
+            try {
+              localStorage.setItem('google_provider_token', session.provider_token)
+            } catch (e) {
+              console.error('Error saving provider token:', e)
+            }
+          }
           loadProfile(session.user)
         } else {
+          try {
+            localStorage.removeItem('google_provider_token')
+          } catch (e) {}
           setProfile(null)
           setIsAdmin(false)
           setAdminRecord(null)

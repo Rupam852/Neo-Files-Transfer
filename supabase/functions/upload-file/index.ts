@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { encode } from "https://deno.land/std@0.168.0/encoding/base64.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,15 +40,27 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    const { data: { session } } = await supabaseClient.auth.getSession()
-    if (!session) {
+    // Verify JWT token on Supabase server using getUser
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+    if (authError || !user) {
       throw new Error("Not authenticated")
     }
 
-    const accessToken = session.provider_token
     const formData = await req.formData()
     const file = formData.get("file") as File
     const folderId = formData.get("folder_id") as string
+    const clientProviderToken = formData.get("provider_token") as string
+
+    // Fall back to getSession if not provided in formData
+    let accessToken = clientProviderToken
+    if (!accessToken) {
+      const { data: { session } } = await supabaseClient.auth.getSession()
+      accessToken = session?.provider_token
+    }
+
+    if (!accessToken) {
+      throw new Error("Google Drive access token not found. Please sign out and sign in again.")
+    }
 
     if (!file) {
       throw new Error("No file provided")
@@ -95,10 +108,8 @@ serve(async (req) => {
     const filePartEncoded = encoder.encode(filePart)
     const closeDelimiterEncoded = encoder.encode(closeDelimiter)
 
-    // Convert file bytes to base64
-    const base64String = btoa(
-      new Uint8Array(fileBytes).reduce((data, byte) => data + String.fromCharCode(byte), "")
-    )
+    // Convert file bytes to base64 using fast Deno std encoder
+    const base64String = encode(new Uint8Array(fileBytes))
     const base64Encoded = encoder.encode(base64String)
 
     const body = new Uint8Array(

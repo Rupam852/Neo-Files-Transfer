@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { file_id, new_name } = await req.json()
+    const { file_id, new_name, provider_token } = await req.json()
 
     if (!file_id || !new_name) {
       throw new Error("file_id and new_name are required")
@@ -30,12 +30,22 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    const { data: { session } } = await supabaseClient.auth.getSession()
-    if (!session) {
+    // Verify JWT token on Supabase server using getUser
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+    if (authError || !user) {
       throw new Error("Not authenticated")
     }
 
-    const accessToken = session.provider_token
+    // Fall back to getSession if not provided in JSON body
+    let accessToken = provider_token
+    if (!accessToken) {
+      const { data: { session } } = await supabaseClient.auth.getSession()
+      accessToken = session?.provider_token
+    }
+
+    if (!accessToken) {
+      throw new Error("Google Drive access token not found. Please sign out and sign in again.")
+    }
 
     // Rename file in Google Drive
     const driveResponse = await fetch(

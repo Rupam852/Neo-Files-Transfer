@@ -126,11 +126,13 @@ export default function FilesPage({ onViewVersions }) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
+      const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
 
       // Upload via edge function
       const formData = new FormData()
       formData.append('file', file)
       formData.append('folder_id', profile.drive_folder_id)
+      formData.append('provider_token', googleToken)
 
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-file`,
@@ -200,6 +202,7 @@ export default function FilesPage({ onViewVersions }) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
+      const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
 
       await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rename-file`,
@@ -212,6 +215,7 @@ export default function FilesPage({ onViewVersions }) {
           body: JSON.stringify({
             file_id: renameModal.google_drive_file_id,
             new_name: newName,
+            provider_token: googleToken,
           }),
         }
       )
@@ -242,6 +246,7 @@ export default function FilesPage({ onViewVersions }) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
+      const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
 
       await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-file`,
@@ -253,6 +258,7 @@ export default function FilesPage({ onViewVersions }) {
           },
           body: JSON.stringify({
             file_id: deleteConfirm.google_drive_file_id,
+            provider_token: googleToken,
           }),
         }
       )

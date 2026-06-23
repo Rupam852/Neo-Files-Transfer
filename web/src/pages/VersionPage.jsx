@@ -67,10 +67,12 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
+      const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
 
       const formData = new FormData()
       formData.append('file', selectedFile)
       formData.append('folder_id', profile.drive_folder_id)
+      formData.append('provider_token', googleToken)
 
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-version`,
