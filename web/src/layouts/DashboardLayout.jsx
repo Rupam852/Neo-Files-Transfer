@@ -43,13 +43,24 @@ export default function DashboardLayout() {
       return 'dashboard'
     }
   })
-  const [selectedFileId, setSelectedFileId] = useState(null)
+  const [selectedFileId, setSelectedFileId] = useState(() => {
+    try {
+      return localStorage.getItem('activeFileId') || null
+    } catch (e) {
+      return null
+    }
+  })
 
   const navigateTab = (tab, fileId = null, push = true) => {
     setCurrentTab(tab)
     setSelectedFileId(fileId)
     try {
       localStorage.setItem('activeTab', tab)
+      if (fileId) {
+        localStorage.setItem('activeFileId', fileId)
+      } else {
+        localStorage.removeItem('activeFileId')
+      }
       if (push && window.history?.pushState) {
         window.history.pushState({ tab, fileId }, '')
       }
@@ -59,10 +70,24 @@ export default function DashboardLayout() {
   }
 
   useEffect(() => {
-    // Set initial history state on mount
+    // Restore and setup initial history state on mount
     try {
-      if (window.history?.replaceState) {
-        window.history.replaceState({ tab: currentTab, fileId: selectedFileId }, '')
+      const currentState = window.history.state
+      if (currentState && currentState.tab) {
+        setCurrentTab(currentState.tab)
+        setSelectedFileId(currentState.fileId || null)
+        localStorage.setItem('activeTab', currentState.tab)
+        if (currentState.fileId) {
+          localStorage.setItem('activeFileId', currentState.fileId)
+        } else {
+          localStorage.removeItem('activeFileId')
+        }
+      } else {
+        const storedTab = localStorage.getItem('activeTab') || 'dashboard'
+        const storedFileId = localStorage.getItem('activeFileId') || null
+        if (window.history?.replaceState) {
+          window.history.replaceState({ tab: storedTab, fileId: storedFileId }, '')
+        }
       }
     } catch (e) {
       console.error('History API error on mount:', e)
@@ -72,9 +97,21 @@ export default function DashboardLayout() {
       if (event.state && event.state.tab) {
         setCurrentTab(event.state.tab)
         setSelectedFileId(event.state.fileId || null)
+        try {
+          localStorage.setItem('activeTab', event.state.tab)
+          if (event.state.fileId) {
+            localStorage.setItem('activeFileId', event.state.fileId)
+          } else {
+            localStorage.removeItem('activeFileId')
+          }
+        } catch (e) {}
       } else {
         setCurrentTab('dashboard')
         setSelectedFileId(null)
+        try {
+          localStorage.setItem('activeTab', 'dashboard')
+          localStorage.removeItem('activeFileId')
+        } catch (e) {}
       }
     }
 
