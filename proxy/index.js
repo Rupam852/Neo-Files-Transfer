@@ -272,7 +272,19 @@ app.get('/download-file', async (req, res) => {
       console.warn('Failed to ensure Google Drive file is public:', permErr)
     }
 
-    const downloadUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}`
+    let confirmToken = 't'
+    try {
+      const gDriveRes = await fetch(`https://drive.google.com/uc?export=download&id=${driveFileId}`)
+      const html = await gDriveRes.text()
+      const confirmMatch = html.match(/confirm=([a-zA-Z0-9_-]+)/)
+      if (confirmMatch) {
+        confirmToken = confirmMatch[1]
+      }
+    } catch (tokenErr) {
+      console.warn('Failed to resolve Google Drive bypass token:', tokenErr)
+    }
+
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}&confirm=${confirmToken}`
     return res.redirect(downloadUrl)
 
   } catch (error) {
