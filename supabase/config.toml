@@ -24,3 +24,7 @@ verify_jwt = false
 
 [functions.create-folder]
 verify_jwt = true
+
+[functions.ping]
+verify_jwt = false
+
