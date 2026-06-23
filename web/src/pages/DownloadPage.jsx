@@ -37,7 +37,7 @@ export default function DownloadPage() {
   }, [downloadBlobUrl])
 
   useEffect(() => {
-    async function resolveDownload() {
+    async function loadMetadata() {
       try {
         // Validate share hash
         const { data: file, error } = await supabase
@@ -72,97 +72,118 @@ export default function DownloadPage() {
           return
         }
 
-        const directUrl = generateDirectDownloadUrl(hash)
-        const fileLimit = 50 * 1024 * 1024 // 50MB
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-
-        // If file is very large or we are on mobile and file is moderately large, bypass streaming to avoid browser memory crashes
-        if (file.file_size && (file.file_size > fileLimit || (isMobile && file.file_size > 15 * 1024 * 1024))) {
-          console.log('Bypassing JS streaming due to size/mobile constraints. Initiating direct browser download.')
-          setStatus('completed')
-          window.location.href = directUrl
-          return
-        }
-
-        setStatus('downloading')
-
-        // Start streaming download via proxy
-        const downloadUrl = `${directUrl}&stream=true`
-        
-        let response
-        try {
-          response = await fetch(downloadUrl)
-        } catch (fetchErr) {
-          console.warn('Initial fetch stream failed, falling back to direct browser download:', fetchErr)
-          setStatus('completed')
-          window.location.href = directUrl
-          return
-        }
-
-        if (!response.ok) {
-          // Attempt to parse JSON error details
-          try {
-            const errData = await response.json()
-            if (errData?.fallbackUrl) {
-              console.log('Stream request failed, falling back to direct download URL:', errData.fallbackUrl)
-              window.location.href = errData.fallbackUrl
-              return
-            }
-            throw new Error(errData?.error || `Server returned HTTP ${response.status}`)
-          } catch (jsonErr) {
-            if (jsonErr instanceof SyntaxError) {
-              throw new Error(`Google Drive Proxy returned HTTP ${response.status}`)
-            }
-            throw jsonErr
-          }
-        }
-
-        if (!response.body) {
-          throw new Error('ReadableStream not supported by proxy response.')
-        }
-
-        const reader = response.body.getReader()
-        const chunks = []
-        let receivedLength = 0
-        const totalLength = file.file_size || parseInt(response.headers.get('Content-Length') || '0', 10)
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          
-          chunks.push(value)
-          receivedLength += value.length
-          setDownloadedBytes(receivedLength)
-          
-          if (totalLength) {
-            const pct = Math.min(Math.round((receivedLength / totalLength) * 100), 100)
-            setProgress(pct)
-          }
-        }
-
-        // Trigger client-side save
-        const blob = new Blob(chunks, { type: file.mime_type || 'application/octet-stream' })
-        const blobUrl = URL.createObjectURL(blob)
-        setDownloadBlobUrl(blobUrl)
-
-        setStatus('completed')
-
-        const a = document.createElement('a')
-        a.href = blobUrl
-        a.download = file.file_name
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
+        setStatus('preview')
 
       } catch (err) {
-        console.error('Download stream error:', err)
-        setErrorMsg(formatErrorMessage(err))
+        console.error('Metadata resolve error:', err)
+        setErrorMsg('Failed to resolve sharing details.')
         setStatus('error')
       }
     }
 
-    resolveDownload()
+    loadMetadata()
   }, [hash])
+
+  const handleStartDownload = async () => {
+    if (!fileInfo) return
+
+    try {
+      const directUrl = generateDirectDownloadUrl(hash)
+      const fileLimit = 50 * 1024 * 1024 // 50MB
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+
+      // If file is very large or we are on mobile and file is moderately large, bypass streaming to avoid browser memory crashes
+      if (fileInfo.file_size && (fileInfo.file_size > fileLimit || (isMobile && fileInfo.file_size > 15 * 1024 * 1024))) {
+        console.log('Bypassing JS streaming due to size/mobile constraints. Initiating direct browser download.')
+        setStatus('downloading')
+        setProgress(100)
+        
+        setTimeout(() => {
+          window.location.href = directUrl
+          setStatus('completed')
+        }, 800)
+        return
+      }
+
+      setStatus('downloading')
+      setProgress(0)
+      setDownloadedBytes(0)
+
+      // Start streaming download via proxy
+      const downloadUrl = `${directUrl}&stream=true`
+      
+      let response
+      try {
+        response = await fetch(downloadUrl)
+      } catch (fetchErr) {
+        console.warn('Initial fetch stream failed, falling back to direct browser download:', fetchErr)
+        setStatus('completed')
+        window.location.href = directUrl
+        return
+      }
+
+      if (!response.ok) {
+        // Attempt to parse JSON error details
+        try {
+          const errData = await response.json()
+          if (errData?.fallbackUrl) {
+            console.log('Stream request failed, falling back to direct download URL:', errData.fallbackUrl)
+            window.location.href = errData.fallbackUrl
+            setStatus('completed')
+            return
+          }
+          throw new Error(errData?.error || `Server returned HTTP ${response.status}`)
+        } catch (jsonErr) {
+          if (jsonErr instanceof SyntaxError) {
+            throw new Error(`Google Drive Proxy returned HTTP ${response.status}`)
+          }
+          throw jsonErr
+        }
+      }
+
+      if (!response.body) {
+        throw new Error('ReadableStream not supported by proxy response.')
+      }
+
+      const reader = response.body.getReader()
+      const chunks = []
+      let receivedLength = 0
+      const totalLength = fileInfo.file_size || parseInt(response.headers.get('Content-Length') || '0', 10)
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        chunks.push(value)
+        receivedLength += value.length
+        setDownloadedBytes(receivedLength)
+        
+        if (totalLength) {
+          const pct = Math.min(Math.round((receivedLength / totalLength) * 100), 100)
+          setProgress(pct)
+        }
+      }
+
+      // Trigger client-side save
+      const blob = new Blob(chunks, { type: fileInfo.mime_type || 'application/octet-stream' })
+      const blobUrl = URL.createObjectURL(blob)
+      setDownloadBlobUrl(blobUrl)
+
+      setStatus('completed')
+
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = fileInfo.file_name
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+
+    } catch (err) {
+      console.error('Download stream error:', err)
+      setErrorMsg(formatErrorMessage(err))
+      setStatus('error')
+    }
+  }
 
   // Get file icon based on mime type
   const iconName = getFileIcon(fileInfo?.mime_type)
@@ -191,6 +212,42 @@ export default function DownloadPage() {
       {/* Main Card Container */}
       <div className="w-full max-w-lg bg-slate-950/80 backdrop-blur-3xl border border-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10">
         
+        {/* State: preview */}
+        {status === 'preview' && (
+          <div className="space-y-6">
+            <div className="text-center space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full text-xs font-semibold uppercase tracking-wider mb-2">
+                <Download size={12} />
+                Secure Link Resolved
+              </div>
+              <h2 className="text-2xl font-bold text-white font-['Space_Grotesk']">Ready to Download</h2>
+              <p className="text-sm text-slate-400 text-center">Click below to start retrieving files from the Shield node.</p>
+            </div>
+
+            {/* File Info Block */}
+            <div className="bg-slate-900/50 border border-slate-900 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-14 h-14 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center justify-center text-indigo-400 flex-shrink-0">
+                <FileIcon size={28} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-white truncate leading-tight mb-1">{fileInfo?.file_name}</p>
+                <p className="text-xs text-slate-400 font-medium">{formatFileSize(totalBytes)}</p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleStartDownload}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] active:scale-[0.98]"
+            >
+              <Download size={18} /> Download Now
+            </button>
+            
+            <p className="text-center text-xs text-slate-500">
+              Files are transferred securely with TLS encryption.
+            </p>
+          </div>
+        )}
+
         {/* State: downloading */}
         {status === 'downloading' && (
           <div className="space-y-6">
