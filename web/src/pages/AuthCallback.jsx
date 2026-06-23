@@ -15,13 +15,12 @@ export default function AuthCallback() {
         return
       }
 
-      // Capture and save Google provider token immediately
+      // Capture and save Google provider token and refresh token immediately
       if (session.provider_token) {
-        try {
-          localStorage.setItem('google_provider_token', session.provider_token)
-        } catch (e) {
-          console.error('Error saving provider token:', e)
-        }
+        localStorage.setItem('google_provider_token', session.provider_token)
+      }
+      if (session.provider_refresh_token) {
+        localStorage.setItem('google_refresh_token', session.provider_refresh_token)
       }
 
       const userEmail = session.user.email
@@ -47,7 +46,18 @@ export default function AuthCallback() {
         return
       }
 
-      // Create/update user profile if it doesn't exist
+      // Create/update user profile
+      const updateData = {
+        name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
+        avatar_url: session.user.user_metadata?.avatar_url || '',
+      }
+      if (session.provider_token) {
+        updateData.google_access_token = session.provider_token
+      }
+      if (session.provider_refresh_token) {
+        updateData.google_refresh_token = session.provider_refresh_token
+      }
+
       const { data: existingProfile } = await supabase
         .from('user_profiles')
         .select('id')
@@ -58,9 +68,13 @@ export default function AuthCallback() {
         await supabase.from('user_profiles').insert({
           id: session.user.id,
           email: userEmail,
-          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
-          avatar_url: session.user.user_metadata?.avatar_url || '',
+          ...updateData
         })
+      } else {
+        await supabase
+          .from('user_profiles')
+          .update(updateData)
+          .eq('id', session.user.id)
       }
 
       // Log activity

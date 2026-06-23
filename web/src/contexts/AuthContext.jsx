@@ -15,14 +15,16 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       if (session?.user) {
+        const sessionTokens = {}
         if (session.provider_token) {
-          try {
-            localStorage.setItem('google_provider_token', session.provider_token)
-          } catch (e) {
-            console.error('Error saving provider token:', e)
-          }
+          sessionTokens.google_access_token = session.provider_token
+          localStorage.setItem('google_provider_token', session.provider_token)
         }
-        loadProfile(session.user)
+        if (session.provider_refresh_token) {
+          sessionTokens.google_refresh_token = session.provider_refresh_token
+          localStorage.setItem('google_refresh_token', session.provider_refresh_token)
+        }
+        loadProfile(session.user, sessionTokens)
       } else {
         setLoading(false)
       }
@@ -33,17 +35,20 @@ export function AuthProvider({ children }) {
       (_event, session) => {
         setUser(session?.user ?? null)
         if (session?.user) {
+          const sessionTokens = {}
           if (session.provider_token) {
-            try {
-              localStorage.setItem('google_provider_token', session.provider_token)
-            } catch (e) {
-              console.error('Error saving provider token:', e)
-            }
+            sessionTokens.google_access_token = session.provider_token
+            localStorage.setItem('google_provider_token', session.provider_token)
           }
-          loadProfile(session.user)
+          if (session.provider_refresh_token) {
+            sessionTokens.google_refresh_token = session.provider_refresh_token
+            localStorage.setItem('google_refresh_token', session.provider_refresh_token)
+          }
+          loadProfile(session.user, sessionTokens)
         } else {
           try {
             localStorage.removeItem('google_provider_token')
+            localStorage.removeItem('google_refresh_token')
           } catch (e) {}
           setProfile(null)
           setIsAdmin(false)
@@ -83,7 +88,7 @@ export function AuthProvider({ children }) {
   }, [user])
 
 
-  async function loadProfile(authUser) {
+  async function loadProfile(authUser, sessionTokens = {}) {
     try {
       // Load user profile
       let { data: profileData, error: profileError } = await supabase
@@ -100,6 +105,9 @@ export function AuthProvider({ children }) {
           name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || '',
           avatar_url: authUser.user_metadata?.avatar_url || '',
         }
+        if (sessionTokens.google_access_token) newProfile.google_access_token = sessionTokens.google_access_token
+        if (sessionTokens.google_refresh_token) newProfile.google_refresh_token = sessionTokens.google_refresh_token
+
         const { data: insertedData, error: insertError } = await supabase
           .from('user_profiles')
           .insert(newProfile)
@@ -111,6 +119,27 @@ export function AuthProvider({ children }) {
         } else {
           // Fallback to local profile info if insert fails
           profileData = { ...newProfile, is_folder_verified: false, drive_folder_id: null }
+        }
+      } else {
+        // If profile exists, check if we need to sync Google tokens to DB
+        const updates = {}
+        if (sessionTokens.google_access_token && profileData.google_access_token !== sessionTokens.google_access_token) {
+          updates.google_access_token = sessionTokens.google_access_token
+        }
+        if (sessionTokens.google_refresh_token && profileData.google_refresh_token !== sessionTokens.google_refresh_token) {
+          updates.google_refresh_token = sessionTokens.google_refresh_token
+        }
+
+        if (Object.keys(updates).length > 0) {
+          const { data: updatedData } = await supabase
+            .from('user_profiles')
+            .update(updates)
+            .eq('id', authUser.id)
+            .select()
+            .maybeSingle()
+          if (updatedData) {
+            profileData = updatedData
+          }
         }
       }
 
@@ -156,7 +185,7 @@ export function AuthProvider({ children }) {
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        scopes: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.file',
+        scopes: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive',
         queryParams: {
           access_type: 'offline',
           prompt: 'consent'
