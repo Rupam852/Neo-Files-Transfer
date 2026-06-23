@@ -61,8 +61,8 @@ export default function FilesPage({ onViewVersions }) {
         setActiveMenu(null)
       }
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
   }, [])
 
   async function loadFiles() {
@@ -438,13 +438,20 @@ export default function FilesPage({ onViewVersions }) {
                       <td className="px-4 py-3">
                         <div className="relative">
                           <button
-                            onClick={() => setActiveMenu(activeMenu === file.id ? null : file.id)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setActiveMenu(activeMenu === file.id ? null : file.id)
+                            }}
                             className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg"
                           >
                             <MoreVertical size={16} />
                           </button>
                           {activeMenu === file.id && (
-                            <div ref={menuRef} className="absolute right-0 mt-1 w-48 bg-dark-600 rounded-lg shadow-xl border border-dark-400 py-1 z-50">
+                            <div 
+                              ref={menuRef} 
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 mt-1 w-48 bg-dark-600 rounded-lg shadow-xl border border-dark-400 py-1 z-50"
+                            >
                               <button
                                 onClick={() => { toggleSharing(file); setActiveMenu(null) }}
                                 className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
