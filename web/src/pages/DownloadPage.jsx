@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import {
   Download, FileX, ShieldX, AlertTriangle, FileText, Image, Video, Archive,
-  Table, Presentation, File, CheckCircle2, AlertCircle
+  Table, Presentation, File, CheckCircle2, AlertCircle, Folder
 } from 'lucide-react'
 import { formatFileSize, getFileIcon, generateDirectDownloadUrl, formatErrorMessage } from '../utils/helpers'
 
@@ -42,7 +42,7 @@ export default function DownloadPage() {
         // Validate share hash
         const { data: file, error } = await supabase
           .from('shared_files')
-          .select('id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id')
+          .select('id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
           .eq('unique_share_hash', hash)
           .maybeSingle()
 
@@ -205,7 +205,7 @@ export default function DownloadPage() {
 
   // Get file icon based on mime type
   const iconName = getFileIcon(fileInfo?.mime_type)
-  const FileIcon = ICON_MAP[iconName] || File
+  const FileIcon = fileInfo?.is_folder ? Folder : (ICON_MAP[iconName] || File)
 
   if (status === 'loading') {
     return (
@@ -249,7 +249,7 @@ export default function DownloadPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-white truncate leading-tight mb-1">{fileInfo?.file_name}</p>
-                <p className="text-xs text-slate-400 font-medium">{formatFileSize(totalBytes)}</p>
+                <p className="text-xs text-slate-400 font-medium">{fileInfo?.is_folder ? 'Folder Archive' : formatFileSize(totalBytes)}</p>
               </div>
             </div>
 
@@ -289,7 +289,7 @@ export default function DownloadPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-white truncate leading-tight mb-1">{fileInfo?.file_name}</p>
-                <p className="text-xs text-slate-400 font-medium">{formatFileSize(totalBytes)}</p>
+                <p className="text-xs text-slate-400 font-medium">{fileInfo?.is_folder ? 'Folder Archive' : formatFileSize(totalBytes)}</p>
               </div>
             </div>
 
@@ -300,7 +300,7 @@ export default function DownloadPage() {
                   {status === 'saving' ? 'Progress: 100%' : `Progress: ${progress}%`}
                 </span>
                 <span className="text-indigo-400 font-semibold">
-                  {status === 'saving' ? 'Saving...' : `${formatFileSize(downloadedBytes)} / ${formatFileSize(totalBytes)}`}
+                  {status === 'saving' ? 'Saving...' : (fileInfo?.is_folder ? `${formatFileSize(downloadedBytes)} downloaded` : `${formatFileSize(downloadedBytes)} / ${formatFileSize(totalBytes)}`)}
                 </span>
               </div>
               <div className="h-2.5 bg-slate-900 border border-slate-800/80 rounded-full overflow-hidden relative">

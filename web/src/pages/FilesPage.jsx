@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import {
   Search, Upload, MoreVertical, Download, Pencil, Trash2,
   Share2, History, FileText, Image, Video, Archive, Table,
-  Presentation, File, SortAsc,
+  Presentation, File, SortAsc, Plus, Folder, ChevronRight,
 } from 'lucide-react'
 import { formatFileSize, formatDate, getExtension, generateShareUrl, generateDirectDownloadUrl, formatErrorMessage } from '../utils/helpers'
 import { useNavigate } from 'react-router-dom'
@@ -65,6 +65,7 @@ export default function FilesPage({ onViewVersions }) {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
+  const folderInputRef = useRef(null)
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -79,8 +80,23 @@ export default function FilesPage({ onViewVersions }) {
   const [newName, setNewName] = useState('')
   const menuRef = useRef(null)
 
+  // Folders and batching states
+  const [currentFolder, setCurrentFolder] = useState(null)
+  const [folderPath, setFolderPath] = useState([])
+  const [uploadQueue, setUploadQueue] = useState([])
+  const [folderCreateModal, setFolderCreateModal] = useState(false)
+  const [folderName, setFolderName] = useState('')
+
+  function handleOpenFolder(folder) {
+    setCurrentFolder(folder)
+    setFolderPath(prev => [...prev, folder])
+  }
+
   useEffect(() => {
     loadFiles()
+  }, [currentFolder, sortBy, sortDir])
+
+  useEffect(() => {
     window.addEventListener('trigger-upload', () => fileInputRef.current?.click())
     return () => window.removeEventListener('trigger-upload', () => {})
   }, [])
@@ -98,11 +114,18 @@ export default function FilesPage({ onViewVersions }) {
   async function loadFiles() {
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('shared_files')
         .select('*, file_versions(*)')
         .eq('user_id', user.id)
-        .order(sortBy, { ascending: sortDir === 'asc' })
+
+      if (currentFolder) {
+        query = query.eq('parent_folder_id', currentFolder.id)
+      } else {
+        query = query.is('parent_folder_id', null)
+      }
+
+      const { data, error } = await query.order(sortBy, { ascending: sortDir === 'asc' })
 
       if (error) throw error
       setFiles(data || [])
@@ -113,42 +136,230 @@ export default function FilesPage({ onViewVersions }) {
     }
   }
 
+  async function uploadBatch(batch) {
+    setUploading(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
+
+    for (let i = 0; i < batch.length; i++) {
+      const item = batch[i]
+      const file = item.fileObj ? item.fileObj : item
+      const dbParentId = item.dbParentId !== undefined ? item.dbParentId : (currentFolder ? currentFolder.id : null)
+      const driveParentId = item.driveParentId !== undefined ? item.driveParentId : (currentFolder ? currentFolder.google_drive_file_id : profile.drive_folder_id)
+
+      setProcessingText(`Uploading file ${i + 1} of ${batch.length}: ${file.name}...`)
+
+      try {
+        const uniqueName = getUniqueFileName(file.name, files)
+
+        const formData = new FormData()
+        formData.append('file', file, uniqueName)
+        formData.append('folder_id', driveParentId)
+        formData.append('provider_token', googleToken)
+
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-file`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+            body: formData,
+          }
+        )
+
+        const result = await res.json()
+        if (!res.ok) throw new Error(result.error || 'Upload failed')
+
+        const shareHash = crypto.randomUUID().replace(/-/g, '').substring(0, 12)
+
+        const { error: insertError } = await supabase.from('shared_files').insert({
+          user_id: user.id,
+          google_drive_file_id: result.file_id,
+          file_name: uniqueName,
+          file_size: file.size,
+          mime_type: file.type,
+          current_version_num: 1,
+          unique_share_hash: shareHash,
+          sharing_status: 'private',
+          parent_folder_id: dbParentId,
+        })
+
+        if (insertError) throw insertError
+
+        const { data: newFile } = await supabase
+          .from('shared_files')
+          .select('id')
+          .eq('google_drive_file_id', result.file_id)
+          .single()
+
+        if (newFile) {
+          await supabase.from('file_versions').insert({
+            file_id: newFile.id,
+            google_drive_file_id: result.file_id,
+            version_number: 1,
+          })
+        }
+
+        await supabase.from('activity_logs').insert({
+          user_id: user.id,
+          action: 'upload',
+          details: `Uploaded file: ${uniqueName}`,
+        })
+
+        toast.success(`${uniqueName} uploaded successfully`)
+      } catch (err) {
+        console.error(err)
+        toast.error(`Failed to upload ${file.name}: ${err.message}`)
+      }
+    }
+
+    setUploading(false)
+    setProcessingText(null)
+    loadFiles()
+  }
+
   async function handleUpload(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const filesSelected = Array.from(e.target.files)
+    if (filesSelected.length === 0) return
 
-    // Generate unique name if file already exists in files list
-    const uniqueName = getUniqueFileName(file.name, files)
-
-    // Validate type using uniqueName extension
-    const ext = uniqueName.split('.').pop().toLowerCase()
-    if (BLOCKED_EXTENSIONS.includes(ext)) {
-      toast.error('This file type is not allowed')
+    if (!profile?.drive_folder_id) {
+      toast.error('Please configure your Google Drive folder in Settings first')
       return
     }
 
-    const ALLOWED_EXTENSIONS = [
-      'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
-      'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',
-      'mp4', 'mkv', 'mov', 'avi',
-      'zip', 'rar', 'tar', 'gz', '7z', 'apk', 'xapk', 'txt'
-    ]
+    const validFiles = filesSelected.filter(file => {
+      const ext = file.name.split('.').pop().toLowerCase()
+      return !BLOCKED_EXTENSIONS.includes(ext)
+    })
 
-    const isAllowedType = ALLOWED_TYPES.includes(file.type) ||
-                          file.type.startsWith('image/') ||
-                          file.type.startsWith('video/') ||
-                          ALLOWED_EXTENSIONS.includes(ext)
-
-    if (!isAllowedType) {
-      toast.error('Unsupported file type')
-      return
+    if (validFiles.length < filesSelected.length) {
+      toast.error('Some files were skipped due to blocked file extensions.')
     }
 
-    // Validate size (100MB)
-    if (file.size > 100 * 1024 * 1024) {
-      toast.error('File size exceeds 100MB limit')
-      return
+    let currentBatch = []
+    let remainingQueue = []
+    let currentBatchSize = 0
+
+    for (const file of validFiles) {
+      if (file.size > 100 * 1024 * 1024) {
+        toast.error(`File ${file.name} exceeds 100MB limit and was skipped.`)
+        continue
+      }
+
+      const item = {
+        fileObj: file,
+        dbParentId: currentFolder ? currentFolder.id : null,
+        driveParentId: currentFolder ? currentFolder.google_drive_file_id : profile.drive_folder_id
+      }
+
+      if (currentBatchSize + file.size <= 100 * 1024 * 1024) {
+        currentBatch.push(item)
+        currentBatchSize += file.size
+      } else {
+        remainingQueue.push(item)
+      }
     }
+
+    setUploadQueue(prev => [...prev, ...remainingQueue])
+
+    if (currentBatch.length > 0) {
+      await uploadBatch(currentBatch)
+    }
+
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function handleUploadRemaining() {
+    let currentBatch = []
+    let remainingQueue = []
+    let currentBatchSize = 0
+
+    for (const item of uploadQueue) {
+      const file = item.fileObj ? item.fileObj : item
+      if (currentBatchSize + file.size <= 100 * 1024 * 1024) {
+        currentBatch.push(item)
+        currentBatchSize += file.size
+      } else {
+        remainingQueue.push(item)
+      }
+    }
+
+    setUploadQueue(remainingQueue)
+
+    if (currentBatch.length > 0) {
+      await uploadBatch(currentBatch)
+    }
+  }
+
+  async function handleCreateFolder() {
+    if (!folderName.trim()) return
+    setProcessingText('Creating folder...')
+    try {
+      if (!profile?.drive_folder_id) {
+        toast.error('Please configure your Google Drive folder in Settings first')
+        return
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const parentDriveFolderId = currentFolder ? currentFolder.google_drive_file_id : profile.drive_folder_id
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-folder`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: folderName.trim(),
+            parent_drive_folder_id: parentDriveFolderId,
+          }),
+        }
+      )
+
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed to create folder')
+
+      const shareHash = crypto.randomUUID().replace(/-/g, '').substring(0, 12)
+      const { error: insertError } = await supabase.from('shared_files').insert({
+        user_id: user.id,
+        google_drive_file_id: result.file_id,
+        file_name: folderName.trim(),
+        mime_type: 'application/vnd.google-apps.folder',
+        is_folder: true,
+        current_version_num: 1,
+        unique_share_hash: shareHash,
+        sharing_status: 'private',
+        parent_folder_id: currentFolder ? currentFolder.id : null,
+      })
+
+      if (insertError) throw insertError
+
+      await supabase.from('activity_logs').insert({
+        user_id: user.id,
+        action: 'create_folder',
+        details: `Created folder: ${folderName.trim()}`,
+      })
+
+      toast.success(`Folder ${folderName.trim()} created successfully`)
+      setFolderCreateModal(false)
+      loadFiles()
+    } catch (err) {
+      console.error(err)
+      toast.error(formatErrorMessage(err))
+    } finally {
+      setProcessingText(null)
+    }
+  }
+
+  async function handleFolderUpload(e) {
+    const filesUploaded = Array.from(e.target.files)
+    if (filesUploaded.length === 0) return
 
     if (!profile?.drive_folder_id) {
       toast.error('Please configure your Google Drive folder in Settings first')
@@ -156,79 +367,141 @@ export default function FilesPage({ onViewVersions }) {
     }
 
     setUploading(true)
-    setProcessingText('Uploading file...')
+    setProcessingText('Analyzing folder structure...')
+
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-      const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
-
-      // Upload via edge function
-      const formData = new FormData()
-      formData.append('file', file, uniqueName) // Browser natively sends uniqueName as filename
-      formData.append('folder_id', profile.drive_folder_id)
-      formData.append('provider_token', googleToken)
-
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-file`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData,
+      const pathsToCreate = new Set()
+      
+      for (const file of filesUploaded) {
+        if (!file.webkitRelativePath) continue
+        const parts = file.webkitRelativePath.split('/')
+        parts.pop()
+        
+        let currentPath = ''
+        for (const part of parts) {
+          currentPath = currentPath ? `${currentPath}/${part}` : part
+          pathsToCreate.add(currentPath)
         }
-      )
-
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || 'Upload failed')
-
-      // Store metadata in Supabase
-      const shareHash = crypto.randomUUID().replace(/-/g, '').substring(0, 12)
-
-      const { error: insertError } = await supabase.from('shared_files').insert({
-        user_id: user.id,
-        google_drive_file_id: result.file_id,
-        file_name: uniqueName,
-        file_size: file.size,
-        mime_type: file.type,
-        current_version_num: 1,
-        unique_share_hash: shareHash,
-        sharing_status: 'private',
-      })
-
-      if (insertError) throw insertError
-
-      // Add version record
-      const { data: newFile } = await supabase
-        .from('shared_files')
-        .select('id')
-        .eq('google_drive_file_id', result.file_id)
-        .single()
-
-      if (newFile) {
-        await supabase.from('file_versions').insert({
-          file_id: newFile.id,
-          google_drive_file_id: result.file_id,
-          version_number: 1,
-        })
       }
 
-      // Log activity
-      await supabase.from('activity_logs').insert({
-        user_id: user.id,
-        action: 'upload',
-        details: `Uploaded file: ${uniqueName}`,
+      const sortedPaths = Array.from(pathsToCreate).sort((a, b) => {
+        const depthA = a.split('/').length
+        const depthB = b.split('/').length
+        return depthA - depthB
       })
 
-      toast.success(`${uniqueName} uploaded successfully`)
-      loadFiles()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const pathLookup = {}
+
+      for (const path of sortedPaths) {
+        const parts = path.split('/')
+        const fName = parts[parts.length - 1]
+        
+        let parentDbId = currentFolder ? currentFolder.id : null
+        let parentDriveId = currentFolder ? currentFolder.google_drive_file_id : profile.drive_folder_id
+
+        if (parts.length > 1) {
+          parts.pop()
+          const parentPath = parts.join('/')
+          const parentInfo = pathLookup[parentPath]
+          if (parentInfo) {
+            parentDbId = parentInfo.dbId
+            parentDriveId = parentInfo.driveId
+          }
+        }
+
+        setProcessingText(`Creating folder: ${path}...`)
+
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-folder`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: fName,
+              parent_drive_folder_id: parentDriveId,
+            }),
+          }
+        )
+
+        const result = await res.json()
+        if (!res.ok) throw new Error(result.error || `Failed to create folder ${fName}`)
+
+        const shareHash = crypto.randomUUID().replace(/-/g, '').substring(0, 12)
+        const { data: dbRow, error: insertError } = await supabase
+          .from('shared_files')
+          .insert({
+            user_id: user.id,
+            google_drive_file_id: result.file_id,
+            file_name: fName,
+            mime_type: 'application/vnd.google-apps.folder',
+            is_folder: true,
+            current_version_num: 1,
+            unique_share_hash: shareHash,
+            sharing_status: 'private',
+            parent_folder_id: parentDbId,
+          })
+          .select('id')
+          .single()
+
+        if (insertError) throw insertError
+
+        pathLookup[path] = { dbId: dbRow.id, driveId: result.file_id }
+      }
+
+      const filesToUpload = filesUploaded.map(file => {
+        const parts = file.webkitRelativePath.split('/')
+        parts.pop()
+        const folderPathStr = parts.join('/')
+        
+        const folderInfo = pathLookup[folderPathStr]
+        return {
+          fileObj: file,
+          dbParentId: folderInfo?.dbId || null,
+          driveParentId: folderInfo?.driveId || profile.drive_folder_id
+        }
+      })
+
+      let currentBatch = []
+      let remainingQueue = []
+      let currentBatchSize = 0
+
+      for (const item of filesToUpload) {
+        if (BLOCKED_EXTENSIONS.includes(item.fileObj.name.split('.').pop().toLowerCase())) {
+          continue
+        }
+
+        if (item.fileObj.size > 100 * 1024 * 1024) {
+          toast.error(`File ${item.fileObj.name} exceeds 100MB and was skipped.`)
+          continue
+        }
+
+        if (currentBatchSize + item.fileObj.size <= 100 * 1024 * 1024) {
+          currentBatch.push(item)
+          currentBatchSize += item.fileObj.size
+        } else {
+          remainingQueue.push(item)
+        }
+      }
+
+      setUploadQueue(prev => [...prev, ...remainingQueue])
+
+      if (currentBatch.length > 0) {
+        await uploadBatch(currentBatch)
+      }
+
     } catch (err) {
       console.error(err)
       toast.error(formatErrorMessage(err))
     } finally {
       setUploading(false)
       setProcessingText(null)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+      if (folderInputRef.current) folderInputRef.current.value = ''
     }
   }
 
@@ -358,11 +631,17 @@ export default function FilesPage({ onViewVersions }) {
     }
   }
 
-  const filteredFiles = files.filter(f =>
-    f.file_name?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredFiles = files
+    .filter(f => f.file_name?.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      if (a.is_folder && !b.is_folder) return -1
+      if (!a.is_folder && b.is_folder) return 1
+      return 0
+    })
 
-  function getIconComponent(mimeType) {
+  function getIconComponent(file) {
+    if (file.is_folder) return Folder
+    const mimeType = file.mime_type
     const type = mimeType?.startsWith('image/') ? 'image' :
                  mimeType?.startsWith('video/') ? 'video' :
                  mimeType?.includes('pdf') ? 'file-text' :
@@ -377,22 +656,77 @@ export default function FilesPage({ onViewVersions }) {
     <div className="space-y-4 flex flex-col min-h-[calc(100vh-150px)] lg:min-h-[calc(100vh-180px)]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-50">My Files</h1>
-        <div className="flex items-center gap-3">
+        {/* Title / Breadcrumb navigation */}
+        <div className="flex flex-wrap items-center gap-2 text-xl md:text-2xl font-bold text-gray-50">
+          <button
+            onClick={() => {
+              setCurrentFolder(null)
+              setFolderPath([])
+            }}
+            className="hover:text-primary-400 transition-colors duration-200 text-left"
+          >
+            My Files
+          </button>
+          {folderPath.map((folder, index) => (
+            <span key={folder.id} className="flex items-center gap-2">
+              <ChevronRight size={18} className="text-gray-500" />
+              <button
+                onClick={() => {
+                  setCurrentFolder(folder)
+                  setFolderPath(folderPath.slice(0, index + 1))
+                }}
+                className="hover:text-primary-400 transition-colors duration-200 text-left"
+              >
+                {folder.file_name}
+              </button>
+            </span>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
           <input
             ref={fileInputRef}
             type="file"
             className="hidden"
+            multiple
             accept=".pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.gif,.webp,.svg,.mp4,.mkv,.mov,.avi,.zip,.rar,.tar,.gz,.7z,.apk,.xapk,.txt"
             onChange={handleUpload}
           />
+          <input
+            ref={folderInputRef}
+            type="file"
+            className="hidden"
+            webkitdirectory="true"
+            directory="true"
+            multiple
+            onChange={handleFolderUpload}
+          />
+
+          <button
+            onClick={() => setFolderCreateModal(true)}
+            disabled={uploading}
+            className="btn-secondary flex items-center gap-2 text-sm"
+          >
+            <Plus size={16} />
+            New Folder
+          </button>
+
+          <button
+            onClick={() => folderInputRef.current?.click()}
+            disabled={uploading}
+            className="btn-secondary flex items-center gap-2 text-sm"
+          >
+            <Folder size={16} />
+            Upload Folder
+          </button>
+
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
             className="btn-primary flex items-center gap-2 text-sm"
           >
             <Upload size={16} />
-            {uploading ? 'Uploading...' : 'Upload File'}
+            {uploading ? 'Uploading...' : 'Upload Files'}
           </button>
         </div>
       </div>
@@ -457,25 +791,44 @@ export default function FilesPage({ onViewVersions }) {
               </thead>
               <tbody className="divide-y divide-dark-400">
                 {filteredFiles.map(file => {
-                  const Icon = getIconComponent(file.mime_type)
+                  const Icon = getIconComponent(file)
                   return (
-                    <tr key={file.id} className="hover:bg-dark-500">
+                    <tr 
+                      key={file.id} 
+                      className="hover:bg-dark-500"
+                      onDoubleClick={() => {
+                        if (file.is_folder) {
+                          handleOpenFolder(file)
+                        }
+                      }}
+                    >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-dark-500 rounded-lg flex items-center justify-center flex-shrink-0">
                             <Icon size={16} className="text-gray-400" />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-100 truncate">{file.file_name}</p>
-                            <p className="text-xs text-gray-400">{getExtension(file.file_name)}</p>
+                            {file.is_folder ? (
+                              <button
+                                onClick={() => handleOpenFolder(file)}
+                                className="text-sm font-medium text-gray-100 hover:text-primary-400 text-left truncate w-full"
+                              >
+                                {file.file_name}
+                              </button>
+                            ) : (
+                              <p className="text-sm font-medium text-gray-100 truncate">{file.file_name}</p>
+                            )}
+                            <p className="text-xs text-gray-400">
+                              {file.is_folder ? 'Folder' : getExtension(file.file_name)}
+                            </p>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-400 hidden sm:table-cell">
-                        {formatFileSize(file.file_size || 0)}
+                        {file.is_folder ? '—' : formatFileSize(file.file_size || 0)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-400 hidden md:table-cell">
-                        v{file.current_version_num}
+                        {file.is_folder ? '—' : `v${file.current_version_num}`}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
@@ -524,7 +877,7 @@ export default function FilesPage({ onViewVersions }) {
                                 className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
                               >
                                 <Share2 size={16} />
-                                Share File
+                                {file.is_folder ? 'Share Folder' : 'Share File'}
                               </button>
                               <button
                                 onClick={() => {
@@ -537,20 +890,22 @@ export default function FilesPage({ onViewVersions }) {
                                 <Pencil size={16} />
                                 Rename
                               </button>
-                              <button
-                                onClick={() => {
-                                  if (onViewVersions) {
-                                    onViewVersions(file.id)
-                                  } else {
-                                    navigate(`/dashboard/files/${file.id}/versions`)
-                                  }
-                                  setActiveMenu(null)
-                                }}
-                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
-                              >
-                                <History size={16} />
-                                Manage Versions
-                              </button>
+                              {!file.is_folder && (
+                                <button
+                                  onClick={() => {
+                                    if (onViewVersions) {
+                                      onViewVersions(file.id)
+                                    } else {
+                                      navigate(`/dashboard/files/${file.id}/versions`)
+                                    }
+                                    setActiveMenu(null)
+                                  }}
+                                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
+                                >
+                                  <History size={16} />
+                                  Manage Versions
+                                </button>
+                              )}
                               <hr className="my-1 border-dark-400" />
                               <button
                                 onClick={() => {
@@ -678,6 +1033,67 @@ export default function FilesPage({ onViewVersions }) {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Create Folder Modal */}
+      {folderCreateModal && (
+        <Modal onClose={() => { setFolderCreateModal(false); setFolderName('') }}>
+          <h3 className="font-semibold text-gray-100 mb-4 text-lg font-['Space_Grotesk']">Create New Folder</h3>
+          <input
+            type="text"
+            placeholder="Folder name"
+            className="input-field mb-4"
+            value={folderName}
+            onChange={e => setFolderName(e.target.value)}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              className="btn-secondary text-sm"
+              onClick={() => { setFolderCreateModal(false); setFolderName('') }}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn-primary text-sm"
+              onClick={handleCreateFolder}
+              disabled={!folderName.trim()}
+            >
+              Create
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Floating Queue Panel */}
+      {uploadQueue.length > 0 && (
+        <div className="fixed bottom-6 right-6 bg-dark-600 border border-dark-400 rounded-xl shadow-2xl p-4 max-w-sm w-full z-50 animate-scale-in">
+          <div className="flex items-center justify-between gap-4 mb-3">
+            <h4 className="text-sm font-semibold text-gray-100">Upload Queue</h4>
+            <span className="text-xs bg-primary-500/10 text-primary-400 px-2 py-0.5 rounded-full font-medium">
+              {uploadQueue.length} {uploadQueue.length === 1 ? 'file' : 'files'} remaining
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mb-3 leading-relaxed">
+            Some files were queued because the concurrent upload size exceeds the 100MB limit.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleUploadRemaining}
+              disabled={uploading}
+              className="btn-primary w-full text-xs py-2"
+            >
+              {uploading ? 'Uploading Batch...' : 'Upload Remaining Files'}
+            </button>
+            <button
+              onClick={() => setUploadQueue([])}
+              className="btn-secondary text-xs py-2 px-3 hover:text-red-400 transition-colors"
+              title="Clear queue"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Global Processing Loader Spinner */}

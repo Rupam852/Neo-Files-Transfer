@@ -22,3 +22,5 @@ verify_jwt = true
 [functions.mail-service]
 verify_jwt = false
 
+[functions.create-folder]
+verify_jwt = true

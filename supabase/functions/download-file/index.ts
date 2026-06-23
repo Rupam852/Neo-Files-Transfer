@@ -44,7 +44,7 @@ serve(async (req) => {
     // Find file by share hash
     const { data: file, error: fileError } = await supabaseAdmin
       .from("shared_files")
-      .select("id, file_name, mime_type, sharing_status, current_version_num, google_drive_file_id")
+      .select("id, file_name, mime_type, sharing_status, current_version_num, google_drive_file_id, is_folder")
       .eq("unique_share_hash", hash)
       .maybeSingle()
 
@@ -158,9 +158,9 @@ serve(async (req) => {
     }
 
     // Helper to fetch file media content from Google Drive
-    const fetchMediaFromDrive = async (token: string) => {
+    const fetchMediaFromDrive = async (driveId: string, token: string) => {
       return await fetch(
-        `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+        `https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -169,14 +169,98 @@ serve(async (req) => {
       )
     }
 
-    let driveResponse = await fetchMediaFromDrive(accessToken)
+    // If it's a folder, recursively package it into a ZIP archive and stream it
+    if (file.is_folder) {
+      const { data: allFiles, error: allFilesError } = await supabaseAdmin
+        .from("shared_files")
+        .select("id, file_name, is_folder, google_drive_file_id, mime_type, parent_folder_id")
+        .eq("user_id", fileOwner.user_id)
+
+      if (allFilesError || !allFiles) {
+        throw new Error("Failed to load folder contents metadata")
+      }
+
+      const filesToZip: { google_drive_file_id: string; relativePath: string; is_folder: boolean; file_name: string }[] = []
+      
+      const buildTree = (folderId: string, currentPath: string) => {
+        const children = allFiles.filter(f => f.parent_folder_id === folderId)
+        for (const child of children) {
+          const relativePath = currentPath ? `${currentPath}/${child.file_name}` : child.file_name
+          if (child.is_folder) {
+            filesToZip.push({
+              google_drive_file_id: child.google_drive_file_id,
+              relativePath: relativePath,
+              is_folder: true,
+              file_name: child.file_name
+            })
+            buildTree(child.id, relativePath)
+          } else {
+            filesToZip.push({
+              google_drive_file_id: child.google_drive_file_id,
+              relativePath: relativePath,
+              is_folder: false,
+              file_name: child.file_name
+            })
+          }
+        }
+      }
+
+      buildTree(file.id, file.file_name)
+
+      // Add the root folder itself to filesToZip list so fflate knows about it if empty
+      filesToZip.push({
+        google_drive_file_id: file.google_drive_file_id,
+        relativePath: file.file_name,
+        is_folder: true,
+        file_name: file.file_name
+      })
+
+      // Dynamically import fflate
+      const { zipSync } = await import("https://esm.sh/fflate@0.8.0")
+      const zipData: Record<string, Uint8Array> = {}
+
+      for (const item of filesToZip) {
+        if (item.is_folder) {
+          zipData[item.relativePath + "/"] = new Uint8Array(0)
+          continue
+        }
+
+        const fileResponse = await fetchMediaFromDrive(item.google_drive_file_id, accessToken)
+        if (fileResponse.ok) {
+          const fileBytes = await fileResponse.arrayBuffer()
+          zipData[item.relativePath] = new Uint8Array(fileBytes)
+        } else {
+          console.error(`Failed to fetch file ${item.file_name} from Drive during folder zip compilation`)
+        }
+      }
+
+      const zippedBytes = zipSync(zipData)
+
+      const responseHeaders = new Headers()
+      responseHeaders.set("Content-Type", "application/zip")
+      responseHeaders.set("Content-Disposition", `attachment; filename="${file.file_name.replace(/"/g, '\\"')}.zip"; filename*=UTF-8''${encodeURIComponent(file.file_name)}.zip`)
+      responseHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate")
+      responseHeaders.set("Pragma", "no-cache")
+      responseHeaders.set("Expires", "0")
+
+      for (const [key, value] of Object.entries(corsHeaders)) {
+        responseHeaders.set(key, value)
+      }
+
+      return new Response(zippedBytes, {
+        headers: responseHeaders,
+        status: 200,
+      })
+    }
+
+    let driveResponse = await fetchMediaFromDrive(driveFileId, accessToken)
 
     // Handle token expiration (401)
     if (driveResponse.status === 401 && refreshToken) {
       console.log("Google Drive alt=media returned 401. Refreshing owner token...")
       try {
         accessToken = await refreshGoogleToken(fileOwner.user_id, refreshToken, supabaseAdmin)
-        driveResponse = await fetchMediaFromDrive(accessToken)
+        driveResponse = await fetchMediaFromDrive(driveFileId, accessToken)
       } catch (refreshErr) {
         console.error("Token refresh failed during download retry:", refreshErr)
       }
