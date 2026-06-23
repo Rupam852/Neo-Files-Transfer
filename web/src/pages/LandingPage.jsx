@@ -94,20 +94,7 @@ export default function LandingPage() {
     setSubmitting(true)
     setBlockMessage('')
     try {
-      const { data: existing } = await supabase
-        .from('pending_registrations')
-        .select('id, status')
-        .eq('email', formData.email.toLowerCase())
-        .maybeSingle()
 
-      if (existing) {
-        if (existing.status === 'approved') {
-          toast.error('This email is already approved. You can log in!')
-        } else {
-          toast.error('This email is already registered and pending admin approval.')
-        }
-        return
-      }
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mail-service/send-otp`,

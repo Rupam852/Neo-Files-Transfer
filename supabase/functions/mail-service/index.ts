@@ -46,6 +46,38 @@ serve(async (req) => {
       }
 
       const normalizedEmail = email.trim().toLowerCase()
+
+      // 1. Check if email is already in approved_users
+      const { data: existingApproved } = await supabase
+        .from("approved_users")
+        .select("id")
+        .eq("email", normalizedEmail)
+        .maybeSingle()
+
+      if (existingApproved) {
+        return new Response(
+          JSON.stringify({ error: "This email is already approved. You can log in!" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        )
+      }
+
+      // 2. Check if email is already in pending_registrations
+      const { data: existingPending } = await supabase
+        .from("pending_registrations")
+        .select("id, status")
+        .eq("email", normalizedEmail)
+        .maybeSingle()
+
+      if (existingPending) {
+        const msg = existingPending.status === 'approved'
+          ? "This email is already approved. You can log in!"
+          : "This email is already registered and pending admin approval."
+        return new Response(
+          JSON.stringify({ error: msg }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        )
+      }
+
       const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "127.0.0.1"
       const now = new Date()
 
@@ -335,6 +367,27 @@ serve(async (req) => {
             .eq("email", normalizedEmail)
           throw new Error(`Incorrect verification code. Attempts left: ${3 - newAttempts}`)
         }
+      }
+
+      // Check if email is already in approved_users or pending_registrations
+      const { data: existingApproved } = await supabase
+        .from("approved_users")
+        .select("id")
+        .eq("email", normalizedEmail)
+        .maybeSingle()
+
+      if (existingApproved) {
+        throw new Error("This email is already approved. You can log in!")
+      }
+
+      const { data: existingPending } = await supabase
+        .from("pending_registrations")
+        .select("id")
+        .eq("email", normalizedEmail)
+        .maybeSingle()
+
+      if (existingPending) {
+        throw new Error("This email is already registered and pending admin approval.")
       }
 
       // Insert into pending_registrations
