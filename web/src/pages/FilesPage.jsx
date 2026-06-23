@@ -23,7 +23,11 @@ const ALLOWED_TYPES = [
 const BLOCKED_EXTENSIONS = ['exe', 'bat', 'cmd', 'msi', 'scr']
 
 function getUniqueFileName(originalName, existingFiles) {
-  const existingNames = existingFiles.map(f => f.file_name.toLowerCase())
+  if (!existingFiles || !Array.isArray(existingFiles)) return originalName
+  const existingNames = existingFiles
+    .map(f => f && f.file_name ? f.file_name.toLowerCase() : '')
+    .filter(name => name !== '')
+  
   let name = originalName
   
   if (!existingNames.includes(name.toLowerCase())) {
@@ -115,12 +119,9 @@ export default function FilesPage({ onViewVersions }) {
 
     // Generate unique name if file already exists in files list
     const uniqueName = getUniqueFileName(file.name, files)
-    const uploadFile = uniqueName !== file.name 
-      ? new File([file], uniqueName, { type: file.type })
-      : file
 
-    // Validate type
-    const ext = uploadFile.name.split('.').pop().toLowerCase()
+    // Validate type using uniqueName extension
+    const ext = uniqueName.split('.').pop().toLowerCase()
     if (BLOCKED_EXTENSIONS.includes(ext)) {
       toast.error('This file type is not allowed')
       return
@@ -133,9 +134,9 @@ export default function FilesPage({ onViewVersions }) {
       'zip', 'rar', 'tar', 'gz', '7z', 'apk', 'xapk', 'txt'
     ]
 
-    const isAllowedType = ALLOWED_TYPES.includes(uploadFile.type) ||
-                          uploadFile.type.startsWith('image/') ||
-                          uploadFile.type.startsWith('video/') ||
+    const isAllowedType = ALLOWED_TYPES.includes(file.type) ||
+                          file.type.startsWith('image/') ||
+                          file.type.startsWith('video/') ||
                           ALLOWED_EXTENSIONS.includes(ext)
 
     if (!isAllowedType) {
@@ -144,7 +145,7 @@ export default function FilesPage({ onViewVersions }) {
     }
 
     // Validate size (100MB)
-    if (uploadFile.size > 100 * 1024 * 1024) {
+    if (file.size > 100 * 1024 * 1024) {
       toast.error('File size exceeds 100MB limit')
       return
     }
@@ -163,7 +164,7 @@ export default function FilesPage({ onViewVersions }) {
 
       // Upload via edge function
       const formData = new FormData()
-      formData.append('file', uploadFile)
+      formData.append('file', file, uniqueName) // Browser natively sends uniqueName as filename
       formData.append('folder_id', profile.drive_folder_id)
       formData.append('provider_token', googleToken)
 
@@ -187,9 +188,9 @@ export default function FilesPage({ onViewVersions }) {
       const { error: insertError } = await supabase.from('shared_files').insert({
         user_id: user.id,
         google_drive_file_id: result.file_id,
-        file_name: uploadFile.name,
-        file_size: uploadFile.size,
-        mime_type: uploadFile.type,
+        file_name: uniqueName,
+        file_size: file.size,
+        mime_type: file.type,
         current_version_num: 1,
         unique_share_hash: shareHash,
         sharing_status: 'private',
@@ -216,10 +217,10 @@ export default function FilesPage({ onViewVersions }) {
       await supabase.from('activity_logs').insert({
         user_id: user.id,
         action: 'upload',
-        details: `Uploaded file: ${uploadFile.name}`,
+        details: `Uploaded file: ${uniqueName}`,
       })
 
-      toast.success(`${uploadFile.name} uploaded successfully`)
+      toast.success(`${uniqueName} uploaded successfully`)
       loadFiles()
     } catch (err) {
       console.error(err)
