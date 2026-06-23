@@ -489,13 +489,18 @@ serve(async (req) => {
           console.error(`Error executing account delete-cascade for ${targetEmail}:`, delErr)
         }
 
-        subject = "Console Account Status - Neo Files Transfer"
+        subject = "Account Deleted & Data Removed - Neo Files Transfer"
         htmlBody = `
           <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #cbd5e1; border-radius: 8px;">
-            <h3 style="color: #f59e0b; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-top: 0;">Account Suspended</h3>
+            <h3 style="color: #ef4444; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-top: 0;">Account Deleted</h3>
             <p style="font-size: 14px; line-height: 1.5;">Hello,</p>
-            <p style="font-size: 14px; line-height: 1.5;">Please note that your access request has been <strong>suspended/deleted</strong> by the administrator.</p>
-            <p style="font-size: 14px; line-height: 1.5; color: #ef4444; font-weight: bold;">Admin suspended your account. Please resubmit your request and connect with the administrator.</p>
+            <p style="font-size: 14px; line-height: 1.5;">Please note that your console account has been deleted by the administrator, and all your personal profile data, shared files, and records have been permanently removed from our system.</p>
+            <p style="font-size: 14px; line-height: 1.5; color: #10b981; font-weight: bold;">If you wish to access the platform again, you are welcome to submit a fresh console access request using this email address.</p>
+            <div style="text-align: center; margin: 25px 0;">
+              <a href="${Deno.env.get("VITE_APP_URL") || "https://neo-files-transfer.pages.dev"}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Request Access Again</a>
+            </div>
+            <p style="font-size: 13px; color: #64748b;">Thank you,</p>
+            <p style="font-size: 13px; color: #64748b;">Neo Files Transfer Team</p>
           </div>
         `
       } else {
