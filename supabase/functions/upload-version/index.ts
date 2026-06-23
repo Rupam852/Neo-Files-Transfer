@@ -37,6 +37,7 @@ serve(async (req) => {
     const file = formData.get("file") as File
     const folderId = formData.get("folder_id") as string
     const clientProviderToken = formData.get("provider_token") as string
+    const oldFileId = formData.get("old_file_id") as string
 
     if (!file) {
       throw new Error("No file provided")
@@ -144,6 +145,38 @@ serve(async (req) => {
     }
 
     const driveFile = await driveResponse.json()
+
+    // Delete old file version from Google Drive if specified
+    if (oldFileId) {
+      console.log(`Deleting old file version from Google Drive: ${oldFileId}`)
+      const deleteFromDrive = async (token: string) => {
+        return await fetch(
+          `https://www.googleapis.com/drive/v3/files/${oldFileId}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        )
+      }
+
+      let deleteResponse = await deleteFromDrive(accessToken)
+      if (deleteResponse.status === 401 && profile.google_refresh_token) {
+        try {
+          accessToken = await refreshGoogleToken(user.id, profile.google_refresh_token, supabaseAdmin)
+          deleteResponse = await deleteFromDrive(accessToken)
+        } catch (err) {
+          console.error("Token refresh failed during delete retry:", err)
+        }
+      }
+
+      if (!deleteResponse.ok && deleteResponse.status !== 404) {
+        console.error(`Failed to delete old file version ${oldFileId}:`, await deleteResponse.text())
+      } else {
+        console.log(`Old file version ${oldFileId} deleted successfully`)
+      }
+    }
 
     return new Response(
       JSON.stringify({

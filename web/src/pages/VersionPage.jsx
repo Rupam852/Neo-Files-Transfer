@@ -75,6 +75,9 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
       formData.append('file', selectedFile)
       formData.append('folder_id', profile.drive_folder_id)
       formData.append('provider_token', googleToken)
+      if (file.google_drive_file_id) {
+        formData.append('old_file_id', file.google_drive_file_id)
+      }
 
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-version`,
@@ -90,6 +93,12 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
 
       const newVersionNum = (file.current_version_num || 0) + 1
 
+      // Delete all old version records to prevent DB bloating
+      await supabase
+        .from('file_versions')
+        .delete()
+        .eq('file_id', fileId)
+
       // Add version record
       await supabase.from('file_versions').insert({
         file_id: fileId,
@@ -97,17 +106,23 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
         version_number: newVersionNum,
       })
 
-      // Update current version number
+      // Update the main file details in shared_files
       await supabase
         .from('shared_files')
-        .update({ current_version_num: newVersionNum })
+        .update({ 
+          current_version_num: newVersionNum,
+          google_drive_file_id: result.file_id,
+          file_name: selectedFile.name,
+          file_size: selectedFile.size,
+          mime_type: result.mime_type || selectedFile.type
+        })
         .eq('id', fileId)
 
       // Log
       await supabase.from('activity_logs').insert({
         user_id: user.id,
         action: 'version_upload',
-        details: `Uploaded version ${newVersionNum} for: ${file.file_name}`,
+        details: `Uploaded version ${newVersionNum} for: ${selectedFile.name}`,
       })
 
       toast.success(`Version ${newVersionNum} uploaded successfully`)
