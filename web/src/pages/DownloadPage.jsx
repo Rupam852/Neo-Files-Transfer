@@ -96,12 +96,19 @@ export default function DownloadPage() {
       if (fileInfo.file_size && (fileInfo.file_size > fileLimit || (isMobile && fileInfo.file_size > 15 * 1024 * 1024))) {
         console.log('Bypassing JS streaming due to size/mobile constraints. Initiating direct browser download.')
         setStatus('downloading')
-        setProgress(100)
+        setProgress(15)
+        
+        setTimeout(() => setProgress(50), 250)
+        setTimeout(() => setProgress(85), 550)
+        setTimeout(() => {
+          setProgress(100)
+          setStatus('saving')
+        }, 850)
         
         setTimeout(() => {
           window.location.href = directUrl
           setStatus('completed')
-        }, 800)
+        }, 1500)
         return
       }
 
@@ -165,11 +172,15 @@ export default function DownloadPage() {
       }
 
       // Trigger client-side save
+      setStatus('saving')
+      setProgress(100)
+      
+      // Allow UI thread to update to the saving state before CPU intensive Blob parsing
+      await new Promise(resolve => setTimeout(resolve, 300))
+
       const blob = new Blob(chunks, { type: fileInfo.mime_type || 'application/octet-stream' })
       const blobUrl = URL.createObjectURL(blob)
       setDownloadBlobUrl(blobUrl)
-
-      setStatus('completed')
 
       const a = document.createElement('a')
       a.href = blobUrl
@@ -177,6 +188,10 @@ export default function DownloadPage() {
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
+
+      // Wait a moment for Chrome's native download UI to trigger before changing status to completed
+      await new Promise(resolve => setTimeout(resolve, 800))
+      setStatus('completed')
 
     } catch (err) {
       console.error('Download stream error:', err)
@@ -248,16 +263,20 @@ export default function DownloadPage() {
           </div>
         )}
 
-        {/* State: downloading */}
-        {status === 'downloading' && (
+        {/* State: downloading or saving */}
+        {(status === 'downloading' || status === 'saving') && (
           <div className="space-y-6">
             <div className="text-center space-y-2">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full text-xs font-semibold uppercase tracking-wider mb-2">
                 <Download size={12} className="animate-bounce" />
-                Secure Stream Active
+                {status === 'saving' ? 'Saving File...' : 'Secure Stream Active'}
               </div>
-              <h2 className="text-2xl font-bold text-white font-['Space_Grotesk']">Downloading File</h2>
-              <p className="text-sm text-slate-400">Streaming secure blocks directly from Shield node.</p>
+              <h2 className="text-2xl font-bold text-white font-['Space_Grotesk']">
+                {status === 'saving' ? 'Finalizing Download' : 'Downloading File'}
+              </h2>
+              <p className="text-sm text-slate-400">
+                {status === 'saving' ? 'Writing file stream directly to your device storage...' : 'Streaming secure blocks directly from Shield node.'}
+              </p>
             </div>
 
             {/* File Info Block */}
@@ -274,21 +293,23 @@ export default function DownloadPage() {
             {/* Realtime Progress Track */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs font-medium">
-                <span className="text-slate-400">Progress: {progress}%</span>
+                <span className="text-slate-400">
+                  {status === 'saving' ? 'Progress: 100%' : `Progress: ${progress}%`}
+                </span>
                 <span className="text-indigo-400 font-semibold">
-                  {formatFileSize(downloadedBytes)} / {formatFileSize(totalBytes)}
+                  {status === 'saving' ? 'Saving...' : `${formatFileSize(downloadedBytes)} / ${formatFileSize(totalBytes)}`}
                 </span>
               </div>
               <div className="h-2.5 bg-slate-900 border border-slate-800/80 rounded-full overflow-hidden relative">
                 <div 
-                  className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full rounded-full transition-all duration-150 ease-out shadow-[0_0_12px_rgba(99,102,241,0.5)]" 
+                  className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(99,102,241,0.5)]" 
                   style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
 
             <div className="text-center text-xs text-slate-500">
-              Please do not close this window. Your download is preparing in local browser memory.
+              {status === 'saving' ? 'Writing cached blocks. Do not close this window.' : 'Please do not close this window. Your download is preparing in local browser memory.'}
             </div>
           </div>
         )}
