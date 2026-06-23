@@ -89,7 +89,7 @@ export default function DownloadPage() {
 
     try {
       const directUrl = generateDirectDownloadUrl(hash)
-      const fileLimit = 50 * 1024 * 1024 // 50MB
+      const fileLimit = 300 * 1024 * 1024 // 300MB
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
       // Always bypass streaming on mobile to prevent browser memory issues, user-activation gate blocking, and edge function timeouts
       if (isMobile || (fileInfo.file_size && fileInfo.file_size > fileLimit)) {
