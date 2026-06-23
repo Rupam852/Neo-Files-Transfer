@@ -8,8 +8,25 @@ import {
   User, Phone, Mail, FileText, Activity, Database, Copy, Plus
 } from 'lucide-react'
 
+const COUNTRIES = [
+  { code: '+91', name: 'India', length: 10, flag: '🇮🇳', placeholder: '98765 43210' },
+  { code: '+1', name: 'USA / Canada', length: 10, flag: '🇺🇸', placeholder: '201 555 0123' },
+  { code: '+44', name: 'United Kingdom', length: 10, flag: '🇬🇧', placeholder: '7911 123456' },
+  { code: '+61', name: 'Australia', length: 9, flag: '🇦🇺', placeholder: '412 345 678' },
+  { code: '+880', name: 'Bangladesh', length: 10, flag: '🇧🇩', placeholder: '1712 345678' },
+  { code: '+92', name: 'Pakistan', length: 10, flag: '🇵🇰', placeholder: '300 1234567' },
+  { code: '+977', name: 'Nepal', length: 10, flag: '🇳🇵', placeholder: '985 1012345' },
+  { code: '+65', name: 'Singapore', length: 8, flag: '🇸🇬', placeholder: '8123 4567' },
+  { code: '+971', name: 'UAE', length: 9, flag: '🇦🇪', placeholder: '50 123 4567' },
+  { code: '+966', name: 'Saudi Arabia', length: 9, flag: '🇸🇦', placeholder: '50 123 4567' },
+  { code: '+60', name: 'Malaysia', length: 9, flag: '🇲🇾', placeholder: '12 345 6789' },
+]
+
 export default function LandingPage() {
-  const [formData, setFormData] = useState({ name: '', phone: '', email: '' })
+  const [formData, setFormData] = useState({ name: '', email: '' })
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0])
+  const [customCode, setCustomCode] = useState('')
+  const [localPhone, setLocalPhone] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [step, setStep] = useState('form') // 'form' or 'otp'
   const [otp, setOtp] = useState('')
@@ -17,11 +34,55 @@ export default function LandingPage() {
   const [resending, setResending] = useState(false)
   const [blockMessage, setBlockMessage] = useState('')
 
+  // Compute final full phone number
+  const finalPhone = selectedCountry.code === 'other'
+    ? `${customCode}${localPhone}`
+    : `${selectedCountry.code}${localPhone}`
+
+  function handleCountryChange(e) {
+    const code = e.target.value
+    if (code === 'other') {
+      setSelectedCountry({ code: 'other', name: 'Other', length: 15, flag: '🌐', placeholder: 'Enter number with custom code' })
+      setCustomCode('+')
+    } else {
+      const match = COUNTRIES.find(c => c.code === code)
+      if (match) {
+        setSelectedCountry(match)
+      }
+    }
+    setLocalPhone('')
+  }
+
+  function handlePhoneChange(e) {
+    const val = e.target.value.replace(/[^0-9]/g, '')
+    const maxLength = selectedCountry.length
+    if (val.length <= maxLength) {
+      setLocalPhone(val)
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!formData.name || !formData.phone || !formData.email) {
+    if (!formData.name || !localPhone || !formData.email) {
       toast.error('All fields are required')
       return
+    }
+
+    // Validate phone number length based on selected country
+    if (selectedCountry.code !== 'other') {
+      if (localPhone.length !== selectedCountry.length) {
+        toast.error(`Please enter a valid ${selectedCountry.length}-digit phone number for ${selectedCountry.name}.`)
+        return
+      }
+    } else {
+      if (!customCode.startsWith('+') || customCode.length < 2) {
+        toast.error('Please enter a valid custom country code starting with + (e.g. +33).')
+        return
+      }
+      if (localPhone.length < 7 || localPhone.length > 15) {
+        toast.error('Please enter a valid phone number (between 7 and 15 digits).')
+        return
+      }
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -53,7 +114,10 @@ export default function LandingPage() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify({
+            ...formData,
+            phone: finalPhone
+          })
         }
       )
 
@@ -91,6 +155,7 @@ export default function LandingPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...formData,
+            phone: finalPhone,
             otp: otp
           })
         }
@@ -102,7 +167,10 @@ export default function LandingPage() {
       }
 
       toast.success('Email verified and request submitted successfully!')
-      setFormData({ name: '', phone: '', email: '' })
+      setFormData({ name: '', email: '' })
+      setLocalPhone('')
+      setCustomCode('')
+      setSelectedCountry(COUNTRIES[0])
       setOtp('')
       setStep('form')
     } catch (err) {
@@ -122,7 +190,10 @@ export default function LandingPage() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify({
+            ...formData,
+            phone: finalPhone
+          })
         }
       )
 
@@ -279,16 +350,43 @@ export default function LandingPage() {
                     {/* Phone Input */}
                     <div className="relative">
                       <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Phone Number</label>
-                      <div className="relative">
-                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                          <Phone size={15} />
-                        </span>
+                      <div className="relative flex bg-[#080d1a]/80 border border-slate-700 hover:border-slate-600 rounded-xl focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/10 transition-all duration-300 overflow-hidden">
+                        {/* Country Selector Dropdown */}
+                        <div className="flex items-center border-r border-slate-700 bg-[#0c1222] px-3 pr-2">
+                          <span className="mr-1 text-sm">{selectedCountry.flag}</span>
+                          <select
+                            value={selectedCountry.code === 'other' ? 'other' : selectedCountry.code}
+                            onChange={handleCountryChange}
+                            className="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer pr-1 py-3"
+                          >
+                            {COUNTRIES.map((c) => (
+                              <option key={c.code} value={c.code} className="bg-[#0b1329] text-white">
+                                {c.code} ({c.name})
+                              </option>
+                            ))}
+                            <option value="other" className="bg-[#0b1329] text-white">Other (+)</option>
+                          </select>
+                        </div>
+                        
+                        {/* Custom Code Input if Other is selected */}
+                        {selectedCountry.code === 'other' && (
+                          <input
+                            type="text"
+                            placeholder="+XX"
+                            value={customCode}
+                            onChange={e => setCustomCode(e.target.value.replace(/[^0-9+]/g, ''))}
+                            className="w-16 px-2 bg-transparent text-white border-r border-slate-700 text-xs font-semibold focus:outline-none text-center"
+                            required
+                          />
+                        )}
+
+                        {/* Phone Number Input */}
                         <input
                           type="tel"
-                          className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-700 hover:border-slate-600 text-white placeholder-slate-400 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
-                          placeholder="+91 XXXXX XXXXX"
-                          value={formData.phone}
-                          onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                          className="flex-1 bg-transparent px-4 py-3 text-white placeholder-slate-500 outline-none text-sm font-medium"
+                          placeholder={selectedCountry.placeholder}
+                          value={localPhone}
+                          onChange={handlePhoneChange}
                           required
                         />
                       </div>
