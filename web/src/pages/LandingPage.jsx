@@ -4,7 +4,8 @@ import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
 import { 
   Cloud, Shield, Link2, ArrowRight, AlertTriangle, 
-  LogIn, UserCheck, HardDrive, Share2, Layers, CheckCircle2 
+  LogIn, UserCheck, HardDrive, Share2, Layers, CheckCircle2,
+  User, Phone, Mail, FileText, Activity, Database, Copy, Plus
 } from 'lucide-react'
 
 export default function LandingPage() {
@@ -60,34 +61,34 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-gray-100 font-['Plus_Jakarta_Sans'] relative overflow-hidden selection:bg-primary-600/30 selection:text-white">
+    <div className="min-h-screen bg-[#030712] text-gray-100 font-['Plus_Jakarta_Sans'] relative overflow-hidden selection:bg-indigo-500/30 selection:text-white">
       {/* Import Premium Fonts */}
       <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 
       {/* Futuristic Background Mesh Gradients */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary-600/10 blur-[130px] pointer-events-none animate-float opacity-80" />
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 blur-[130px] pointer-events-none animate-float opacity-80" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-purple-600/10 blur-[150px] pointer-events-none animate-float-delayed opacity-75" />
-      <div className="absolute top-[30%] left-[40%] w-[300px] h-[300px] rounded-full bg-teal-500/5 blur-[100px] pointer-events-none animate-float opacity-50" />
+      <div className="absolute top-[30%] left-[40%] w-[300px] h-[300px] rounded-full bg-cyan-500/5 blur-[100px] pointer-events-none animate-float opacity-50" />
 
       {/* Subtle Grid Overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)] bg-[size:30px_30px] pointer-events-none" />
 
       {/* Header */}
-      <header className="relative z-10 border-b border-white/5 bg-[#070b14]/50 backdrop-blur-md sticky top-0">
+      <header className="relative z-20 border-b border-white/5 bg-[#030712]/60 backdrop-blur-xl sticky top-0">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-tr from-primary-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-primary-600/20 hover:rotate-6 transition-transform duration-300">
+            <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 hover:rotate-6 transition-transform duration-300">
               <span className="text-white font-extrabold text-base tracking-wider font-['Space_Grotesk']">NF</span>
             </div>
             <span className="font-bold text-xl tracking-tight text-white font-['Space_Grotesk']">
-              Neo<span className="text-primary-500">Files</span>
+              Neo<span className="text-indigo-400">Files</span>
             </span>
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
-            <a href="#features" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-primary-500 hover:after:w-full after:transition-all after:duration-300">Features</a>
-            <a href="#security" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-primary-500 hover:after:w-full after:transition-all after:duration-300">Security</a>
-            <a href="#register" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-primary-500 hover:after:w-full after:transition-all after:duration-300">Register</a>
+            <a href="#features" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-indigo-500 hover:after:w-full after:transition-all after:duration-300">Features</a>
+            <a href="#security" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-indigo-500 hover:after:w-full after:transition-all after:duration-300">Security</a>
+            <a href="#register" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-indigo-500 hover:after:w-full after:transition-all after:duration-300">Register</a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -103,118 +104,185 @@ export default function LandingPage() {
       </header>
 
       {/* Hero & Registration Section */}
-      <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-24 lg:pt-24 lg:pb-32">
-        <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+      <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-24 lg:pt-20 lg:pb-32">
+        <div className="grid lg:grid-cols-12 gap-16 lg:gap-8 items-center">
           
           {/* Left Side: Headline & Copy */}
-          <div className="lg:col-span-7 space-y-8 text-center lg:text-left">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-600/10 to-purple-600/10 border border-primary-500/20 text-primary-400 rounded-full text-xs font-semibold uppercase tracking-wider animate-fade-in-up">
-              <Cloud size={14} className="animate-bounce" />
-              Advanced File Management
+          <div className="lg:col-span-6 space-y-8 text-center lg:text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full text-xs font-semibold uppercase tracking-wider animate-fade-in-up">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
+              v1.0 Live Proxy Storage
             </div>
             
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1] font-['Space_Grotesk'] animate-fade-in-up animation-delay-100">
               Secure Cloud <br />
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary-400 via-purple-400 to-teal-400">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
                 File Distribution
               </span>
             </h1>
 
             <p className="text-base sm:text-lg text-gray-400 max-w-xl mx-auto lg:mx-0 leading-relaxed animate-fade-in-up animation-delay-200">
-              Upload files to your custom Google Drive storage and generate proxy download links. 
-              Track version histories, share anonymously, and keep your primary drive private.
+              Upload files directly to private Google Drive backends and distribute secure proxy download links. 
+              Track logs, control access, and scale storage with zero limits.
             </p>
 
-            {/* Micro Feature Indicators */}
-            <div className="grid sm:grid-cols-3 gap-4 pt-4 text-left max-w-md mx-auto lg:mx-0 animate-fade-in-up animation-delay-300">
-              <div className="flex items-center gap-2 text-sm text-gray-300">
-                <CheckCircle2 size={16} className="text-teal-400 flex-shrink-0" />
-                <span>Infinite Storage</span>
+            {/* Premium Micro Feature Pills */}
+            <div className="flex flex-wrap gap-3 justify-center lg:justify-start pt-4 animate-fade-in-up animation-delay-300">
+              <div className="flex items-center gap-2 px-3.5 py-1.5 bg-emerald-500/5 border border-emerald-500/10 rounded-full text-xs font-semibold text-emerald-400">
+                <Database size={13} />
+                <span>Unlimited Drive Storage</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-300">
-                <CheckCircle2 size={16} className="text-primary-400 flex-shrink-0" />
-                <span>Encrypted Proxy</span>
+              <div className="flex items-center gap-2 px-3.5 py-1.5 bg-indigo-500/5 border border-indigo-500/10 rounded-full text-xs font-semibold text-indigo-400">
+                <Shield size={13} />
+                <span>Proxy Encrypted API</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-300">
-                <CheckCircle2 size={16} className="text-purple-400 flex-shrink-0" />
-                <span>Version History</span>
+              <div className="flex items-center gap-2 px-3.5 py-1.5 bg-purple-500/5 border border-purple-500/10 rounded-full text-xs font-semibold text-purple-400">
+                <Activity size={13} />
+                <span>Live Share Auditing</span>
               </div>
             </div>
           </div>
 
-          {/* Right Side: Glassmorphic Registration Widget */}
-          <div id="register" className="lg:col-span-5 relative animate-fade-in-up animation-delay-300">
-            {/* Widget Glow Backdrop */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-primary-600/20 to-purple-600/20 rounded-2xl filter blur-xl opacity-70 pointer-events-none animate-pulse-glow" />
-
-            <div className="relative bg-white/[0.02] backdrop-blur-2xl border border-white/10 shadow-2xl p-8 rounded-2xl space-y-6 animate-float">
-              <div className="space-y-2 text-center lg:text-left">
-                <h3 className="text-2xl font-bold text-white font-['Space_Grotesk'] flex items-center justify-center lg:justify-start gap-2">
-                  <UserCheck size={22} className="text-primary-400 animate-pulse" />
-                  Request Access
-                </h3>
-                <p className="text-xs text-gray-400">
-                  Submit details. Login becomes active once approved by an admin.
-                </p>
+          {/* Right Side: Overlapping Mock Console & Registration Card */}
+          <div id="register" className="lg:col-span-6 relative flex justify-center lg:justify-end">
+            <div className="relative w-full max-w-md">
+              
+              {/* Back Card: Active Share Proxies (Dribbble Parallax Style) */}
+              <div className="absolute -top-12 -left-12 w-64 bg-slate-950/60 backdrop-blur-xl border border-white/5 p-4 rounded-xl shadow-2xl animate-float-delayed pointer-events-none hidden xl:block z-0">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Active Proxies</span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs bg-white/[0.02] p-2 rounded-lg">
+                    <div className="flex items-center gap-2 truncate">
+                      <FileText size={12} className="text-indigo-400 flex-shrink-0" />
+                      <span className="text-gray-300 truncate font-mono">marketing_v2.mp4</span>
+                    </div>
+                    <span className="text-[9px] bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded font-bold">120 MB/s</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs bg-white/[0.02] p-2 rounded-lg">
+                    <div className="flex items-center gap-2 truncate">
+                      <FileText size={12} className="text-indigo-400 flex-shrink-0" />
+                      <span className="text-gray-300 truncate font-mono">user_db_export.zip</span>
+                    </div>
+                    <span className="text-[9px] bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded font-bold">Encrypted</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Warning Message inside Widget */}
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start gap-2.5">
-                <AlertTriangle size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
-                <p className="text-[11px] text-amber-200 leading-normal">
-                  Your Google login email must match the registration email requested here.
-                </p>
+              {/* Front Card: Bandwidth Gauge (Dribbble Parallax Style) */}
+              <div className="absolute -bottom-8 -right-10 w-48 bg-slate-950/60 backdrop-blur-xl border border-white/5 p-4 rounded-xl shadow-2xl animate-float pointer-events-none hidden xl:block z-20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity size={14} className="text-indigo-400 animate-pulse" />
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Uptime Monitor</span>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-lg font-bold font-mono text-white">99.98%</div>
+                  <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                    <div className="w-[99%] h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full" />
+                  </div>
+                  <div className="text-[9px] text-gray-500">Live request latency: 24ms</div>
+                </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Full Name</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-3 bg-[#0d1527]/50 border border-white/5 text-gray-100 placeholder-gray-600 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all duration-200 text-sm font-medium"
-                    placeholder="John Doe"
-                    value={formData.name}
-                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
+              {/* Glow Backdrop */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 rounded-2xl filter blur-2xl opacity-80 pointer-events-none animate-pulse-glow" />
+
+              {/* Center Main Card: Sleek Developer Portal Form */}
+              <div className="relative bg-slate-950/80 backdrop-blur-3xl border border-slate-800 shadow-2xl p-8 rounded-2xl space-y-6 animate-float z-10">
+                <div className="space-y-2 text-center lg:text-left">
+                  <h3 className="text-2xl font-bold text-white font-['Space_Grotesk'] flex items-center justify-center lg:justify-start gap-2">
+                    <UserCheck size={22} className="text-indigo-400 animate-pulse" />
+                    Request Access
+                  </h3>
+                  <p className="text-xs text-gray-400">
+                    Register your details. Login becomes active once approved by an admin.
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Phone Number</label>
-                  <input
-                    type="tel"
-                    className="w-full px-4 py-3 bg-[#0d1527]/50 border border-white/5 text-gray-100 placeholder-gray-600 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all duration-200 text-sm font-medium"
-                    placeholder="+91 XXXXX XXXXX"
-                    value={formData.phone}
-                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                    required
-                  />
+
+                {/* Cyber Warning Alert */}
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start gap-2.5">
+                  <AlertTriangle size={15} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-[11px] text-amber-300/90 leading-normal">
+                    Your Google login email must match the registration email requested here.
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Email Address</label>
-                  <input
-                    type="email"
-                    className="w-full px-4 py-3 bg-[#0d1527]/50 border border-white/5 text-gray-100 placeholder-gray-600 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all duration-200 text-sm font-medium"
-                    placeholder="your-google-email@gmail.com"
-                    value={formData.email}
-                    onChange={e => setFormData({ ...formData, email: e.target.value })}
-                    required
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full py-3.5 bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-500 hover:to-purple-500 text-white rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary-600/20"
-                >
-                  {submitting ? 'Submitting Request...' : 'Submit Registration'}
-                </button>
-              </form>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Name Input */}
+                  <div className="relative">
+                    <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Full Name</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
+                        <User size={15} />
+                      </span>
+                      <input
+                        type="text"
+                        className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-800 text-gray-100 placeholder-gray-600 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
+                        placeholder="John Doe"
+                        value={formData.name}
+                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Phone Input */}
+                  <div className="relative">
+                    <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Phone Number</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
+                        <Phone size={15} />
+                      </span>
+                      <input
+                        type="tel"
+                        className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-800 text-gray-100 placeholder-gray-600 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
+                        placeholder="+91 XXXXX XXXXX"
+                        value={formData.phone}
+                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email Input */}
+                  <div className="relative">
+                    <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Email Address</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
+                        <Mail size={15} />
+                      </span>
+                      <input
+                        type="email"
+                        className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-800 text-gray-100 placeholder-gray-600 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
+                        placeholder="your-google-email@gmail.com"
+                        value={formData.email}
+                        onChange={e => setFormData({ ...formData, email: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full py-3.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 text-white rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/25 tracking-wide uppercase text-xs"
+                  >
+                    {submitting ? 'Requesting Provisioning...' : 'Request Console Access'}
+                  </button>
+                </form>
+              </div>
+
             </div>
           </div>
+
         </div>
       </section>
 
       {/* Feature Highlights Grid */}
-      <section id="features" className="relative z-10 py-24 bg-black/20 border-y border-white/5">
+      <section id="features" className="relative z-10 py-24 bg-black/30 border-y border-white/5">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-16 space-y-3 animate-fade-in-up">
             <h2 className="text-3xl font-extrabold text-white font-['Space_Grotesk']">
@@ -226,9 +294,11 @@ export default function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white/[0.01] border border-white/5 p-8 rounded-2xl space-y-4 hover:border-primary-500/30 hover:bg-white/[0.02] transition-all duration-300 group hover:-translate-y-1 animate-fade-in-up animation-delay-100">
-              <div className="w-12 h-12 bg-primary-600/10 border border-primary-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                <HardDrive size={24} className="text-primary-400" />
+            {/* Card 1 */}
+            <div className="relative bg-slate-950/40 backdrop-blur-xl border border-slate-900 p-8 rounded-2xl space-y-4 hover:border-indigo-500/30 hover:bg-slate-900/40 transition-all duration-300 group hover:-translate-y-1 overflow-hidden animate-fade-in-up animation-delay-100">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-indigo-500 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="w-12 h-12 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <HardDrive size={24} className="text-indigo-400" />
               </div>
               <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">Google Drive Backed</h3>
               <p className="text-gray-400 text-sm leading-relaxed">
@@ -236,8 +306,10 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="bg-white/[0.01] border border-white/5 p-8 rounded-2xl space-y-4 hover:border-purple-500/30 hover:bg-white/[0.02] transition-all duration-300 group hover:-translate-y-1 animate-fade-in-up animation-delay-200">
-              <div className="w-12 h-12 bg-purple-600/10 border border-purple-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+            {/* Card 2 */}
+            <div className="relative bg-slate-950/40 backdrop-blur-xl border border-slate-900 p-8 rounded-2xl space-y-4 hover:border-purple-500/30 hover:bg-slate-900/40 transition-all duration-300 group hover:-translate-y-1 overflow-hidden animate-fade-in-up animation-delay-200">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="w-12 h-12 bg-purple-600/10 border border-purple-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                 <Share2 size={24} className="text-purple-400" />
               </div>
               <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">Proxy Share Links</h3>
@@ -246,9 +318,11 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="bg-white/[0.01] border border-white/5 p-8 rounded-2xl space-y-4 hover:border-teal-500/30 hover:bg-white/[0.02] transition-all duration-300 group hover:-translate-y-1 animate-fade-in-up animation-delay-300">
-              <div className="w-12 h-12 bg-teal-600/10 border border-teal-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Layers size={24} className="text-teal-400" />
+            {/* Card 3 */}
+            <div className="relative bg-slate-950/40 backdrop-blur-xl border border-slate-900 p-8 rounded-2xl space-y-4 hover:border-cyan-500/30 hover:bg-slate-900/40 transition-all duration-300 group hover:-translate-y-1 overflow-hidden animate-fade-in-up animation-delay-300">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-cyan-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="w-12 h-12 bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <Layers size={24} className="text-cyan-400" />
               </div>
               <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">Automatic Versioning</h3>
               <p className="text-gray-400 text-sm leading-relaxed">
@@ -261,26 +335,45 @@ export default function LandingPage() {
 
       {/* Security Info Panel */}
       <section id="security" className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-24">
-        <div className="bg-gradient-to-tr from-primary-600/5 to-purple-600/5 border border-white/5 rounded-3xl p-8 sm:p-12 relative overflow-hidden flex flex-col md:flex-row items-center gap-8 justify-between animate-fade-in-up animation-delay-500">
-          <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-primary-600/10 rounded-full blur-[80px] pointer-events-none" />
+        <div className="bg-gradient-to-tr from-indigo-500/10 via-purple-500/5 to-transparent border border-slate-800 rounded-3xl p-8 sm:p-12 relative overflow-hidden flex flex-col lg:flex-row items-center gap-8 justify-between animate-fade-in-up animation-delay-500">
+          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none animate-pulse-glow" />
           
-          <div className="space-y-4 max-w-xl text-center md:text-left">
-            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto md:mx-0">
-              <Shield size={24} className="text-teal-400 animate-pulse" />
+          <div className="space-y-6 max-w-xl text-center lg:text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-semibold uppercase tracking-wider">
+              <Shield size={12} className="animate-pulse" />
+              Enterprise Grade
             </div>
-            <h3 className="text-2xl sm:text-3xl font-bold text-white font-['Space_Grotesk']">
-              Enterprise Grade Privacy Controls
+            <h3 className="text-3xl sm:text-4xl font-bold text-white font-['Space_Grotesk'] leading-tight">
+              Privacy and Security <br />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
+                Without Compromise
+              </span>
             </h3>
-            <p className="text-sm text-gray-400 leading-relaxed">
+            <p className="text-sm sm:text-base text-slate-400 leading-relaxed font-normal">
               We leverage Row Level Security (RLS) on database calls combined with short-lived JWT signatures. 
               Only verified approved users can trigger storage functions, ensuring absolute compliance with cloud security standards.
             </p>
+            
+            <div className="flex flex-wrap justify-center lg:justify-start gap-6 pt-2">
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <CheckCircle2 size={14} className="text-emerald-400" />
+                <span>Row Level Security (RLS)</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <CheckCircle2 size={14} className="text-emerald-400" />
+                <span>Short-lived JWT Tokens</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <CheckCircle2 size={14} className="text-emerald-400" />
+                <span>Google API Isolation</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 z-10 w-full lg:w-auto flex justify-center">
             <Link 
               to="/login"
-              className="px-8 py-4 bg-white text-gray-900 rounded-xl text-sm font-bold hover:bg-gray-100 transition-colors shadow-lg shadow-white/5 inline-flex items-center gap-2 transform hover:scale-105 active:scale-95 duration-200"
+              className="px-8 py-4 bg-white text-slate-950 hover:bg-slate-100 rounded-xl text-sm font-bold transition-all duration-200 shadow-xl shadow-white/5 hover:shadow-indigo-500/10 inline-flex items-center gap-2 transform hover:scale-[1.03] active:scale-95 duration-200 w-full sm:w-auto justify-center"
             >
               Sign In To Console
               <ArrowRight size={16} />
