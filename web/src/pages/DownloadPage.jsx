@@ -104,8 +104,10 @@ export default function DownloadPage() {
           setProgress(95)
           setStatus('saving')
         }, 2500)
-        // Trigger native browser download — Edge Function sends Content-Disposition: attachment
-        window.location.href = directUrl
+        // Use window.open so the current page stays intact (window.location.href would navigate away and reset the app).
+        // Since this is a cross-origin URL, filename comes from the server's Content-Disposition header
+        // which the Edge Function already sets to: attachment; filename="foldername.zip"
+        window.open(directUrl, '_blank')
         setTimeout(() => setStatus('completed'), 6000)
         return
       }
