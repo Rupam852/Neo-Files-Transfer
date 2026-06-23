@@ -269,49 +269,66 @@ export default function FilesPage({ onViewVersions }) {
       const dbParentId = item.dbParentId !== undefined ? item.dbParentId : (currentFolder ? currentFolder.id : null)
       const driveParentId = item.driveParentId !== undefined ? item.driveParentId : (currentFolder ? currentFolder.google_drive_file_id : profile.drive_folder_id)
 
-      setProcessingText(`Uploading file ${i + 1} of ${batch.length}: ${file.name}...`)
+      setProcessingText(`Uploading file ${i + 1} of ${batch.length}: ${file.name} (0%)...`)
 
       try {
         const uniqueName = getUniqueFileName(file.name, files)
         const proxyUrl = import.meta.env.VITE_PROXY_URL
-        let res
 
-        if (proxyUrl) {
-          const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
-          res = await fetch(
-            `${cleanProxy}/upload-file`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'X-File-Name': encodeURIComponent(uniqueName),
-                'X-Folder-Id': driveParentId,
-                'X-File-Size': file.size,
-                'X-File-Type': file.type || 'application/octet-stream'
-              },
-              body: file // Upload the raw file binary stream directly
+        const result = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest()
+          const uploadUrl = proxyUrl
+            ? `${proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl}/upload-file`
+            : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-file`
+
+          xhr.open('POST', uploadUrl)
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+
+          if (proxyUrl) {
+            xhr.setRequestHeader('X-File-Name', encodeURIComponent(uniqueName))
+            xhr.setRequestHeader('X-Folder-Id', driveParentId)
+            xhr.setRequestHeader('X-File-Size', file.size)
+            xhr.setRequestHeader('X-File-Type', file.type || 'application/octet-stream')
+          }
+
+          // Track upload progress
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 100)
+              setProcessingText(`Uploading file ${i + 1} of ${batch.length}: ${file.name} (${pct}%)`)
             }
-          )
-        } else {
-          const formData = new FormData()
-          formData.append('file', file, uniqueName)
-          formData.append('folder_id', driveParentId)
-          formData.append('provider_token', googleToken)
+          })
 
-          res = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-file`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-              },
-              body: formData,
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                resolve(JSON.parse(xhr.responseText))
+              } catch (parseErr) {
+                resolve({ success: true })
+              }
+            } else {
+              try {
+                const errJson = JSON.parse(xhr.responseText)
+                reject(new Error(errJson.error || `Server returned HTTP ${xhr.status}`))
+              } catch (parseErr) {
+                reject(new Error(`Server returned HTTP ${xhr.status}`))
+              }
             }
-          )
-        }
+          }
 
-        const result = await res.json()
-        if (!res.ok) throw new Error(result.error || 'Upload failed')
+          xhr.onerror = () => reject(new Error('Network error. Connection failed.'))
+          xhr.onabort = () => reject(new Error('Upload aborted.'))
+
+          if (proxyUrl) {
+            xhr.send(file)
+          } else {
+            const formData = new FormData()
+            formData.append('file', file, uniqueName)
+            formData.append('folder_id', driveParentId)
+            formData.append('provider_token', googleToken)
+            xhr.send(formData)
+          }
+        })
 
         const { error: insertError } = await supabase.from('shared_files').insert({
           user_id: user.id,

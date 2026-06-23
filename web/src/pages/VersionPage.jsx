@@ -69,55 +69,72 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
     }
 
     setUploading(true)
-    setProcessingText('Uploading version...')
+    setProcessingText('Uploading version (0%)...')
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
       const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
-      let res
 
-      if (proxyUrl) {
-        const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
-        const headers = {
-          'Authorization': `Bearer ${token}`,
-          'X-File-Name': encodeURIComponent(selectedFile.name),
-          'X-Folder-Id': profile.drive_folder_id,
-          'X-File-Size': selectedFile.size,
-          'X-File-Type': selectedFile.type || 'application/octet-stream'
-        }
-        if (file.google_drive_file_id) {
-          headers['X-Old-File-Id'] = file.google_drive_file_id
-        }
+      const result = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        const uploadUrl = proxyUrl
+          ? `${proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl}/upload-file`
+          : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-version`
 
-        res = await fetch(
-          `${cleanProxy}/upload-file`,
-          {
-            method: 'POST',
-            headers: headers,
-            body: selectedFile // Stream version raw body directly
+        xhr.open('POST', uploadUrl)
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+
+        if (proxyUrl) {
+          xhr.setRequestHeader('X-File-Name', encodeURIComponent(selectedFile.name))
+          xhr.setRequestHeader('X-Folder-Id', profile.drive_folder_id)
+          xhr.setRequestHeader('X-File-Size', selectedFile.size)
+          xhr.setRequestHeader('X-File-Type', selectedFile.type || 'application/octet-stream')
+          if (file.google_drive_file_id) {
+            xhr.setRequestHeader('X-Old-File-Id', file.google_drive_file_id)
           }
-        )
-      } else {
-        const formData = new FormData()
-        formData.append('file', selectedFile)
-        formData.append('folder_id', profile.drive_folder_id)
-        formData.append('provider_token', googleToken)
-        if (file.google_drive_file_id) {
-          formData.append('old_file_id', file.google_drive_file_id)
         }
 
-        res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-version`,
-          {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData,
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100)
+            setProcessingText(`Uploading version (${pct}%)...`)
           }
-        )
-      }
+        })
 
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || 'Upload failed')
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText))
+            } catch (parseErr) {
+              resolve({ success: true })
+            }
+          } else {
+            try {
+              const errJson = JSON.parse(xhr.responseText)
+              reject(new Error(errJson.error || `Server returned HTTP ${xhr.status}`))
+            } catch (parseErr) {
+              reject(new Error(`Server returned HTTP ${xhr.status}`))
+            }
+          }
+        }
+
+        xhr.onerror = () => reject(new Error('Network error. Connection failed.'))
+        xhr.onabort = () => reject(new Error('Upload aborted.'))
+
+        if (proxyUrl) {
+          xhr.send(selectedFile)
+        } else {
+          const formData = new FormData()
+          formData.append('file', selectedFile)
+          formData.append('folder_id', profile.drive_folder_id)
+          formData.append('provider_token', googleToken)
+          if (file.google_drive_file_id) {
+            formData.append('old_file_id', file.google_drive_file_id)
+          }
+          xhr.send(formData)
+        }
+      })
 
       const newVersionNum = (file.current_version_num || 0) + 1
 
