@@ -1501,11 +1501,11 @@ export default function FilesPage({ onViewVersions }) {
                       type="text"
                       readOnly
                       className={`input-field text-xs bg-dark-500 py-2 border-dark-400 select-all transition-opacity ${shareModal.sharing_status === 'private' ? 'opacity-50' : ''}`}
-                      value={generateDirectDownloadUrl(shareModal.unique_share_hash, shareModal.is_folder)}
+                      value={generateDirectDownloadUrl(shareModal.unique_share_hash, shareModal.is_folder, shareModal.file_size)}
                     />
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(generateDirectDownloadUrl(shareModal.unique_share_hash, shareModal.is_folder))
+                        navigator.clipboard.writeText(generateDirectDownloadUrl(shareModal.unique_share_hash, shareModal.is_folder, shareModal.file_size))
                         toast.success('Direct download link copied!')
                       }}
                       className="btn-primary py-2 px-4 text-xs font-semibold shrink-0"

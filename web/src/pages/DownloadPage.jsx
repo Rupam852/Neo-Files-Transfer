@@ -89,7 +89,7 @@ export default function DownloadPage() {
     if (!fileInfo) return
 
     try {
-      const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder)
+      const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)
 
       console.log('Using native browser download manager for maximum speed.')
       setStatus('downloading')
@@ -264,7 +264,7 @@ export default function DownloadPage() {
             </div>
             <button
               onClick={() => {
-                const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder)
+                const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)
                 window.location.href = directUrl
               }}
               className="w-full btn-primary py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
@@ -360,7 +360,7 @@ export default function DownloadPage() {
               </button>
               <button
                 onClick={() => {
-                  const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder)
+                  const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)
                   window.location.href = directUrl
                 }}
                 className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-200"

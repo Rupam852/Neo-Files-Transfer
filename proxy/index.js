@@ -241,51 +241,45 @@ app.get('/download-file', async (req, res) => {
     }
 
     // --- CASE B: SINGLE FILE STREAMING ---
-    const makeFilePublicOnDrive = async (tokenVal) => {
-      return await fetch(
-        `https://www.googleapis.com/drive/v3/files/${driveFileId}/permissions`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${tokenVal}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            role: 'reader',
-            type: 'anyone',
-          }),
-        }
-      )
-    }
+    let driveResponse = await fetchMediaFromDrive(driveFileId, accessToken)
 
-    try {
-      let permRes = await makeFilePublicOnDrive(accessToken)
-      if (permRes.status === 401 && refreshToken) {
+    if (driveResponse.status === 401 && refreshToken) {
+      try {
         accessToken = await refreshGoogleToken(file.user_id, refreshToken, supabaseAdmin)
-        permRes = await makeFilePublicOnDrive(accessToken)
+        driveResponse = await fetchMediaFromDrive(driveFileId, accessToken)
+      } catch (refreshErr) {
+        console.error('Token refresh failed during download retry:', refreshErr)
       }
-      if (!permRes.ok) {
-        const errTxt = await permRes.text()
-        console.warn(`Failed to change Google Drive permissions for ${driveFileId}:`, errTxt)
-      }
-    } catch (permErr) {
-      console.warn('Failed to ensure Google Drive file is public:', permErr)
     }
 
-    let confirmToken = 't'
-    try {
-      const gDriveRes = await fetch(`https://drive.google.com/uc?export=download&id=${driveFileId}`)
-      const html = await gDriveRes.text()
-      const confirmMatch = html.match(/confirm=([a-zA-Z0-9_-]+)/)
-      if (confirmMatch) {
-        confirmToken = confirmMatch[1]
+    if (!driveResponse.ok) {
+      console.error('Google Drive alt=media fetch failed with status:', driveResponse.status)
+      const downloadUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}`
+      if (isStream) {
+        return res.status(400).json({
+          error: `Failed to fetch file content from Google Drive (HTTP ${driveResponse.status})`,
+          fallbackUrl: downloadUrl
+        })
       }
-    } catch (tokenErr) {
-      console.warn('Failed to resolve Google Drive bypass token:', tokenErr)
+      return res.redirect(downloadUrl)
     }
 
-    const downloadUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}&confirm=${confirmToken}`
-    return res.redirect(downloadUrl)
+    // Set correct headers
+    const contentType = file.mime_type || driveResponse.headers.get('Content-Type') || 'application/octet-stream'
+    res.setHeader('Content-Type', contentType)
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.file_name)}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`)
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    
+    const gDriveContentLength = driveResponse.headers.get('Content-Length')
+    if (gDriveContentLength) {
+      res.setHeader('Content-Length', gDriveContentLength)
+    } else if (file.file_size) {
+      res.setHeader('Content-Length', file.file_size)
+    }
+
+    // Stream directly from Drive to Client
+    const driveStream = Readable.fromWeb(driveResponse.body)
+    driveStream.pipe(res)
 
   } catch (error) {
     console.error('Download Proxy Error:', error)

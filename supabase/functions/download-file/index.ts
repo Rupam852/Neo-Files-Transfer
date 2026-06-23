@@ -282,28 +282,22 @@ serve(async (req) => {
           }
         )
       }
-      
-      const responseHeaders = new Headers()
-      responseHeaders.set("Location", downloadUrl)
-      for (const [key, value] of Object.entries(corsHeaders)) {
-        responseHeaders.set(key, value)
-      }
-      return new Response(null, {
-        status: 302,
-        headers: responseHeaders
-      })
+      return Response.redirect(downloadUrl, 302)
     }
 
     // Set correct headers for download attachment streaming
     const responseHeaders = new Headers()
     responseHeaders.set("Content-Type", file.mime_type || driveResponse.headers.get("Content-Type") || "application/octet-stream")
     responseHeaders.set("Content-Disposition", `attachment; filename="${file.file_name.replace(/"/g, '\\"')}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`)
-    
-    // Prevent browser and CDN caching of downloads to ensure latest version is always served
     responseHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate")
     responseHeaders.set("Pragma", "no-cache")
     responseHeaders.set("Expires", "0")
-    
+
+    const gDriveContentLength = driveResponse.headers.get("Content-Length")
+    if (gDriveContentLength) {
+      responseHeaders.set("Content-Length", gDriveContentLength)
+    }
+
     // Add CORS headers
     for (const [key, value] of Object.entries(corsHeaders)) {
       responseHeaders.set(key, value)
