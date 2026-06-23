@@ -78,9 +78,11 @@ export default function DashboardLayout() {
       `}>
         {/* Logo */}
         <div className="h-16 flex items-center gap-3 px-6 border-b border-dark-400">
-          <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">NF</span>
-          </div>
+          <img 
+            src="/favicon.png" 
+            alt="Neo Files Logo" 
+            className="w-8 h-8 object-contain"
+          />
           <span className="font-semibold text-gray-100">Neo Files</span>
           <button
             className="ml-auto lg:hidden text-gray-400 hover:text-gray-200"

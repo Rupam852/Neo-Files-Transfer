@@ -74,12 +74,14 @@ export default function LandingPage() {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)] bg-[size:30px_30px] pointer-events-none" />
 
       {/* Header */}
-      <header className="relative z-20 border-b border-white/5 bg-[#030712]/60 backdrop-blur-xl sticky top-0">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-[#030712]/70 backdrop-blur-md shadow-lg shadow-black/20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 hover:rotate-6 transition-transform duration-300">
-              <span className="text-white font-extrabold text-base tracking-wider font-['Space_Grotesk']">NF</span>
-            </div>
+            <img 
+              src="/favicon.png" 
+              alt="Neo Files Logo" 
+              className="w-10 h-10 object-contain hover:rotate-6 transition-transform duration-300"
+            />
             <span className="font-bold text-xl tracking-tight text-white font-['Space_Grotesk']">
               Neo<span className="text-indigo-400">Files</span>
             </span>
@@ -104,7 +106,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero & Registration Section */}
-      <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-24 lg:pt-20 lg:pb-32">
+      <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-28 pb-24 lg:pt-36 lg:pb-32">
         <div className="grid lg:grid-cols-12 gap-16 lg:gap-8 items-center">
           
           {/* Left Side: Headline & Copy */}
@@ -229,7 +231,7 @@ export default function LandingPage() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full py-3.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 text-white rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/25 tracking-wide uppercase text-xs"
+                    className="w-full py-3.5 bg-indigo-600 hover:bg-pink-600 text-white rounded-xl text-sm font-bold transition-colors duration-300 transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-600/25 tracking-wide uppercase text-xs"
                   >
                     {submitting ? 'Requesting Provisioning...' : 'Request Console Access'}
                   </button>
@@ -349,9 +351,11 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
             <div className="flex flex-col items-center sm:items-start gap-2">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">NF</span>
-                </div>
+                <img 
+                  src="/favicon.png" 
+                  alt="Neo Files Logo" 
+                  className="w-8 h-8 object-contain"
+                />
                 <span className="text-xs text-gray-500">Neo Files Transfer • Built with Supabase & Google Drive</span>
               </div>
               <span className="text-[11px] text-gray-600 font-medium sm:pl-10">

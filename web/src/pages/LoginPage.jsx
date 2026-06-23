@@ -57,9 +57,11 @@ export default function LoginPage() {
 
           {/* Logo */}
           <div className="flex items-center gap-3 z-10">
-            <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <span className="text-white font-extrabold text-base tracking-wider font-['Space_Grotesk']">NF</span>
-            </div>
+            <img 
+              src="/favicon.png" 
+              alt="Neo Files Logo" 
+              className="w-10 h-10 object-contain"
+            />
             <span className="font-bold text-xl tracking-tight text-white font-['Space_Grotesk']">
               Neo<span className="text-indigo-400">Files</span>
             </span>
@@ -93,9 +95,11 @@ export default function LoginPage() {
           
           {/* Logo fallback for mobile view */}
           <div className="flex md:hidden items-center justify-center gap-3 mb-8">
-            <div className="w-9 h-9 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm tracking-wide">NF</span>
-            </div>
+            <img 
+              src="/favicon.png" 
+              alt="Neo Files Logo" 
+              className="w-9 h-9 object-contain"
+            />
             <span className="font-bold text-lg text-white font-['Space_Grotesk']">
               Neo<span className="text-indigo-400">Files</span>
             </span>

@@ -10,7 +10,7 @@
 
 body {
   font-family: 'Inter', 'Roboto', sans-serif;
-  background-color: #0a1128;
+  background-color: #030712;
   color: #e2e8f0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -39,23 +39,23 @@ body {
 
 /* Custom Auto-hiding Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: transparent;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 .is-scrolling ::-webkit-scrollbar-thumb,
 .is-scrolling::-webkit-scrollbar-thumb,
 ::-webkit-scrollbar-thumb:hover {
-  background: #2d4060;
+  background: rgba(99, 102, 241, 0.35); /* Translucent Indigo to match theme */
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #374d6e;
+  background: rgba(99, 102, 241, 0.65);
 }
 
 /* Firefox auto-hide scrollbar fallback */
@@ -64,7 +64,7 @@ html {
   scrollbar-width: thin;
 }
 html.is-scrolling {
-  scrollbar-color: #2d4060 transparent;
+  scrollbar-color: rgba(99, 102, 241, 0.35) transparent;
 }
 
 /* Custom premium keyframe animations */
