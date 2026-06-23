@@ -21,11 +21,53 @@ export default function AdminDashboardPage() {
   const [systemSettings, setSystemSettings] = useState({})
 
   useEffect(() => {
-    fetchData()
+    fetchData(true)
+
+    // Subscribe to realtime updates for pending_registrations
+    const pendingChannel = supabase
+      .channel('pending-registrations-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pending_registrations' },
+        () => {
+          fetchData(false)
+        }
+      )
+      .subscribe()
+
+    // Subscribe to realtime updates for approved_users
+    const approvedChannel = supabase
+      .channel('approved-users-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'approved_users' },
+        () => {
+          fetchData(false)
+        }
+      )
+      .subscribe()
+
+    // Subscribe to realtime updates for system_settings
+    const settingsChannel = supabase
+      .channel('system-settings-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'system_settings' },
+        () => {
+          fetchData(false)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(pendingChannel)
+      supabase.removeChannel(approvedChannel)
+      supabase.removeChannel(settingsChannel)
+    }
   }, [])
 
-  async function fetchData() {
-    setLoading(true)
+  async function fetchData(showSpinner = false) {
+    if (showSpinner) setLoading(true)
     try {
       const [pendingRes, approvedRes, settingsRes] = await Promise.all([
         supabase.from('pending_registrations').select('*').order('submitted_at', { ascending: false }),
@@ -40,7 +82,7 @@ export default function AdminDashboardPage() {
     } catch (err) {
       console.error(err)
     } finally {
-      setLoading(false)
+      if (showSpinner) setLoading(false)
     }
   }
 
