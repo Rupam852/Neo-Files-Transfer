@@ -7,7 +7,7 @@ import {
   Share2, History, FileText, Image, Video, Archive, Table,
   Presentation, File, SortAsc,
 } from 'lucide-react'
-import { formatFileSize, formatDate, getExtension, generateShareUrl } from '../utils/helpers'
+import { formatFileSize, formatDate, getExtension, generateShareUrl, formatErrorMessage } from '../utils/helpers'
 import { useNavigate } from 'react-router-dom'
 
 const ALLOWED_TYPES = [
@@ -224,7 +224,7 @@ export default function FilesPage({ onViewVersions }) {
       loadFiles()
     } catch (err) {
       console.error(err)
-      toast.error(err.message || 'Upload failed')
+      toast.error(formatErrorMessage(err))
     } finally {
       setUploading(false)
       setProcessingText(null)
@@ -274,7 +274,7 @@ export default function FilesPage({ onViewVersions }) {
       setRenameModal(null)
       loadFiles()
     } catch (err) {
-      toast.error('Failed to rename file')
+      toast.error(formatErrorMessage(err))
     } finally {
       setProcessingText(null)
     }
@@ -318,7 +318,7 @@ export default function FilesPage({ onViewVersions }) {
       setDeleteConfirm(null)
       loadFiles()
     } catch (err) {
-      toast.error('Failed to delete file')
+      toast.error(formatErrorMessage(err))
     } finally {
       setProcessingText(null)
     }
@@ -342,7 +342,7 @@ export default function FilesPage({ onViewVersions }) {
       toast.success(`File is now ${newStatus}`)
       loadFiles()
     } catch (err) {
-      toast.error('Failed to update sharing status')
+      toast.error(formatErrorMessage(err))
     } finally {
       setProcessingText(null)
     }

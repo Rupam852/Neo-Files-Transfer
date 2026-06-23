@@ -49,3 +49,26 @@ export function getExtension(filename) {
   const parts = filename.split('.')
   return parts.length > 1 ? parts.pop().toUpperCase() : ''
 }
+
+export function formatErrorMessage(error) {
+  if (!error) return 'An unexpected error occurred'
+  const msg = typeof error === 'string' ? error : (error.message || 'An unexpected error occurred')
+  
+  if (msg.includes('Insufficient permissions for the specified parent') || msg.includes('insufficientFilePermissions') || msg.includes('403')) {
+    return 'Google Drive Permission Error: The connected Google account does not have "Editor" permissions for the specified folder.'
+  }
+  if (msg.includes('File not found') || msg.includes('Folder not found') || msg.includes('404')) {
+    return 'Google Drive Resource Not Found: Please verify that the folder URL/ID in Settings exists and is valid.'
+  }
+  if (msg.includes('invalid_grant') || msg.includes('invalid credentials') || msg.includes('token expired') || msg.includes('401')) {
+    return 'Authentication Session Expired: Please sign out and sign in again to refresh your Google Drive connection.'
+  }
+  if (msg.includes('storage') || msg.includes('quota') || msg.includes('limit')) {
+    return 'Google Drive Storage Full: The target Google Drive has run out of storage space. Please free up space and try again.'
+  }
+  if (msg.includes('network') || msg.includes('fetch') || msg.includes('Failed to fetch')) {
+    return 'Network Error: Please check your internet connection and try again.'
+  }
+  return msg
+}
+

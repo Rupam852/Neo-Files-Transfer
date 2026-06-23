@@ -4,7 +4,7 @@ import { supabase } from '../services/supabase'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { User, FolderInput, Shield, LogOut, Check, AlertTriangle } from 'lucide-react'
-import { extractFolderId } from '../utils/helpers'
+import { extractFolderId, formatErrorMessage } from '../utils/helpers'
 
 export default function SettingsPage() {
   const { profile, signOut, refreshProfile, signInWithGoogle } = useAuth()
@@ -34,7 +34,7 @@ export default function SettingsPage() {
       toast.success('Profile updated')
       refreshProfile()
     } catch (err) {
-      toast.error('Failed to update profile')
+      toast.error(formatErrorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -87,7 +87,7 @@ export default function SettingsPage() {
       refreshProfile()
     } catch (err) {
       console.error(err)
-      toast.error(err.message || 'This folder is not publicly accessible.')
+      toast.error(formatErrorMessage(err))
     } finally {
       setVerifying(false)
     }

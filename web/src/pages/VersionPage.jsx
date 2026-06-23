@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
 import { ArrowLeft, Upload, Check, Clock } from 'lucide-react'
-import { formatFileSize, formatDate } from '../utils/helpers'
+import { formatFileSize, formatDate, formatErrorMessage } from '../utils/helpers'
 
 export default function VersionPage({ fileId: propFileId, onBack }) {
   const { fileId: paramFileId } = useParams()
@@ -129,7 +129,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
       loadData()
     } catch (err) {
       console.error(err)
-      toast.error(err.message || 'Version upload failed')
+      toast.error(formatErrorMessage(err))
     } finally {
       setUploading(false)
       setProcessingText(null)
