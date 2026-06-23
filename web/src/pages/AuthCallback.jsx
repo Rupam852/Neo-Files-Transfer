@@ -15,6 +15,15 @@ export default function AuthCallback() {
         return
       }
 
+      // Capture and save Google provider token immediately
+      if (session.provider_token) {
+        try {
+          localStorage.setItem('google_provider_token', session.provider_token)
+        } catch (e) {
+          console.error('Error saving provider token:', e)
+        }
+      }
+
       const userEmail = session.user.email
 
       // Check if user is approved
