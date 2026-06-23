@@ -174,7 +174,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
 
       {/* Upload New Version */}
       <div className="card">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h3 className="font-semibold text-gray-100">Upload New Version</h3>
             <p className="text-sm text-gray-400 mt-1">
