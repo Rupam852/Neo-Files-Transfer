@@ -808,13 +808,13 @@ export default function AdminDashboardPage() {
                 onClick={() => setShowLogoutConfirm(false)}
                 className="flex-1 py-2.5 bg-dark-500 hover:bg-dark-400 border border-dark-300 text-gray-200 rounded-xl text-sm font-semibold transition-colors"
               >
-                No, Cancel
+                No
               </button>
               <button
                 onClick={confirmSignOut}
                 className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-semibold transition-colors shadow-lg shadow-red-600/20"
               >
-                Yes, Sign Out
+                Yes
               </button>
             </div>
           </div>
