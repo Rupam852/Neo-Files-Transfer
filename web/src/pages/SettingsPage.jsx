@@ -7,7 +7,7 @@ import { User, FolderInput, Shield, LogOut, Check, AlertTriangle } from 'lucide-
 import { extractFolderId } from '../utils/helpers'
 
 export default function SettingsPage() {
-  const { profile, signOut, refreshProfile } = useAuth()
+  const { profile, signOut, refreshProfile, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
   const [displayName, setDisplayName] = useState(profile?.name || '')
@@ -176,6 +176,32 @@ export default function SettingsPage() {
           <p className="text-sm text-gray-500">
             Connect your Google Drive folder where Neo Files will store your uploaded files.
           </p>
+
+          {/* Token Status Info */}
+          <div className="bg-dark-500 rounded-xl p-4 border border-dark-300 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-gray-200">API Connection Status</h4>
+              {profile?.google_refresh_token ? (
+                <span className="flex items-center gap-1 text-[11px] font-medium text-green-400 bg-green-500/10 px-2.5 py-0.5 rounded-full">
+                  <Check size={12} /> Connected
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-[11px] font-medium text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-full">
+                  <AlertTriangle size={12} /> Disconnected
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Google Drive access keys are stored securely in your database profile and auto-renewed automatically. 
+              {!profile?.google_refresh_token && " Please link your Google Drive below to enable file uploads."}
+            </p>
+            <button
+              onClick={() => signInWithGoogle(true)}
+              className="w-full btn-secondary text-xs flex items-center justify-center gap-1.5 py-2 hover:bg-dark-400 transition-colors"
+            >
+              Link / Re-authorize Google Drive
+            </button>
+          </div>
 
           {profile?.drive_folder_id && (
             <div className="bg-green-900/30 border border-green-600/30 rounded-lg p-3 flex items-center gap-2">

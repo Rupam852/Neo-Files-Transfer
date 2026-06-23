@@ -180,7 +180,7 @@ export function AuthProvider({ children }) {
     }
   }
 
-  async function signInWithGoogle() {
+  async function signInWithGoogle(forceConsent = false) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -188,7 +188,7 @@ export function AuthProvider({ children }) {
         scopes: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive',
         queryParams: {
           access_type: 'offline',
-          prompt: 'consent'
+          prompt: forceConsent ? 'consent' : 'select_account'
         }
       }
     })
