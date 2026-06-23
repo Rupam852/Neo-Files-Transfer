@@ -26,6 +26,7 @@ export default function DownloadPage() {
   const [totalBytes, setTotalBytes] = useState(0)
   const [errorMsg, setErrorMsg] = useState('')
   const [downloadBlobUrl, setDownloadBlobUrl] = useState('')
+  const [downloadStage, setDownloadStage] = useState('')
 
   useEffect(() => {
     // Cleanup blob URL on unmount
@@ -99,21 +100,29 @@ export default function DownloadPage() {
         console.log('File size exceeds safety limit. Bypassing JS streaming to use native browser download manager.')
         setStatus('downloading')
         setProgress(15)
+        setDownloadStage('Connecting to proxy server...')
         
-        setTimeout(() => setProgress(50), 200)
-        setTimeout(() => setProgress(85), 400)
+        setTimeout(() => {
+          setProgress(50)
+          setDownloadStage('Requesting file from Google Drive...')
+        }, 200)
+        
+        setTimeout(() => {
+          setProgress(85)
+          setDownloadStage('Initializing direct browser download stream...')
+        }, 450)
+        
         setTimeout(() => {
           setProgress(100)
           setStatus('saving')
-        }, 600)
-        
-        setTimeout(() => {
+          setDownloadStage('Downloading via native download manager...')
           window.location.href = directUrl
-        }, 800)
+        }, 700)
 
         setTimeout(() => {
           setStatus('completed')
-        }, 5000) // 800ms setup + 4.2 seconds hold
+          setDownloadStage('')
+        }, 2200) // Fast transition since browser handles the download stream in background
         return
       }
 
@@ -197,8 +206,8 @@ export default function DownloadPage() {
       a.click()
       document.body.removeChild(a)
 
-      // Wait 6 seconds for Chrome's native download UI to trigger before changing status to completed
-      await new Promise(resolve => setTimeout(resolve, 6000))
+      // Wait 1.5 seconds for browser's native download UI to trigger before changing status to completed
+      await new Promise(resolve => setTimeout(resolve, 1500))
       setStatus('completed')
 
     } catch (err) {
@@ -283,13 +292,13 @@ export default function DownloadPage() {
                 {status === 'saving' ? 'Finalizing Download' : 'Downloading File'}
               </h2>
               <p className="text-sm text-slate-400">
-                {status === 'saving'
+                {downloadStage || (status === 'saving'
                   ? 'Writing cached blocks to your browser — download will trigger automatically...'
                   : fileInfo?.is_folder && progress === 0
                     ? 'Server is compressing folder contents into a ZIP. Please wait...'
                     : fileInfo?.is_folder
                       ? 'Streaming ZIP archive from Shield node...'
-                      : 'Streaming secure blocks directly from Shield node.'}
+                      : 'Streaming secure blocks directly from Shield node.')}
               </p>
             </div>
 
