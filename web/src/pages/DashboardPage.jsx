@@ -19,8 +19,8 @@ export default function DashboardPage({ onNavigate }) {
 
   const [stats, setStats] = useState({
     totalFiles: 0,
+    sharedFiles: 0,
     publicLinks: 0,
-    privateLinks: 0,
     totalDownloads: 0,
   })
   const [loading, setLoading] = useState(true)
@@ -31,14 +31,14 @@ export default function DashboardPage({ onNavigate }) {
       try {
         const { data: files } = await supabase
           .from('shared_files')
-          .select('id, sharing_status')
+          .select('id, sharing_status, unique_share_hash, is_folder')
           .eq('user_id', user.id)
 
         if (files) {
           setStats({
-            totalFiles: files.length,
-            publicLinks: files.filter(f => f.sharing_status === 'public').length,
-            privateLinks: files.filter(f => f.sharing_status === 'private').length,
+            totalFiles: files.filter(f => !f.is_folder).length,
+            sharedFiles: files.filter(f => f.unique_share_hash !== null).length,
+            publicLinks: files.filter(f => f.sharing_status === 'public' && f.unique_share_hash !== null).length,
             totalDownloads: 0,
           })
         }
@@ -97,7 +97,7 @@ export default function DashboardPage({ onNavigate }) {
         <StatCard
           icon={Share2}
           label="Shared Files"
-          value={stats.publicLinks + stats.privateLinks}
+          value={stats.sharedFiles}
           color="purple"
           loading={loading}
         />
