@@ -33,6 +33,7 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const profileRef = useRef(null)
 
   const [currentTab, setCurrentTab] = useState(() => {
@@ -91,7 +92,12 @@ export default function DashboardLayout() {
     }
   }, [])
 
-  async function handleSignOut() {
+  function handleSignOut() {
+    setShowLogoutConfirm(true)
+    setProfileOpen(false)
+  }
+
+  async function confirmSignOut() {
     await signOut()
     navigate('/login', { replace: true })
   }
@@ -253,6 +259,37 @@ export default function DashboardLayout() {
           {currentTab === 'versions' && <VersionPage fileId={selectedFileId} onBack={() => window.history.back()} />}
         </main>
       </div>
+
+      {/* Sign Out Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-dark-600 border border-dark-400 rounded-2xl max-w-sm w-full p-6 space-y-6 shadow-2xl animate-scale-in">
+            <div className="space-y-2 text-center">
+              <div className="w-12 h-12 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center mx-auto text-red-400">
+                <LogOut size={24} />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-50 font-['Space_Grotesk']">Sign Out</h3>
+              <p className="text-sm text-gray-400">
+                Are you sure you want to log out of your session?
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2.5 bg-dark-500 hover:bg-dark-400 border border-dark-300 text-gray-200 rounded-xl text-sm font-semibold transition-colors"
+              >
+                No, Cancel
+              </button>
+              <button
+                onClick={confirmSignOut}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-semibold transition-colors shadow-lg shadow-red-600/20"
+              >
+                Yes, Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
