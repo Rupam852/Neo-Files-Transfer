@@ -88,7 +88,7 @@ export default function LandingPage() {
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
             <a href="#features" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-indigo-500 hover:after:w-full after:transition-all after:duration-300">Features</a>
             <a href="#security" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-indigo-500 hover:after:w-full after:transition-all after:duration-300">Security</a>
-            <a href="#footer" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-indigo-500 hover:after:w-full after:transition-all after:duration-300">Privacy Policy</a>
+            <Link to="/privacy" className="hover:text-white transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-indigo-500 hover:after:w-full after:transition-all after:duration-300">Privacy Policy</Link>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -359,8 +359,8 @@ export default function LandingPage() {
               </span>
             </div>
             <div className="flex gap-6 text-xs text-gray-500">
-              <a href="#" className="hover:text-gray-300">Privacy Policy</a>
-              <a href="#" className="hover:text-gray-300">Terms of Service</a>
+              <Link to="/privacy" className="hover:text-gray-300">Privacy Policy</Link>
+              <Link to="/terms" className="hover:text-gray-300">Terms of Service</Link>
             </div>
           </div>
         </div>

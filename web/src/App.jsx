@@ -14,6 +14,8 @@ import AuthCallback from './pages/AuthCallback'
 import AccessDeniedPage from './pages/AccessDeniedPage'
 import FileNotFoundPage from './pages/FileNotFoundPage'
 import DownloadPage from './pages/DownloadPage'
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
+import TermsOfServicePage from './pages/TermsOfServicePage'
 
 // Admin Pages
 import AdminLoginPage from './pages/AdminLoginPage'
@@ -73,6 +75,8 @@ export default function App() {
         <Route index element={<HomeRoute />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="auth/callback" element={<AuthCallback />} />
+        <Route path="privacy" element={<PrivacyPolicyPage />} />
+        <Route path="terms" element={<TermsOfServicePage />} />
       </Route>
 
       {/* Admin Route */}
