@@ -25,14 +25,24 @@ export default function AdminDashboardPage() {
 
   const navigateTab = (tab, push = true) => {
     setActiveTab(tab)
-    if (push) {
-      window.history.pushState({ adminTab: tab }, '')
+    try {
+      if (push && window.history?.pushState) {
+        window.history.pushState({ adminTab: tab }, '')
+      }
+    } catch (e) {
+      console.error('History API error:', e)
     }
   }
 
   useEffect(() => {
     // Set initial history state on mount
-    window.history.replaceState({ adminTab: activeTab }, '')
+    try {
+      if (window.history?.replaceState) {
+        window.history.replaceState({ adminTab: activeTab }, '')
+      }
+    } catch (e) {
+      console.error('History API error on mount:', e)
+    }
 
     const handlePopState = (event) => {
       if (event.state && event.state.adminTab) {

@@ -35,18 +35,37 @@ export default function DashboardLayout() {
   const [profileOpen, setProfileOpen] = useState(false)
   const profileRef = useRef(null)
 
+  const [currentTab, setCurrentTab] = useState(() => {
+    try {
+      return localStorage.getItem('activeTab') || 'dashboard'
+    } catch (e) {
+      return 'dashboard'
+    }
+  })
+  const [selectedFileId, setSelectedFileId] = useState(null)
+
   const navigateTab = (tab, fileId = null, push = true) => {
     setCurrentTab(tab)
     setSelectedFileId(fileId)
-    localStorage.setItem('activeTab', tab)
-    if (push) {
-      window.history.pushState({ tab, fileId }, '')
+    try {
+      localStorage.setItem('activeTab', tab)
+      if (push && window.history?.pushState) {
+        window.history.pushState({ tab, fileId }, '')
+      }
+    } catch (e) {
+      console.error('History API error:', e)
     }
   }
 
   useEffect(() => {
     // Set initial history state on mount
-    window.history.replaceState({ tab: currentTab, fileId: selectedFileId }, '')
+    try {
+      if (window.history?.replaceState) {
+        window.history.replaceState({ tab: currentTab, fileId: selectedFileId }, '')
+      }
+    } catch (e) {
+      console.error('History API error on mount:', e)
+    }
 
     const handlePopState = (event) => {
       if (event.state && event.state.tab) {
