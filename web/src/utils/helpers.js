@@ -33,6 +33,11 @@ export function generateShareUrl(hash) {
   return `${baseUrl}/download/${hash}`
 }
 
+export function generateDirectDownloadUrl(hash) {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  return `${supabaseUrl}/functions/v1/download-file?hash=${hash}`
+}
+
 export function extractFolderId(url) {
   const patterns = [
     /\/folders\/([a-zA-Z0-9_-]+)/,

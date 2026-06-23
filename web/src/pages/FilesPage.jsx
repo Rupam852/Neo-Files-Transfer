@@ -7,7 +7,7 @@ import {
   Share2, History, FileText, Image, Video, Archive, Table,
   Presentation, File, SortAsc,
 } from 'lucide-react'
-import { formatFileSize, formatDate, getExtension, generateShareUrl, formatErrorMessage } from '../utils/helpers'
+import { formatFileSize, formatDate, getExtension, generateShareUrl, generateDirectDownloadUrl, formatErrorMessage } from '../utils/helpers'
 import { useNavigate } from 'react-router-dom'
 
 const ALLOWED_TYPES = [
@@ -518,14 +518,13 @@ export default function FilesPage({ onViewVersions }) {
                               </button>
                               <button
                                 onClick={() => {
-                                  navigator.clipboard.writeText(generateShareUrl(file.unique_share_hash))
-                                  toast.success('Share link copied!')
+                                  setShareModal(file)
                                   setActiveMenu(null)
                                 }}
                                 className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
                               >
-                                <Download size={16} />
-                                Copy Share Link
+                                <Share2 size={16} />
+                                Share File
                               </button>
                               <button
                                 onClick={() => {
@@ -605,6 +604,78 @@ export default function FilesPage({ onViewVersions }) {
           <div className="flex justify-end gap-2">
             <button className="btn-secondary text-sm" onClick={() => setDeleteConfirm(null)}>Cancel</button>
             <button className="btn-danger text-sm" onClick={handleDelete}>Delete</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Share Links Modal */}
+      {shareModal && (
+        <Modal onClose={() => setShareModal(null)}>
+          <div className="space-y-5 font-sans">
+            <div>
+              <h3 className="font-semibold text-gray-100 text-lg font-['Space_Grotesk'] mb-1">Share File</h3>
+              <p className="text-xs text-gray-400 truncate">{shareModal.file_name}</p>
+            </div>
+
+            {/* Option A: Web Share Link */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
+                Option A: Web Download Page Link
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  className="input-field text-xs bg-dark-500 py-2 border-dark-400 select-all"
+                  value={generateShareUrl(shareModal.unique_share_hash)}
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(generateShareUrl(shareModal.unique_share_hash))
+                    toast.success('Web download link copied!')
+                  }}
+                  className="btn-primary py-2 px-4 text-xs font-semibold shrink-0"
+                >
+                  Copy
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-normal">
+                Opens the beautiful download page with real-time progress bar. Perfect for sharing with users.
+              </p>
+            </div>
+
+            {/* Option B: Direct API Download Link */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-pink-400 uppercase tracking-wider">
+                Option B: Direct Download Link
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  className="input-field text-xs bg-dark-500 py-2 border-dark-400 select-all"
+                  value={generateDirectDownloadUrl(shareModal.unique_share_hash)}
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(generateDirectDownloadUrl(shareModal.unique_share_hash))
+                    toast.success('Direct download link copied!')
+                  }}
+                  className="btn-primary py-2 px-4 text-xs font-semibold shrink-0"
+                >
+                  Copy
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-normal">
+                Direct stream connection. Clicking this link in any browser or website starts downloading the file instantly in the background without redirecting.
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button className="btn-secondary text-xs py-2 px-4" onClick={() => setShareModal(null)}>
+                Close
+              </button>
+            </div>
           </div>
         </Modal>
       )}
