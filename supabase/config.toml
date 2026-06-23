@@ -18,3 +18,7 @@ verify_jwt = false
 
 [functions.upload-version]
 verify_jwt = true
+
+[functions.mail-service]
+verify_jwt = false
+

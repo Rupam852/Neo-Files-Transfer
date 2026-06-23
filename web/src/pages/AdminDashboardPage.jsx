@@ -44,6 +44,33 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function sendStatusEmail(email, action) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        console.warn('No active session found, cannot send status email')
+        return
+      }
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mail-service/notify-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ email, action }),
+        }
+      )
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        console.error('Failed to send email notification:', errData.error || response.statusText)
+      }
+    } catch (err) {
+      console.error('Error calling mail-service notify-user:', err)
+    }
+  }
+
   async function approveUser(user) {
     try {
       // Add to approved_users
@@ -66,6 +93,9 @@ export default function AdminDashboardPage() {
         details: `Approved user: ${user.email}`,
       })
 
+      // Send notification email asynchronously (non-blocking)
+      sendStatusEmail(user.email, 'approved')
+
       toast.success(`${user.name} has been approved`)
       fetchData()
     } catch (err) {
@@ -86,6 +116,9 @@ export default function AdminDashboardPage() {
         action: 'user_rejection',
         details: `Rejected user: ${user.email}`,
       })
+
+      // Send notification email asynchronously (non-blocking)
+      sendStatusEmail(user.email, 'rejected')
 
       toast.success(`${user.name} has been rejected`)
       fetchData()
@@ -130,6 +163,9 @@ export default function AdminDashboardPage() {
         action: 'user_revoke_approval',
         details: `Revoked approval and deleted registration for: ${email}`,
       })
+
+      // Send notification email asynchronously (non-blocking)
+      sendStatusEmail(email, 'suspended')
 
       toast.success(`Approved user ${email} deleted`)
       fetchData()

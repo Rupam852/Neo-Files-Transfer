@@ -11,6 +11,11 @@ import {
 export default function LandingPage() {
   const [formData, setFormData] = useState({ name: '', phone: '', email: '' })
   const [submitting, setSubmitting] = useState(false)
+  const [step, setStep] = useState('form') // 'form' or 'otp'
+  const [otp, setOtp] = useState('')
+  const [verifying, setVerifying] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [blockMessage, setBlockMessage] = useState('')
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -26,37 +31,116 @@ export default function LandingPage() {
     }
 
     setSubmitting(true)
+    setBlockMessage('')
     try {
       const { data: existing } = await supabase
         .from('pending_registrations')
-        .select('id')
+        .select('id, status')
         .eq('email', formData.email.toLowerCase())
-        .in('status', ['pending', 'approved'])
         .maybeSingle()
 
       if (existing) {
-        toast.error('This email is already registered')
+        if (existing.status === 'approved') {
+          toast.error('This email is already approved. You can log in!')
+        } else {
+          toast.error('This email is already registered and pending admin approval.')
+        }
         return
       }
 
-      const { error } = await supabase
-        .from('pending_registrations')
-        .insert({
-          name: formData.name,
-          phone: formData.phone,
-          email: formData.email.toLowerCase(),
-          status: 'pending',
-        })
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mail-service/send-otp`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        }
+      )
 
-      if (error) throw error
+      const result = await response.json()
+      if (!response.ok) {
+        if (response.status === 429) {
+          setBlockMessage(result.error)
+        }
+        throw new Error(result.error || 'Failed to send verification code')
+      }
 
-      toast.success('Registration submitted! Please wait for admin approval.')
-      setFormData({ name: '', phone: '', email: '' })
+      toast.success('Verification code sent to your email!')
+      setStep('otp')
     } catch (err) {
       console.error(err)
-      toast.error('Registration failed. Please try again.')
+      toast.error(err.message || 'Registration failed. Please try again.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleVerifyOtp(e) {
+    e.preventDefault()
+    if (!otp || otp.length !== 6) {
+      toast.error('Please enter a valid 6-digit code')
+      return
+    }
+
+    setVerifying(true)
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mail-service/verify-otp`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            otp: otp
+          })
+        }
+      )
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Verification failed')
+      }
+
+      toast.success('Email verified and request submitted successfully!')
+      setFormData({ name: '', phone: '', email: '' })
+      setOtp('')
+      setStep('form')
+    } catch (err) {
+      console.error(err)
+      toast.error(err.message || 'OTP verification failed')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  async function handleResendOtp() {
+    setResending(true)
+    setBlockMessage('')
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mail-service/send-otp`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        }
+      )
+
+      const result = await response.json()
+      if (!response.ok) {
+        if (response.status === 429) {
+          setBlockMessage(result.error)
+        }
+        throw new Error(result.error || 'Failed to resend verification code')
+      }
+
+      toast.success('New verification code sent!')
+      setOtp('')
+    } catch (err) {
+      console.error(err)
+      toast.error(err.message || 'Failed to resend OTP')
+    } finally {
+      setResending(false)
     }
   }
 
@@ -172,70 +256,139 @@ export default function LandingPage() {
                   </p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Name Input */}
-                  <div className="relative">
-                    <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Full Name</label>
+                {step === 'form' ? (
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Name Input */}
                     <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <User size={15} />
-                      </span>
+                      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Full Name</label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <User size={15} />
+                        </span>
+                        <input
+                          type="text"
+                          className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-700 hover:border-slate-600 text-white placeholder-slate-400 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
+                          placeholder="John Doe"
+                          value={formData.name}
+                          onChange={e => setFormData({ ...formData, name: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Phone Input */}
+                    <div className="relative">
+                      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Phone Number</label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Phone size={15} />
+                        </span>
+                        <input
+                          type="tel"
+                          className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-700 hover:border-slate-600 text-white placeholder-slate-400 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
+                          placeholder="+91 XXXXX XXXXX"
+                          value={formData.phone}
+                          onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Email Input */}
+                    <div className="relative">
+                      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Email Address</label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Mail size={15} />
+                        </span>
+                        <input
+                          type="email"
+                          className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-700 hover:border-slate-600 text-white placeholder-slate-400 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
+                          placeholder="your-google-email@gmail.com"
+                          value={formData.email}
+                          onChange={e => setFormData({ ...formData, email: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full py-3.5 bg-indigo-600 hover:bg-pink-600 text-white rounded-xl text-sm font-bold transition-colors duration-300 transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-600/25 tracking-wide uppercase text-xs"
+                    >
+                      {submitting ? 'Requesting Provisioning...' : 'Request Console Access'}
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleVerifyOtp} className="space-y-5">
+                    {/* OTP Warning / Spam Check banner */}
+                    <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3.5 flex items-start gap-2.5">
+                      <Mail size={16} className="text-indigo-400 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-indigo-300 leading-normal text-left">
+                        Verification code sent to <strong>{formData.email}</strong>. <br />
+                        <span className="text-amber-400 font-semibold">Please check spam folder if not found in inbox.</span>
+                      </div>
+                    </div>
+
+                    {/* OTP Input */}
+                    <div className="relative">
+                      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5 text-left">Verification Code</label>
                       <input
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-700 hover:border-slate-600 text-white placeholder-slate-400 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
-                        placeholder="John Doe"
-                        value={formData.name}
-                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                        maxLength={6}
+                        className="w-full text-center tracking-[0.5em] font-mono text-2xl py-3 bg-[#080d1a]/80 border border-slate-700 hover:border-slate-600 text-white rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 font-bold"
+                        placeholder="000000"
+                        value={otp}
+                        onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
                         required
+                        disabled={!!blockMessage}
                       />
                     </div>
-                  </div>
 
-                  {/* Phone Input */}
-                  <div className="relative">
-                    <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Phone Number</label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Phone size={15} />
-                      </span>
-                      <input
-                        type="tel"
-                        className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-700 hover:border-slate-600 text-white placeholder-slate-400 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
-                        placeholder="+91 XXXXX XXXXX"
-                        value={formData.phone}
-                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                        required
-                      />
+                    {/* Block Message display */}
+                    {blockMessage && (
+                      <div className="bg-red-500/15 border border-red-500/20 text-red-400 rounded-xl p-3.5 text-xs text-center leading-normal">
+                        {blockMessage}
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="space-y-3">
+                      <button
+                        type="submit"
+                        disabled={verifying || !!blockMessage}
+                        className="w-full py-3.5 bg-indigo-600 hover:bg-pink-600 text-white rounded-xl text-sm font-bold transition-colors duration-300 transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-600/25 tracking-wide uppercase text-xs"
+                      >
+                        {verifying ? 'Verifying Code...' : 'Verify Email & Submit'}
+                      </button>
+
+                      <div className="flex justify-between items-center px-1 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStep('form')
+                            setBlockMessage('')
+                            setOtp('')
+                          }}
+                          className="text-slate-400 hover:text-white transition-colors"
+                        >
+                          Change Details
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleResendOtp}
+                          disabled={resending || !!blockMessage}
+                          className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium disabled:opacity-40"
+                        >
+                          {resending ? 'Resending...' : 'Resend OTP'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Email Input */}
-                  <div className="relative">
-                    <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Email Address</label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Mail size={15} />
-                      </span>
-                      <input
-                        type="email"
-                        className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-700 hover:border-slate-600 text-white placeholder-slate-400 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
-                        placeholder="your-google-email@gmail.com"
-                        value={formData.email}
-                        onChange={e => setFormData({ ...formData, email: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Action Button */}
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full py-3.5 bg-indigo-600 hover:bg-pink-600 text-white rounded-xl text-sm font-bold transition-colors duration-300 transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-600/25 tracking-wide uppercase text-xs"
-                  >
-                    {submitting ? 'Requesting Provisioning...' : 'Request Console Access'}
-                  </button>
-                </form>
+                  </form>
+                )}
               </div>
 
             </div>
