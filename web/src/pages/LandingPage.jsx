@@ -212,14 +212,14 @@ export default function LandingPage() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {/* Name Input */}
                   <div className="relative">
-                    <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Full Name</label>
+                    <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Full Name</label>
                     <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
+                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                         <User size={15} />
                       </span>
                       <input
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-800 text-gray-100 placeholder-gray-600 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
+                        className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-700 hover:border-slate-600 text-white placeholder-slate-400 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
                         placeholder="John Doe"
                         value={formData.name}
                         onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -230,14 +230,14 @@ export default function LandingPage() {
 
                   {/* Phone Input */}
                   <div className="relative">
-                    <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Phone Number</label>
+                    <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Phone Number</label>
                     <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
+                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                         <Phone size={15} />
                       </span>
                       <input
                         type="tel"
-                        className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-800 text-gray-100 placeholder-gray-600 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
+                        className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-700 hover:border-slate-600 text-white placeholder-slate-400 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
                         placeholder="+91 XXXXX XXXXX"
                         value={formData.phone}
                         onChange={e => setFormData({ ...formData, phone: e.target.value })}
@@ -248,14 +248,14 @@ export default function LandingPage() {
 
                   {/* Email Input */}
                   <div className="relative">
-                    <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Email Address</label>
+                    <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Email Address</label>
                     <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
+                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                         <Mail size={15} />
                       </span>
                       <input
                         type="email"
-                        className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-800 text-gray-100 placeholder-gray-600 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
+                        className="w-full pl-10 pr-4 py-3 bg-[#080d1a]/80 border border-slate-700 hover:border-slate-600 text-white placeholder-slate-400 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all duration-300 text-sm font-medium"
                         placeholder="your-google-email@gmail.com"
                         value={formData.email}
                         onChange={e => setFormData({ ...formData, email: e.target.value })}
