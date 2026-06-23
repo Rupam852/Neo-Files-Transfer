@@ -144,53 +144,14 @@ export default function LandingPage() {
           </div>
 
           {/* Right Side: Overlapping Mock Console & Registration Card */}
-          <div id="register" className="lg:col-span-6 relative flex justify-center lg:justify-end">
+          <div id="register" className="lg:col-span-6 relative flex justify-center lg:justify-end animate-fade-in-up animation-delay-300">
             <div className="relative w-full max-w-md">
               
-              {/* Back Card: Active Share Proxies (Dribbble Parallax Style) */}
-              <div className="absolute -top-12 -left-12 w-64 bg-slate-950/60 backdrop-blur-xl border border-white/5 p-4 rounded-xl shadow-2xl animate-float-delayed pointer-events-none hidden xl:block z-0">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Active Proxies</span>
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs bg-white/[0.02] p-2 rounded-lg">
-                    <div className="flex items-center gap-2 truncate">
-                      <FileText size={12} className="text-indigo-400 flex-shrink-0" />
-                      <span className="text-gray-300 truncate font-mono">marketing_v2.mp4</span>
-                    </div>
-                    <span className="text-[9px] bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded font-bold">120 MB/s</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs bg-white/[0.02] p-2 rounded-lg">
-                    <div className="flex items-center gap-2 truncate">
-                      <FileText size={12} className="text-indigo-400 flex-shrink-0" />
-                      <span className="text-gray-300 truncate font-mono">user_db_export.zip</span>
-                    </div>
-                    <span className="text-[9px] bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded font-bold">Encrypted</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Front Card: Bandwidth Gauge (Dribbble Parallax Style) */}
-              <div className="absolute -bottom-8 -right-10 w-48 bg-slate-950/60 backdrop-blur-xl border border-white/5 p-4 rounded-xl shadow-2xl animate-float pointer-events-none hidden xl:block z-20">
-                <div className="flex items-center gap-2 mb-2">
-                  <Activity size={14} className="text-indigo-400 animate-pulse" />
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Uptime Monitor</span>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-lg font-bold font-mono text-white">99.98%</div>
-                  <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                    <div className="w-[99%] h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full" />
-                  </div>
-                  <div className="text-[9px] text-gray-500">Live request latency: 24ms</div>
-                </div>
-              </div>
-
               {/* Glow Backdrop */}
               <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 rounded-2xl filter blur-2xl opacity-80 pointer-events-none animate-pulse-glow" />
 
               {/* Center Main Card: Sleek Developer Portal Form */}
-              <div className="relative bg-slate-950/80 backdrop-blur-3xl border border-slate-800 shadow-2xl p-8 rounded-2xl space-y-6 animate-float z-10">
+              <div className="relative bg-slate-950/85 backdrop-blur-3xl border border-slate-800 shadow-2xl p-8 rounded-2xl space-y-6 z-10">
                 <div className="space-y-2 text-center lg:text-left">
                   <h3 className="text-2xl font-bold text-white font-['Space_Grotesk'] flex items-center justify-center lg:justify-start gap-2">
                     <UserCheck size={22} className="text-indigo-400 animate-pulse" />
