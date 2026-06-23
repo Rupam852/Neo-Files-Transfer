@@ -99,7 +99,7 @@ export default function SettingsPage() {
       details: 'User logged out',
     })
     await signOut()
-    navigate('/login')
+    navigate('/login', { replace: true })
   }
 
   return (

@@ -369,7 +369,7 @@ export default function AdminDashboardPage() {
       details: 'Admin logged out',
     })
     await signOut()
-    navigate('/')
+    navigate('/', { replace: true })
   }
 
   const adminEmails = new Set(adminsList.map(a => a.email.toLowerCase()))

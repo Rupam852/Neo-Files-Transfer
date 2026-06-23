@@ -11,7 +11,7 @@ export default function AuthCallback() {
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session?.user) {
-        navigate('/login')
+        navigate('/login', { replace: true })
         return
       }
 
@@ -34,7 +34,7 @@ export default function AuthCallback() {
       if (!approved && !admin) {
         await supabase.auth.signOut()
         toast.error('Your account has not been approved yet. Please contact an admin.')
-        navigate('/login')
+        navigate('/login', { replace: true })
         return
       }
 
@@ -63,9 +63,9 @@ export default function AuthCallback() {
 
       // Redirect based on role
       if (admin) {
-        navigate('/')
+        navigate('/', { replace: true })
       } else {
-        navigate('/')
+        navigate('/', { replace: true })
       }
     }
 

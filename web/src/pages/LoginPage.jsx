@@ -11,7 +11,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user && !loading) {
-      navigate('/')
+      navigate('/', { replace: true })
     }
   }, [user, loading, navigate])
 

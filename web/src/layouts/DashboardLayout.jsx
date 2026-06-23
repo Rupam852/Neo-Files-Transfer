@@ -51,7 +51,7 @@ export default function DashboardLayout() {
 
   async function handleSignOut() {
     await signOut()
-    navigate('/login')
+    navigate('/login', { replace: true })
   }
 
   function handleUploadClick() {

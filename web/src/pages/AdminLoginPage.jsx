@@ -19,7 +19,7 @@ export default function AdminLoginPage() {
   }
 
   if (user && isAdmin) {
-    navigate('/')
+    navigate('/', { replace: true })
     return null
   }
 
