@@ -358,9 +358,13 @@ app.get('/download-file', async (req, res) => {
 
       if (!aborted) {
         // Increment download count in database asynchronously
-        supabaseAdmin.rpc('increment_download_count', { file_id: file.id }).catch((err) => {
-          console.error('Failed to increment download count:', err)
-        })
+        (async () => {
+          try {
+            await supabaseAdmin.rpc('increment_download_count', { file_id: file.id })
+          } catch (err) {
+            console.error('Failed to increment download count:', err)
+          }
+        })()
 
         // Finalize the archive stream
         archive.finalize()
@@ -408,11 +412,15 @@ app.get('/download-file', async (req, res) => {
     }
 
     // Increment download count in database asynchronously
-    supabaseAdmin.rpc('increment_download_count', { file_id: file.id }).catch((err) => {
-      // Ignore if user cancels download early (aborted stream)
-      if (err.message && err.message.includes('aborted')) return
-      console.error('Failed to increment download count:', err)
-    })
+    (async () => {
+      try {
+        await supabaseAdmin.rpc('increment_download_count', { file_id: file.id })
+      } catch (err) {
+        // Ignore if user cancels download early (aborted stream)
+        if (err.message && err.message.includes('aborted')) return
+        console.error('Failed to increment download count:', err)
+      }
+    })()
 
     // Listen for client abort to clean up stream and prevent socket leak
     res.on('close', () => {
