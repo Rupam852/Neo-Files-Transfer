@@ -37,19 +37,34 @@ body {
   }
 }
 
+/* Custom Auto-hiding Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a1128;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2d4060;
+  background: transparent;
   border-radius: 3px;
+}
+.is-scrolling ::-webkit-scrollbar-thumb,
+.is-scrolling::-webkit-scrollbar-thumb,
+::-webkit-scrollbar-thumb:hover {
+  background: #2d4060;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #374d6e;
+}
+
+/* Firefox auto-hide scrollbar fallback */
+html {
+  scrollbar-color: transparent transparent;
+  scrollbar-width: thin;
+}
+html.is-scrolling {
+  scrollbar-color: #2d4060 transparent;
 }
 
 /* Custom premium keyframe animations */

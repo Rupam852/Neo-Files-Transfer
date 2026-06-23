@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 
@@ -47,6 +48,24 @@ function HomeRoute() {
 }
 
 export default function App() {
+  useEffect(() => {
+    let timeout;
+    const handleScroll = () => {
+      document.documentElement.classList.add('is-scrolling');
+      document.body.classList.add('is-scrolling');
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        document.documentElement.classList.remove('is-scrolling');
+        document.body.classList.remove('is-scrolling');
+      }, 1000);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      clearTimeout(timeout);
+    };
+  }, []);
+
   return (
     <Routes>
       {/* Public Routes */}
