@@ -107,8 +107,11 @@ export default function DownloadPage() {
         
         setTimeout(() => {
           window.location.href = directUrl
-          setStatus('completed')
         }, 1500)
+
+        setTimeout(() => {
+          setStatus('completed')
+        }, 6500) // 1.5 seconds setup + 5 seconds saving hold
         return
       }
 
@@ -189,8 +192,8 @@ export default function DownloadPage() {
       a.click()
       document.body.removeChild(a)
 
-      // Wait a moment for Chrome's native download UI to trigger before changing status to completed
-      await new Promise(resolve => setTimeout(resolve, 800))
+      // Wait 5 seconds for Chrome's native download UI to trigger before changing status to completed
+      await new Promise(resolve => setTimeout(resolve, 5000))
       setStatus('completed')
 
     } catch (err) {
