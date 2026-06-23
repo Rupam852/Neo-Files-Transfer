@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminRecord, setAdminRecord] = useState(null)
+  const [isPaused, setIsPaused] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -82,8 +83,31 @@ export function AuthProvider({ children }) {
       )
       .subscribe()
 
+    // Subscribe to realtime updates for the current user's entry in the approved_users table
+    const approvedChannel = supabase
+      .channel(`approved-status-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'approved_users',
+          filter: `email=eq.${user.email.toLowerCase()}`,
+        },
+        async (payload) => {
+          console.log('Realtime approved user update:', payload)
+          if (payload.eventType === 'DELETE') {
+            await signOut()
+          } else if (payload.new) {
+            setIsPaused(payload.new.is_paused || false)
+          }
+        }
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(adminChannel)
+      supabase.removeChannel(approvedChannel)
     }
   }, [user])
 
@@ -160,7 +184,7 @@ export function AuthProvider({ children }) {
       if (!isUserAdmin) {
         const { data: approvedData } = await supabase
           .from('approved_users')
-          .select('id')
+          .select('id, is_paused')
           .eq('email', authUser.email.toLowerCase())
           .maybeSingle()
 
@@ -170,8 +194,12 @@ export function AuthProvider({ children }) {
           setUser(null)
           setProfile(null)
           setIsAdmin(false)
+          setIsPaused(false)
           return
         }
+        setIsPaused(approvedData.is_paused || false)
+      } else {
+        setIsPaused(false)
       }
     } catch (err) {
       console.error('Error loading profile:', err)
@@ -201,6 +229,7 @@ export function AuthProvider({ children }) {
     setProfile(null)
     setIsAdmin(false)
     setAdminRecord(null)
+    setIsPaused(false)
   }
 
   async function refreshProfile() {
@@ -215,6 +244,7 @@ export function AuthProvider({ children }) {
       profile,
       isAdmin,
       adminRecord,
+      isPaused,
       loading,
       signInWithGoogle,
       signOut,

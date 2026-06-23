@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import {
   Search, Check, X, Trash2, Phone, Mail,
   LogOut, Users, UserCheck, Clock, ShieldCheck,
-  Settings, Activity,
+  Settings, Activity, Pause, Play,
 } from 'lucide-react'
 import { formatDate } from '../utils/helpers'
 
@@ -271,6 +271,35 @@ export default function AdminDashboardPage() {
     } catch (err) {
       console.error(err)
       toast.error('Failed to delete approved user')
+    }
+  }
+
+  async function togglePauseUser(user) {
+    if (adminRecord?.role !== 'super_admin') {
+      toast.error('Only the Super Administrator can pause or resume user accounts.')
+      return
+    }
+
+    const newPausedState = !user.is_paused
+    try {
+      const { error } = await supabase
+        .from('approved_users')
+        .update({ is_paused: newPausedState })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      await supabase.from('admin_activity_logs').insert({
+        admin_id: profile?.id,
+        action: newPausedState ? 'user_pause' : 'user_resume',
+        details: `${newPausedState ? 'Paused' : 'Resumed'} user account: ${user.email}`,
+      })
+
+      toast.success(`User ${user.email} has been ${newPausedState ? 'paused' : 'resumed'}`)
+      fetchData()
+    } catch (err) {
+      console.error(err)
+      toast.error(`Failed to update user status: ${err.message || JSON.stringify(err)}`)
     }
   }
 
@@ -618,6 +647,7 @@ export default function AdminDashboardPage() {
                     <thead>
                       <tr className="bg-dark-500 border-b border-dark-300">
                         <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Email</th>
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Status</th>
                         <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3 hidden sm:table-cell">Approved At</th>
                         <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Actions</th>
                       </tr>
@@ -625,7 +655,7 @@ export default function AdminDashboardPage() {
                     <tbody className="divide-y divide-dark-400">
                       {filteredApproved.length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="text-center py-8 text-gray-400 text-sm">
+                          <td colSpan={4} className="text-center py-8 text-gray-400 text-sm">
                             No approved users
                           </td>
                         </tr>
@@ -633,9 +663,34 @@ export default function AdminDashboardPage() {
                         filteredApproved.map(user => (
                           <tr key={user.id} className="hover:bg-dark-500">
                             <td className="px-4 py-3 text-sm font-medium text-gray-100 truncate max-w-[150px] sm:max-w-xs">{user.email}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                                user.is_paused
+                                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                  : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                  user.is_paused ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'
+                                }`} />
+                                {user.is_paused ? 'Paused' : 'Active'}
+                              </span>
+                            </td>
                             <td className="px-4 py-3 text-sm text-gray-400 hidden sm:table-cell">{formatDate(user.approved_at)}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-1">
+                                {adminRecord?.role === 'super_admin' && (
+                                  <button
+                                    onClick={() => togglePauseUser(user)}
+                                    className={`p-1.5 rounded-lg ${
+                                      user.is_paused
+                                        ? 'text-emerald-400 hover:bg-emerald-500/10'
+                                        : 'text-amber-400 hover:bg-amber-500/10'
+                                    }`}
+                                    title={user.is_paused ? "Resume Account" : "Pause Account"}
+                                  >
+                                    {user.is_paused ? <Play size={16} /> : <Pause size={16} />}
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => deleteApprovedUser(user.email)}
                                   className="p-1.5 text-red-400 hover:bg-dark-500 rounded-lg"

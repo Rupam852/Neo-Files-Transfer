@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 
+import { ShieldAlert, LogOut } from 'lucide-react'
+
 // Layouts
 import MainLayout from './layouts/MainLayout'
 import DashboardLayout from './layouts/DashboardLayout'
@@ -32,9 +34,48 @@ function LoadingScreen() {
   )
 }
 
+function TemporaryBlockScreen() {
+  const { signOut } = useAuth()
+
+  return (
+    <div className="min-h-screen w-full bg-[#030712] text-gray-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 font-['Plus_Jakarta_Sans'] relative overflow-hidden">
+      {/* Import Premium Fonts */}
+      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+
+      {/* Futuristic Background Light Glows */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-red-500/5 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-red-500/5 blur-[120px] pointer-events-none" />
+
+      {/* Main Card */}
+      <div className="w-full max-w-md bg-slate-950/80 backdrop-blur-3xl border border-red-500/10 rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10 text-center space-y-6">
+        <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center mx-auto text-red-400">
+          <ShieldAlert size={36} className="animate-pulse" />
+        </div>
+        
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-white font-['Space_Grotesk']">Account Temporarily Paused</h2>
+          <p className="text-sm text-slate-400">
+            Your access has been temporarily suspended by the administrator. Your files and data remain securely stored.
+          </p>
+          <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-3 text-xs text-red-400 font-semibold mt-2">
+            Please contact developer support.
+          </div>
+        </div>
+
+        <button
+          onClick={signOut}
+          className="w-full bg-dark-500 hover:bg-dark-400 border border-dark-300 text-gray-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300 active:scale-[0.98]"
+        >
+          <LogOut size={18} /> Sign Out
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // HomeRoute resolves the base URL page dynamically based on login and roles
 function HomeRoute() {
-  const { user, isAdmin, loading } = useAuth()
+  const { user, isAdmin, isPaused, loading } = useAuth()
 
   if (loading) return <LoadingScreen />
 
@@ -44,6 +85,10 @@ function HomeRoute() {
 
   if (isAdmin) {
     return <AdminDashboardPage />
+  }
+
+  if (isPaused) {
+    return <TemporaryBlockScreen />
   }
 
   return <DashboardLayout />
