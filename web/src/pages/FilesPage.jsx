@@ -22,6 +22,31 @@ const ALLOWED_TYPES = [
 
 const BLOCKED_EXTENSIONS = ['exe', 'bat', 'cmd', 'msi', 'scr']
 
+function getUniqueFileName(originalName, existingFiles) {
+  const existingNames = existingFiles.map(f => f.file_name.toLowerCase())
+  let name = originalName
+  
+  if (!existingNames.includes(name.toLowerCase())) {
+    return name
+  }
+
+  const lastDotIndex = originalName.lastIndexOf('.')
+  let baseName = originalName
+  let ext = ''
+  
+  if (lastDotIndex !== -1) {
+    baseName = originalName.substring(0, lastDotIndex)
+    ext = originalName.substring(lastDotIndex)
+  }
+
+  let counter = 1
+  while (existingNames.includes(`${baseName} (${counter})${ext}`.toLowerCase())) {
+    counter++
+  }
+
+  return `${baseName} (${counter})${ext}`
+}
+
 const ICON_MAP = {
   'file-text': FileText,
   'image': Image,
@@ -87,8 +112,14 @@ export default function FilesPage({ onViewVersions }) {
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Generate unique name if file already exists in files list
+    const uniqueName = getUniqueFileName(file.name, files)
+    const uploadFile = uniqueName !== file.name 
+      ? new File([file], uniqueName, { type: file.type })
+      : file
+
     // Validate type
-    const ext = file.name.split('.').pop().toLowerCase()
+    const ext = uploadFile.name.split('.').pop().toLowerCase()
     if (BLOCKED_EXTENSIONS.includes(ext)) {
       toast.error('This file type is not allowed')
       return
@@ -101,9 +132,9 @@ export default function FilesPage({ onViewVersions }) {
       'zip', 'rar', 'tar', 'gz', '7z', 'apk', 'xapk', 'txt'
     ]
 
-    const isAllowedType = ALLOWED_TYPES.includes(file.type) ||
-                          file.type.startsWith('image/') ||
-                          file.type.startsWith('video/') ||
+    const isAllowedType = ALLOWED_TYPES.includes(uploadFile.type) ||
+                          uploadFile.type.startsWith('image/') ||
+                          uploadFile.type.startsWith('video/') ||
                           ALLOWED_EXTENSIONS.includes(ext)
 
     if (!isAllowedType) {
@@ -112,7 +143,7 @@ export default function FilesPage({ onViewVersions }) {
     }
 
     // Validate size (100MB)
-    if (file.size > 100 * 1024 * 1024) {
+    if (uploadFile.size > 100 * 1024 * 1024) {
       toast.error('File size exceeds 100MB limit')
       return
     }
@@ -130,7 +161,7 @@ export default function FilesPage({ onViewVersions }) {
 
       // Upload via edge function
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('file', uploadFile)
       formData.append('folder_id', profile.drive_folder_id)
       formData.append('provider_token', googleToken)
 
@@ -154,9 +185,9 @@ export default function FilesPage({ onViewVersions }) {
       const { error: insertError } = await supabase.from('shared_files').insert({
         user_id: user.id,
         google_drive_file_id: result.file_id,
-        file_name: file.name,
-        file_size: file.size,
-        mime_type: file.type,
+        file_name: uploadFile.name,
+        file_size: uploadFile.size,
+        mime_type: uploadFile.type,
         current_version_num: 1,
         unique_share_hash: shareHash,
         sharing_status: 'private',
@@ -183,10 +214,10 @@ export default function FilesPage({ onViewVersions }) {
       await supabase.from('activity_logs').insert({
         user_id: user.id,
         action: 'upload',
-        details: `Uploaded file: ${file.name}`,
+        details: `Uploaded file: ${uploadFile.name}`,
       })
 
-      toast.success(`${file.name} uploaded successfully`)
+      toast.success(`${uploadFile.name} uploaded successfully`)
       loadFiles()
     } catch (err) {
       console.error(err)
@@ -320,7 +351,7 @@ export default function FilesPage({ onViewVersions }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 flex flex-col min-h-[calc(100vh-150px)] lg:min-h-[calc(100vh-180px)]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-50">My Files</h1>
@@ -388,8 +419,8 @@ export default function FilesPage({ onViewVersions }) {
           <p className="text-gray-400">No files yet. Upload your first file to get started.</p>
         </div>
       ) : (
-        <div className="bg-dark-600 rounded-xl border border-dark-300 overflow-hidden">
-          <div className="overflow-x-auto min-h-[280px]">
+        <div className="bg-dark-600 rounded-xl border border-dark-300 overflow-hidden flex-1 flex flex-col">
+          <div className="overflow-x-auto flex-grow min-h-[280px]">
             <table className="w-full">
               <thead>
                 <tr className="bg-dark-500 border-b border-dark-300">
