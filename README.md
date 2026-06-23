@@ -33,29 +33,30 @@ A premium, secure, and responsive web-based file management and transfer platfor
 | Layer | Technologies |
 | :--- | :--- |
 | **Frontend** | React (Vite), Tailwind CSS, Lucide Icons, HTML5 History API |
-| **Backend & Database** | Supabase (Authentication, PostgreSQL Database, Storage Buckets, Realtime Channels) |
-| **Edge Functions** | Deno, Nodemailer (SMTP Server Integration) |
+| **Database & Auth** | Supabase (Authentication, PostgreSQL Database, Realtime Channels) |
+| **Edge Functions** | Deno (SMTP verification email delivery, small-medium file downloads, user moderation) |
+| **Proxy & Zip Compiler** | Render (Express, Node.js, Archiver dynamic streams) |
 
 ---
 
 ## 🏗️ Architecture & Workflow
 
-The platform leverages **React** for client-side rendering, **Supabase** for user access control/metadata tracking, and Deno-based **Supabase Edge Functions** as a middleware proxy to interact with **Google Drive API** securely.
+The platform leverages **React** for client-side rendering, **Supabase** for user access control/metadata tracking, and a hybrid backend split between **Supabase Edge Functions** (for fast regional, cold-start-free execution) and a **Render Proxy Server** (for long-running, timeout-free file streaming and ZIP compression on-the-fly).
 
-Below is the flowchart representing the platform's multi-layered tree storage hierarchy, batch uploads, and zipped on-the-fly streaming download architecture:
+Below is the flowchart representing the platform's multi-layered tree storage hierarchy, direct uploads, and zipped on-the-fly streaming download architecture:
 
 ```mermaid
 graph TD
     %% Styling
     classDef client fill:#312e81,stroke:#6366f1,stroke-width:2px,color:#fff;
     classDef edge fill:#1e1b4b,stroke:#8b5cf6,stroke-width:2px,color:#fff;
+    classDef proxy fill:#4c1d95,stroke:#a78bfa,stroke-width:2px,color:#fff;
     classDef db fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff;
     classDef ext fill:#7c2d12,stroke:#f97316,stroke-width:2px,color:#fff;
 
     subgraph Client ["Client Side (React SPA)"]
         A[User Dashboard]:::client
         B[Download Page]:::client
-        C[Progress Bar Component]:::client
     end
 
     subgraph Backend ["Supabase Backend Layer"]
@@ -67,6 +68,10 @@ graph TD
             G[create-folder]:::edge
             H[download-file]:::edge
         end
+    end
+
+    subgraph RenderProxy ["Proxy Server (Render Node.js)"]
+        P[Render Proxy Express]:::proxy
     end
 
     subgraph External ["External Services"]
@@ -82,34 +87,35 @@ graph TD
     G -->|Create Folder Object| I
     G -->|Save Metadata with parent_folder_id| D
     
-    A -->|2. Upload File / Folder Tree| F
-    F -->|Upload Binary Chunks| I
-    F -->|Insert File Record| D
+    A -->|2. Upload File / Folder Tree (Direct)*| I
+    A -->|3. Register metadata| D
     
     B -->|Query metadata| D
-    B -->|Request stream &stream=true| H
-    H -->|Retrieve Owner Google Tokens| D
-    H -->|Fetch media alt=media| I
-    I -->|Direct stream response| H
-    H -->|Streamed Chunk Response| C
-    C -->|Construct Blob & Trigger Save| B
     
-    B -->|Download Folder ZIP| H
-    H -->|Query child tree metadata| D
-    H -->|Download all child files| I
-    H -->|Compile recursive ZIP fflate| H
-    H -->|Stream ZIP attachment| B
+    %% Downloads Decision routing
+    B -->|Download file <50MB| H
+    B -->|Download folder or file >50MB| P
+    
+    H -->|Retrieve Owner Google Tokens| D
+    H -->|Fetch alt=media stream| I
+    H -->|Direct stream response| B
+    
+    P -->|Retrieve Owner Google Tokens| D
+    P -->|Fetch alt=media stream| I
+    P -->|Stream file / compile dynamic ZIP| P
+    P -->|Direct ZIP / file stream| B
 
-    H & F & G -->|If 401 Unauthorized| J
+    H & F & G & P -->|If 401 Unauthorized| J
     J -->|New Access Token| D
 ```
 
 ### Key Workflow Explanations:
-1. **Google Auth & Token Storage**: Users sign in via Google OAuth. The retrieved tokens (access & refresh) are safely encrypted and synchronized in the `user_profiles` database table.
-2. **Directory & Tree uploads**: When users upload nested directories or folders, directories are created parent-first, and files are linked to their corresponding database parents (`parent_folder_id` referencing `shared_files(id) ON DELETE CASCADE`).
-3. **Chunked Stream Downloads**: For single files, the download client reads stream blocks chunk-by-chunk using `ReadableStream` to render the dynamic progress bar (0 to 100%) and then creates a local blob to save to the system.
-4. **On-the-fly ZIP Compilation**: When shared folders are requested for download, the Deno Edge Function (`download-file`) queries all child elements recursively, downloads their binary contents in parallel from Google Drive, wraps them into a ZIP archive structure on-the-fly using `fflate`, and streams the ZIP file directly.
-5. **Token Auto-Refresh Middleware**: The Edge Functions automatically intercept Google API `401 Unauthorized` responses, exchange the owner's refresh token for a fresh access token, save it to the DB, and resume the operation seamlessly.
+1. **Google Auth & Token Storage**: Users sign in via Google OAuth. The retrieved access and refresh tokens are safely stored in the `user_profiles` database table.
+2. **Directory & Tree Uploads**: When users upload nested directories or folders, directories are created parent-first, and files are linked to their corresponding database parents (`parent_folder_id` referencing `shared_files(id) ON DELETE CASCADE`).
+3. **High-Speed Direct Client Uploads**: Uploading files bypasses backend servers. The React frontend negotiates a resumable session directly with Google Drive using the owner's `accessToken` and uploads raw bytes directly from the client's browser, giving 100% full upload speed.
+4. **Hybrid Download Streaming Routing**: Single files under 50MB are routed through the regional **Supabase Edge Function** (`download-file`) for instant, cold-start-free downloads. Folders and larger files (>50MB) are routed through the **Render Proxy** to prevent execution timeouts (bypassing the 150-second Deno execution limit). Both backend servers fetch the authenticated `alt=media` stream from the Google Drive API using the owner's credentials, bypassing Google's 1 MB/s speed throttling on public links and removing login requirements for guests.
+5. **On-the-fly ZIP Compilation**: When a shared folder is downloaded, the Render Proxy queries all child elements recursively, downloads their binary contents in parallel, packages them into a standard `.zip` archive on the fly using `archiver`, and streams the ZIP file directly to the guest browser.
+6. **Token Auto-Refresh Middleware**: Both Deno Edge Functions and the Render Proxy automatically intercept Google API `401 Unauthorized` responses, exchange the owner's refresh token for a fresh access token, save it to the DB, and resume the operation seamlessly.
 
 ---
 
