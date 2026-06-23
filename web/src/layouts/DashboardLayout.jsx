@@ -238,13 +238,15 @@ export default function DashboardLayout() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleUploadClick}
-              className="btn-primary flex items-center gap-2 text-sm"
-            >
-              <Upload size={16} />
-              <span className="hidden sm:inline">Upload</span>
-            </button>
+            {currentTab !== 'files' && (
+              <button
+                onClick={handleUploadClick}
+                className="btn-primary flex items-center gap-2 text-sm"
+              >
+                <Upload size={16} />
+                <span className="hidden sm:inline">Upload</span>
+              </button>
+            )}
             <button className="relative p-2 text-gray-400 hover:text-gray-200 rounded-lg hover:bg-dark-500">
               <Bell size={20} />
             </button>
