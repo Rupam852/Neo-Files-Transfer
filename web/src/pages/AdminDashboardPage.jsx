@@ -892,8 +892,8 @@ function StatCard({ icon: Icon, label, value, color }) {
         <Icon size={20} />
       </div>
       <div>
-        <p className="text-2xl font-bold text-gray-100">{value}</p>
-        <p className="text-xs text-gray-400">{label}</p>
+        <p className="text-2xl font-bold text-gray-100 leading-none">{value}</p>
+        <p className="text-xs text-gray-400 mt-1">{label}</p>
       </div>
     </div>
   )
