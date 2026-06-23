@@ -235,6 +235,11 @@ app.get('/download-file', async (req, res) => {
         }
       }
 
+      // Increment download count in database asynchronously
+      supabaseAdmin.rpc('increment_download_count', { file_id: file.id }).catch((err) => {
+        console.error('Failed to increment download count:', err)
+      })
+
       // Finalize the archive stream
       archive.finalize()
       return
@@ -276,6 +281,13 @@ app.get('/download-file', async (req, res) => {
     } else if (file.file_size) {
       res.setHeader('Content-Length', file.file_size)
     }
+
+    // Increment download count in database asynchronously
+    supabaseAdmin.rpc('increment_download_count', { file_id: file.id }).catch((err) => {
+      // Ignore if user cancels download early (aborted stream)
+      if (err.message && err.message.includes('aborted')) return
+      console.error('Failed to increment download count:', err)
+    })
 
     // Stream directly from Drive to Client
     const driveStream = Readable.fromWeb(driveResponse.body)

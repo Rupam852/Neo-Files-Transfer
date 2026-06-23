@@ -247,6 +247,11 @@ serve(async (req) => {
         responseHeaders.set(key, value)
       }
 
+      // Increment download count in database asynchronously
+      supabaseAdmin.rpc("increment_download_count", { file_id: file.id }).catch((err) => {
+        console.error("Failed to increment download count:", err)
+      })
+
       return new Response(zippedBytes, {
         headers: responseHeaders,
         status: 200,
@@ -302,6 +307,11 @@ serve(async (req) => {
     for (const [key, value] of Object.entries(corsHeaders)) {
       responseHeaders.set(key, value)
     }
+
+    // Increment download count in database asynchronously
+    supabaseAdmin.rpc("increment_download_count", { file_id: file.id }).catch((err) => {
+      console.error("Failed to increment download count:", err)
+    })
 
     // Stream the body directly to the client
     return new Response(driveResponse.body, {
