@@ -414,7 +414,7 @@ export default function AdminDashboardPage() {
 
       <div className="max-w-7xl mx-auto p-4 lg:p-6">
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard icon={Users} label="Total Registrations" value={pendingCount + approvedCount} color="blue" />
           <StatCard icon={Clock} label="Pending" value={pendingCount} color="orange" />
           <StatCard icon={UserCheck} label="Approved" value={approvedCount} color="green" />
@@ -422,7 +422,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 bg-dark-600 rounded-lg border border-dark-400 p-1 mb-6 w-fit">
+        <div className="flex flex-wrap items-center gap-1 bg-dark-600 rounded-lg border border-dark-400 p-1 mb-6 w-fit">
           <button
             onClick={() => setActiveTab('pending')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -491,9 +491,9 @@ export default function AdminDashboardPage() {
                       <tr className="bg-dark-500 border-b border-dark-300">
                         <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Name</th>
                         <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Email</th>
-                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Phone</th>
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Phone</th>
                         <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Status</th>
-                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Submitted</th>
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3 hidden sm:table-cell">Submitted</th>
                         <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Actions</th>
                       </tr>
                     </thead>
@@ -508,8 +508,8 @@ export default function AdminDashboardPage() {
                         filteredPending.map(user => (
                           <tr key={user.id} className="hover:bg-dark-500">
                             <td className="px-4 py-3 text-sm font-medium text-gray-100">{user.name}</td>
-                            <td className="px-4 py-3 text-sm text-gray-400">{user.email}</td>
-                            <td className="px-4 py-3 text-sm text-gray-400">{user.phone}</td>
+                            <td className="px-4 py-3 text-sm text-gray-400 truncate max-w-[150px] sm:max-w-xs">{user.email}</td>
+                            <td className="px-4 py-3 text-sm text-gray-400 hidden md:table-cell">{user.phone}</td>
                             <td className="px-4 py-3">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                                 user.status === 'pending' ? 'bg-amber-900/30 text-amber-400' :
@@ -519,7 +519,7 @@ export default function AdminDashboardPage() {
                                 {user.status}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-400">{formatDate(user.submitted_at)}</td>
+                            <td className="px-4 py-3 text-sm text-gray-400 hidden sm:table-cell">{formatDate(user.submitted_at)}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-1">
                                 {user.status === 'pending' && (
@@ -580,7 +580,7 @@ export default function AdminDashboardPage() {
                     <thead>
                       <tr className="bg-dark-500 border-b border-dark-300">
                         <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Email</th>
-                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Approved At</th>
+                        <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3 hidden sm:table-cell">Approved At</th>
                         <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Actions</th>
                       </tr>
                     </thead>
@@ -594,8 +594,8 @@ export default function AdminDashboardPage() {
                       ) : (
                         filteredApproved.map(user => (
                           <tr key={user.id} className="hover:bg-dark-500">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-100">{user.email}</td>
-                            <td className="px-4 py-3 text-sm text-gray-400">{formatDate(user.approved_at)}</td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-100 truncate max-w-[150px] sm:max-w-xs">{user.email}</td>
+                            <td className="px-4 py-3 text-sm text-gray-400 hidden sm:table-cell">{formatDate(user.approved_at)}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-1">
                                 <button
@@ -680,7 +680,7 @@ export default function AdminDashboardPage() {
                         <tr className="bg-dark-500 border-b border-dark-300">
                           <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Email</th>
                           <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Role</th>
-                          <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Added At</th>
+                          <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3 hidden sm:table-cell">Added At</th>
                           {adminRecord?.role === 'super_admin' && (
                             <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Actions</th>
                           )}
@@ -689,7 +689,7 @@ export default function AdminDashboardPage() {
                       <tbody className="divide-y divide-dark-400">
                         {adminsList.map(admin => (
                           <tr key={admin.id} className="hover:bg-dark-500">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-100">{admin.email}</td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-100 truncate max-w-[150px] sm:max-w-xs">{admin.email}</td>
                             <td className="px-4 py-3 text-sm">
                               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                 admin.role === 'super_admin' ? 'bg-purple-900/30 text-purple-400' : 'bg-primary-900/30 text-primary-400'
@@ -697,7 +697,7 @@ export default function AdminDashboardPage() {
                                 {admin.role === 'super_admin' ? 'Super Admin' : 'Admin'}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-400">{formatDate(admin.created_at)}</td>
+                            <td className="px-4 py-3 text-sm text-gray-400 hidden sm:table-cell">{formatDate(admin.created_at)}</td>
                             {adminRecord?.role === 'super_admin' && (
                               <td className="px-4 py-3 text-sm">
                                 {admin.email.toLowerCase() !== profile?.email?.toLowerCase() && admin.role !== 'super_admin' ? (
