@@ -31,15 +31,16 @@ export default function DashboardPage({ onNavigate }) {
       try {
         const { data: files } = await supabase
           .from('shared_files')
-          .select('id, sharing_status, unique_share_hash, is_folder')
+          .select('id, sharing_status, unique_share_hash, is_folder, download_count')
           .eq('user_id', user.id)
 
         if (files) {
+          const sumDownloads = files.reduce((acc, f) => acc + (f.download_count || 0), 0)
           setStats({
             totalFiles: files.filter(f => !f.is_folder).length,
             sharedFiles: files.filter(f => f.unique_share_hash !== null).length,
             publicLinks: files.filter(f => f.sharing_status === 'public' && f.unique_share_hash !== null).length,
-            totalDownloads: 0,
+            totalDownloads: sumDownloads,
           })
         }
       } catch (err) {
