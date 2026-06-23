@@ -92,25 +92,6 @@ export default function DownloadPage() {
       const fileLimit = 50 * 1024 * 1024 // 50MB
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 
-      // Folders are zipped on-the-fly by the Edge Function — always use direct browser download.
-      // Folders have file_size=0 in the DB so we can't use the JS streaming path (unknown size,
-      // and buffering a potentially large ZIP in memory blocks the browser thread).
-      if (fileInfo.is_folder) {
-        setStatus('downloading')
-        setProgress(15)
-        setTimeout(() => setProgress(40), 500)
-        setTimeout(() => setProgress(70), 1500)
-        setTimeout(() => {
-          setProgress(95)
-          setStatus('saving')
-        }, 2500)
-        // Use window.open so the current page stays intact (window.location.href would navigate away and reset the app).
-        // Since this is a cross-origin URL, filename comes from the server's Content-Disposition header
-        // which the Edge Function already sets to: attachment; filename="foldername.zip"
-        window.open(directUrl, '_blank')
-        setTimeout(() => setStatus('completed'), 6000)
-        return
-      }
 
       // If file is very large or we are on mobile and file is moderately large, bypass streaming to avoid browser memory crashes
       if (fileInfo.file_size && (fileInfo.file_size > fileLimit || (isMobile && fileInfo.file_size > 15 * 1024 * 1024))) {
@@ -301,7 +282,13 @@ export default function DownloadPage() {
                 {status === 'saving' ? 'Finalizing Download' : 'Downloading File'}
               </h2>
               <p className="text-sm text-slate-400">
-                {status === 'saving' ? 'Preparing your download. Check your browser\'s download bar...' : fileInfo?.is_folder ? 'Compressing folder contents. Your download will start shortly...' : 'Streaming secure blocks directly from Shield node.'}
+                {status === 'saving'
+                  ? 'Writing cached blocks to your browser — download will trigger automatically...'
+                  : fileInfo?.is_folder && progress === 0
+                    ? 'Server is compressing folder contents into a ZIP. Please wait...'
+                    : fileInfo?.is_folder
+                      ? 'Streaming ZIP archive from Shield node...'
+                      : 'Streaming secure blocks directly from Shield node.'}
               </p>
             </div>
 
@@ -320,17 +307,21 @@ export default function DownloadPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs font-medium">
                 <span className="text-slate-400">
-                  {status === 'saving' ? 'Progress: 100%' : `Progress: ${progress}%`}
+                  {status === 'saving' ? 'Progress: 100%' : fileInfo?.is_folder && progress === 0 ? 'Building archive...' : `Progress: ${progress}%`}
                 </span>
                 <span className="text-indigo-400 font-semibold">
                   {status === 'saving' ? 'Saving...' : (fileInfo?.is_folder ? `${formatFileSize(downloadedBytes)} downloaded` : `${formatFileSize(downloadedBytes)} / ${formatFileSize(totalBytes)}`)}
                 </span>
               </div>
               <div className="h-2.5 bg-slate-900 border border-slate-800/80 rounded-full overflow-hidden relative">
-                <div 
-                  className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(99,102,241,0.5)]" 
-                  style={{ width: `${progress}%` }}
-                />
+                {fileInfo?.is_folder && progress === 0 && status === 'downloading' ? (
+                  <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-indigo-500/0 via-purple-500 to-indigo-500/0 animate-shimmer shadow-[0_0_12px_rgba(99,102,241,0.5)]" />
+                ) : (
+                  <div
+                    className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(99,102,241,0.5)]"
+                    style={{ width: `${progress}%` }}
+                  />
+                )}
               </div>
             </div>
 
