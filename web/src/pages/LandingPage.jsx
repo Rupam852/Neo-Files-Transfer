@@ -355,7 +355,7 @@ export default function LandingPage() {
                 <span className="text-xs text-gray-500">Neo Files Transfer v1.0 • Built with Supabase & Google Drive</span>
               </div>
               <span className="text-[11px] text-gray-600 font-medium sm:pl-10">
-                Support & Developer: <a href="mailto:support@neofiles.com" className="text-indigo-400 hover:text-indigo-300 hover:underline font-mono">support@neofiles.com</a>
+                Support & Developer: <a href="mailto:rupambairagya08@gmail.com" className="text-indigo-400 hover:text-indigo-300 hover:underline font-mono">rupambairagya08@gmail.com</a>
               </span>
             </div>
             <div className="flex gap-6 text-xs text-gray-500">
