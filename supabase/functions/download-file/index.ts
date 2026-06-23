@@ -253,57 +253,50 @@ serve(async (req) => {
       })
     }
 
-    let driveResponse = await fetchMediaFromDrive(driveFileId, accessToken)
-
-    // Handle token expiration (401)
-    if (driveResponse.status === 401 && refreshToken) {
-      console.log("Google Drive alt=media returned 401. Refreshing owner token...")
-      try {
-        accessToken = await refreshGoogleToken(fileOwner.user_id, refreshToken, supabaseAdmin)
-        driveResponse = await fetchMediaFromDrive(driveFileId, accessToken)
-      } catch (refreshErr) {
-        console.error("Token refresh failed during download retry:", refreshErr)
-      }
-    }
-
-    if (!driveResponse.ok) {
-      console.error("Failed to fetch from Drive, status:", driveResponse.status)
-      // Fallback: Redirect to public Drive download link if streaming failed
-      const downloadUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}`
-      if (isStream) {
-        return new Response(
-          JSON.stringify({
-            error: `Failed to fetch file content from Google Drive (HTTP ${driveResponse.status})`,
-            fallbackUrl: downloadUrl,
+    const makeFilePublicOnDrive = async (driveId: string, token: string) => {
+      return await fetch(
+        `https://www.googleapis.com/drive/v3/files/${driveId}/permissions`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json; charset=UTF-8",
+          },
+          body: JSON.stringify({
+            role: "reader",
+            type: "anyone",
           }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json", ...corsHeaders },
-          }
-        )
-      }
-      return Response.redirect(downloadUrl, 302)
+        }
+      )
     }
 
-    // Set correct headers for download attachment streaming
+    try {
+      let permRes = await makeFilePublicOnDrive(driveFileId, accessToken)
+      if (permRes.status === 401 && refreshToken) {
+        console.log("Token expired during permission update. Refreshing...")
+        accessToken = await refreshGoogleToken(fileOwner.user_id, refreshToken, supabaseAdmin)
+        permRes = await makeFilePublicOnDrive(driveFileId, accessToken)
+      }
+      if (!permRes.ok) {
+        const errTxt = await permRes.text()
+        console.warn(`Failed to change Google Drive permissions for ${driveFileId}:`, errTxt)
+      }
+    } catch (permErr) {
+      console.warn("Failed to ensure Google Drive file is public:", permErr)
+    }
+
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}`
+    
+    // Construct CORS-friendly 302 redirect response
     const responseHeaders = new Headers()
-    responseHeaders.set("Content-Type", file.mime_type || driveResponse.headers.get("Content-Type") || "application/octet-stream")
-    responseHeaders.set("Content-Disposition", `attachment; filename="${file.file_name.replace(/"/g, '\\"')}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`)
-    
-    // Prevent browser and CDN caching of downloads to ensure latest version is always served
-    responseHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate")
-    responseHeaders.set("Pragma", "no-cache")
-    responseHeaders.set("Expires", "0")
-    
-    // Add CORS headers
+    responseHeaders.set("Location", downloadUrl)
     for (const [key, value] of Object.entries(corsHeaders)) {
       responseHeaders.set(key, value)
     }
 
-    // Stream the body directly to the client
-    return new Response(driveResponse.body, {
-      headers: responseHeaders,
-      status: 200,
+    return new Response(null, {
+      status: 302,
+      headers: responseHeaders
     })
 
   } catch (error) {
