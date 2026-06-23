@@ -92,14 +92,20 @@ export function AuthProvider({ children }) {
           event: '*',
           schema: 'public',
           table: 'approved_users',
-          filter: `email=eq.${user.email.toLowerCase()}`,
         },
         async (payload) => {
           console.log('Realtime approved user update:', payload)
+          const targetEmail = user.email.toLowerCase()
           if (payload.eventType === 'DELETE') {
-            await signOut()
+            const oldEmail = payload.old?.email?.toLowerCase()
+            if (oldEmail === targetEmail) {
+              await signOut()
+            }
           } else if (payload.new) {
-            setIsPaused(payload.new.is_paused || false)
+            const newEmail = payload.new.email?.toLowerCase()
+            if (newEmail === targetEmail) {
+              setIsPaused(payload.new.is_paused || false)
+            }
           }
         }
       )
