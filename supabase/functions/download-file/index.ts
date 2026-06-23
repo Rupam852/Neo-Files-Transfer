@@ -83,45 +83,91 @@ serve(async (req) => {
 
     const driveFileId = latestVersion?.google_drive_file_id || file.google_drive_file_id
 
-    // Get the download URL from Google Drive API
-    // We need the owner's Google access token
-    // For this, we use the file owner's session
+    // Get the file owner
     const { data: fileOwner } = await supabaseAdmin
       .from("shared_files")
       .select("user_id")
       .eq("id", file.id)
       .single()
 
-    // Use the Google Drive webContentLink for direct download
-    // Since we can't easily get the owner's token in a serverless function,
-    // we'll use the public sharing approach
+    if (!fileOwner) {
+      throw new Error("File owner not found")
+    }
 
-    // Option 1: If file has webContentLink (public files)
-    const driveResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=webContentLink,webViewLink`,
-      {
-        headers: {
-          // Use API key for public file access
-          Authorization: `Bearer ${Deno.env.get("GOOGLE_API_KEY") || ""}`,
-        },
-      }
-    )
+    // Fetch the owner's Google tokens from the database
+    const { data: ownerProfile, error: ownerError } = await supabaseAdmin
+      .from("user_profiles")
+      .select("google_access_token, google_refresh_token")
+      .eq("id", fileOwner.user_id)
+      .single()
 
-    if (driveResponse.ok) {
-      const driveData = await driveResponse.json()
-      if (driveData.webContentLink) {
-        return Response.redirect(driveData.webContentLink, 302)
+    if (ownerError || !ownerProfile) {
+      throw new Error("Failed to retrieve file owner's Google tokens")
+    }
+
+    let accessToken = ownerProfile.google_access_token
+    const refreshToken = ownerProfile.google_refresh_token
+
+    if (!accessToken) {
+      if (refreshToken) {
+        accessToken = await refreshGoogleToken(fileOwner.user_id, refreshToken, supabaseAdmin)
+      } else {
+        throw new Error("Owner's Google access token is missing and no refresh token is available")
       }
     }
 
-    // Option 2: Direct download via Drive export URL
-    const downloadUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}`
-    return Response.redirect(downloadUrl, 302)
+    // Helper to fetch file media content from Google Drive
+    const fetchMediaFromDrive = async (token: string) => {
+      return await fetch(
+        `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+    }
+
+    let driveResponse = await fetchMediaFromDrive(accessToken)
+
+    // Handle token expiration (401)
+    if (driveResponse.status === 401 && refreshToken) {
+      console.log("Google Drive alt=media returned 401. Refreshing owner token...")
+      try {
+        accessToken = await refreshGoogleToken(fileOwner.user_id, refreshToken, supabaseAdmin)
+        driveResponse = await fetchMediaFromDrive(accessToken)
+      } catch (refreshErr) {
+        console.error("Token refresh failed during download retry:", refreshErr)
+      }
+    }
+
+    if (!driveResponse.ok) {
+      console.error("Failed to fetch from Drive, status:", driveResponse.status)
+      // Fallback: Redirect to public Drive download link if streaming failed
+      const downloadUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}`
+      return Response.redirect(downloadUrl, 302)
+    }
+
+    // Set correct headers for download attachment streaming
+    const responseHeaders = new Headers()
+    responseHeaders.set("Content-Type", file.mime_type || driveResponse.headers.get("Content-Type") || "application/octet-stream")
+    responseHeaders.set("Content-Disposition", `attachment; filename="${encodeURIComponent(file.file_name)}"`)
+    
+    // Add CORS headers
+    for (const [key, value] of Object.entries(corsHeaders)) {
+      responseHeaders.set(key, value)
+    }
+
+    // Stream the body directly to the client
+    return new Response(driveResponse.body, {
+      headers: responseHeaders,
+      status: 200,
+    })
 
   } catch (error) {
     console.error("Download error:", error)
     return new Response(
-      "<html><body style='font-family:sans-serif;text-align:center;padding:50px'><h1>Error</h1><p>An error occurred while processing your download.</p></body></html>",
+      `<html><body style='font-family:sans-serif;text-align:center;padding:50px'><h1>Download Failed</h1><p>${error.message}</p></body></html>`,
       {
         status: 500,
         headers: { "Content-Type": "text/html" },
@@ -129,3 +175,51 @@ serve(async (req) => {
     )
   }
 })
+
+// Helper to refresh Google token and save it to the database
+async function refreshGoogleToken(userId: string, refreshToken: string, supabaseAdmin: any): Promise<string> {
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID")
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")
+
+  if (!clientId || !clientSecret) {
+    throw new Error("Google OAuth credentials are not configured in system environment secrets.")
+  }
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    console.error("Failed to refresh Google token:", errText)
+    throw new Error("Failed to refresh Google access token. Please sign out and sign in again.")
+  }
+
+  const data = await res.json()
+  const newAccessToken = data.access_token
+
+  if (!newAccessToken) {
+    throw new Error("No access token returned in refresh response")
+  }
+
+  // Save the new access token to the database
+  const { error: updateError } = await supabaseAdmin
+    .from("user_profiles")
+    .update({ google_access_token: newAccessToken })
+    .eq("id", userId)
+
+  if (updateError) {
+    console.error("Failed to update new access token in database:", updateError)
+  }
+
+  return newAccessToken
+}
