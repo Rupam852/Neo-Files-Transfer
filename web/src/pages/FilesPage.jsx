@@ -93,7 +93,20 @@ export default function FilesPage({ onViewVersions }) {
       toast.error('This file type is not allowed')
       return
     }
-    if (!ALLOWED_TYPES.includes(file.type) && !file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+
+    const ALLOWED_EXTENSIONS = [
+      'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+      'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',
+      'mp4', 'mkv', 'mov', 'avi',
+      'zip', 'rar', 'tar', 'gz', '7z', 'apk', 'txt'
+    ]
+
+    const isAllowedType = ALLOWED_TYPES.includes(file.type) ||
+                          file.type.startsWith('image/') ||
+                          file.type.startsWith('video/') ||
+                          ALLOWED_EXTENSIONS.includes(ext)
+
+    if (!isAllowedType) {
       toast.error('Unsupported file type')
       return
     }
