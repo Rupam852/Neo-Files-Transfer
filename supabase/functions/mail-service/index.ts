@@ -457,6 +457,38 @@ serve(async (req) => {
           </div>
         `
       } else if (action === "suspended") {
+        // Delete the user from auth.users (triggers cascade deletion of user_profiles, shared_files, logs, etc.)
+        try {
+          const { data: profileRecord } = await supabase
+            .from("user_profiles")
+            .select("id")
+            .eq("email", targetEmail)
+            .maybeSingle()
+
+          let userIdToDelete = profileRecord?.id
+
+          if (!userIdToDelete) {
+            const { data: listResult, error: listErr } = await supabase.auth.admin.listUsers()
+            if (!listErr && listResult?.users) {
+              const matchedUser = listResult.users.find(u => u.email?.toLowerCase() === targetEmail)
+              if (matchedUser) {
+                userIdToDelete = matchedUser.id
+              }
+            }
+          }
+
+          if (userIdToDelete) {
+            const { error: deleteUserErr } = await supabase.auth.admin.deleteUser(userIdToDelete)
+            if (deleteUserErr) {
+              console.error(`Failed to delete auth user ${userIdToDelete}:`, deleteUserErr.message)
+            } else {
+              console.log(`Successfully deleted auth user ${userIdToDelete} from auth.users (cascaded profiles, shared files, activity logs)`)
+            }
+          }
+        } catch (delErr) {
+          console.error(`Error executing account delete-cascade for ${targetEmail}:`, delErr)
+        }
+
         subject = "Console Account Status - Neo Files Transfer"
         htmlBody = `
           <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #cbd5e1; border-radius: 8px;">
