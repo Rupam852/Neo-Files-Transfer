@@ -54,8 +54,12 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
     const selectedFile = e.target.files?.[0]
     if (!selectedFile) return
 
-    if (selectedFile.size > 100 * 1024 * 1024) {
-      toast.error('File size exceeds 100MB limit')
+    const proxyUrl = import.meta.env.VITE_PROXY_URL
+    const uploadLimit = proxyUrl ? 250 * 1024 * 1024 : 100 * 1024 * 1024
+    const limitLabel = proxyUrl ? '250MB' : '100MB'
+
+    if (selectedFile.size > uploadLimit) {
+      toast.error(`File size exceeds ${limitLabel} limit`)
       return
     }
 
@@ -70,23 +74,47 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
       const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
+      let res
 
-      const formData = new FormData()
-      formData.append('file', selectedFile)
-      formData.append('folder_id', profile.drive_folder_id)
-      formData.append('provider_token', googleToken)
-      if (file.google_drive_file_id) {
-        formData.append('old_file_id', file.google_drive_file_id)
-      }
-
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-version`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: formData,
+      if (proxyUrl) {
+        const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
+        const headers = {
+          'Authorization': `Bearer ${token}`,
+          'X-File-Name': encodeURIComponent(selectedFile.name),
+          'X-Folder-Id': profile.drive_folder_id,
+          'X-File-Size': selectedFile.size,
+          'X-File-Type': selectedFile.type || 'application/octet-stream'
         }
-      )
+        if (file.google_drive_file_id) {
+          headers['X-Old-File-Id'] = file.google_drive_file_id
+        }
+
+        res = await fetch(
+          `${cleanProxy}/upload-file`,
+          {
+            method: 'POST',
+            headers: headers,
+            body: selectedFile // Stream version raw body directly
+          }
+        )
+      } else {
+        const formData = new FormData()
+        formData.append('file', selectedFile)
+        formData.append('folder_id', profile.drive_folder_id)
+        formData.append('provider_token', googleToken)
+        if (file.google_drive_file_id) {
+          formData.append('old_file_id', file.google_drive_file_id)
+        }
+
+        res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-version`,
+          {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData,
+          }
+        )
+      }
 
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Upload failed')

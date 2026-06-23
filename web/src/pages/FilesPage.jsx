@@ -273,22 +273,42 @@ export default function FilesPage({ onViewVersions }) {
 
       try {
         const uniqueName = getUniqueFileName(file.name, files)
+        const proxyUrl = import.meta.env.VITE_PROXY_URL
+        let res
 
-        const formData = new FormData()
-        formData.append('file', file, uniqueName)
-        formData.append('folder_id', driveParentId)
-        formData.append('provider_token', googleToken)
+        if (proxyUrl) {
+          const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
+          res = await fetch(
+            `${cleanProxy}/upload-file`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-File-Name': encodeURIComponent(uniqueName),
+                'X-Folder-Id': driveParentId,
+                'X-File-Size': file.size,
+                'X-File-Type': file.type || 'application/octet-stream'
+              },
+              body: file // Upload the raw file binary stream directly
+            }
+          )
+        } else {
+          const formData = new FormData()
+          formData.append('file', file, uniqueName)
+          formData.append('folder_id', driveParentId)
+          formData.append('provider_token', googleToken)
 
-        const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-file`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-            body: formData,
-          }
-        )
+          res = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-file`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+              body: formData,
+            }
+          )
+        }
 
         const result = await res.json()
         if (!res.ok) throw new Error(result.error || 'Upload failed')
@@ -358,11 +378,12 @@ export default function FilesPage({ onViewVersions }) {
 
     let currentBatch = []
     let remainingQueue = []
-    let currentBatchSize = 0
+    const uploadLimit = import.meta.env.VITE_PROXY_URL ? 250 * 1024 * 1024 : 100 * 1024 * 1024
+    const limitLabel = import.meta.env.VITE_PROXY_URL ? '250MB' : '100MB'
 
     for (const file of validFiles) {
-      if (file.size > 100 * 1024 * 1024) {
-        toast.error(`File ${file.name} exceeds 100MB limit and was skipped.`)
+      if (file.size > uploadLimit) {
+        toast.error(`File ${file.name} exceeds ${limitLabel} limit and was skipped.`)
         continue
       }
 
@@ -372,7 +393,7 @@ export default function FilesPage({ onViewVersions }) {
         driveParentId: currentFolder ? currentFolder.google_drive_file_id : profile.drive_folder_id
       }
 
-      if (currentBatchSize + file.size <= 100 * 1024 * 1024) {
+      if (currentBatchSize + file.size <= uploadLimit) {
         currentBatch.push(item)
         currentBatchSize += file.size
       } else {
@@ -392,11 +413,12 @@ export default function FilesPage({ onViewVersions }) {
   async function handleUploadRemaining() {
     let currentBatch = []
     let remainingQueue = []
+    const uploadLimit = import.meta.env.VITE_PROXY_URL ? 250 * 1024 * 1024 : 100 * 1024 * 1024
     let currentBatchSize = 0
 
     for (const item of uploadQueue) {
       const file = item.fileObj ? item.fileObj : item
-      if (currentBatchSize + file.size <= 100 * 1024 * 1024) {
+      if (currentBatchSize + file.size <= uploadLimit) {
         currentBatch.push(item)
         currentBatchSize += file.size
       } else {
@@ -583,6 +605,8 @@ export default function FilesPage({ onViewVersions }) {
 
       let currentBatch = []
       let remainingQueue = []
+      const uploadLimit = import.meta.env.VITE_PROXY_URL ? 250 * 1024 * 1024 : 100 * 1024 * 1024
+      const limitLabel = import.meta.env.VITE_PROXY_URL ? '250MB' : '100MB'
       let currentBatchSize = 0
 
       for (const item of filesToUpload) {
@@ -590,12 +614,12 @@ export default function FilesPage({ onViewVersions }) {
           continue
         }
 
-        if (item.fileObj.size > 100 * 1024 * 1024) {
-          toast.error(`File ${item.fileObj.name} exceeds 100MB and was skipped.`)
+        if (item.fileObj.size > uploadLimit) {
+          toast.error(`File ${item.fileObj.name} exceeds ${limitLabel} and was skipped.`)
           continue
         }
 
-        if (currentBatchSize + item.fileObj.size <= 100 * 1024 * 1024) {
+        if (currentBatchSize + item.fileObj.size <= uploadLimit) {
           currentBatch.push(item)
           currentBatchSize += item.fileObj.size
         } else {
@@ -1407,7 +1431,7 @@ export default function FilesPage({ onViewVersions }) {
             </span>
           </div>
           <p className="text-xs text-gray-400 mb-3 leading-relaxed">
-            Some files were queued because the concurrent upload size exceeds the 100MB limit.
+            Some files were queued because the concurrent upload size exceeds the {import.meta.env.VITE_PROXY_URL ? '250MB' : '100MB'} limit.
           </p>
           <div className="flex gap-2">
             <button

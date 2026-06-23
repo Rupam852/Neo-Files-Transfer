@@ -251,6 +251,155 @@ app.get('/download-file', async (req, res) => {
   }
 })
 
+// Helper to authenticate user using Supabase JWT token
+async function getAuthenticatedUser(req, supabaseAdmin) {
+  const authHeader = req.headers.authorization || req.headers.Authorization
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new Error('Missing or invalid authorization header')
+  }
+  const token = authHeader.split(' ')[1]
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
+  if (error || !user) {
+    throw new Error('User authentication failed: ' + (error?.message || 'Invalid session'))
+  }
+  return user
+}
+
+// Streaming upload endpoint using Google Drive Resumable Upload API
+app.post('/upload-file', async (req, res) => {
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase environment variables are missing on the proxy server.')
+    }
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Authenticate user via Supabase JWT
+    const user = await getAuthenticatedUser(req, supabaseAdmin)
+
+    // Retrieve headers
+    const fileName = decodeURIComponent(req.headers['x-file-name'] || '')
+    const folderId = req.headers['x-folder-id']
+    const fileType = req.headers['x-file-type'] || 'application/octet-stream'
+    const fileSize = req.headers['x-file-size']
+    const oldFileId = req.headers['x-old-file-id'] // Optional: For version replacements
+
+    if (!fileName || !folderId) {
+      return res.status(400).json({ error: 'Missing x-file-name or x-folder-id headers.' })
+    }
+
+    // Get Owner's Google Tokens
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('google_access_token, google_refresh_token')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile) {
+      throw new Error('Failed to load user profile Google tokens.')
+    }
+
+    let accessToken = profile.google_access_token
+    const refreshToken = profile.google_refresh_token
+
+    if (!accessToken && refreshToken) {
+      accessToken = await refreshGoogleToken(user.id, refreshToken, supabaseAdmin)
+    } else if (!accessToken) {
+      throw new Error("Owner's Google authentication connection is missing.")
+    }
+
+    // Helper to start the Resumable session on Google Drive
+    const startResumableSession = async (token) => {
+      return await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json; charset=UTF-8',
+            'X-Upload-Content-Type': fileType
+          },
+          body: JSON.stringify({
+            name: fileName,
+            parents: [folderId]
+          })
+        }
+      )
+    }
+
+    let initiateResponse = await startResumableSession(accessToken)
+
+    // Handle token expiration / 401 status
+    if (initiateResponse.status === 401 && refreshToken) {
+      console.log('Google Drive upload initiate returned 401. Refreshing token...')
+      accessToken = await refreshGoogleToken(user.id, refreshToken, supabaseAdmin)
+      initiateResponse = await startResumableSession(accessToken)
+    }
+
+    if (!initiateResponse.ok) {
+      const errText = await initiateResponse.text()
+      throw new Error(`Failed to initiate Google Drive resumable session: ${errText}`)
+    }
+
+    const uploadUrl = initiateResponse.headers.get('Location')
+    if (!uploadUrl) {
+      throw new Error('Google Drive API did not return resumable upload Location header.')
+    }
+
+    // Pipe the incoming request stream directly to the Google Drive PUT session
+    const webStream = Readable.toWeb(req)
+
+    const uploadHeaders = {
+      'Content-Type': fileType
+    }
+    if (fileSize) {
+      uploadHeaders['Content-Length'] = fileSize
+    }
+
+    console.log(`Piping upload stream directly to Google Drive for: ${fileName}`)
+    const driveUploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: uploadHeaders,
+      body: webStream,
+      duplex: 'half' // Required for piping request body stream in Node fetch
+    })
+
+    if (!driveUploadResponse.ok) {
+      const errText = await driveUploadResponse.text()
+      throw new Error(`Google Drive PUT stream failed: ${errText}`)
+    }
+
+    const driveFile = await driveUploadResponse.json()
+
+    // Delete old file version from Google Drive if specified
+    if (oldFileId) {
+      console.log(`Deleting old file version from Google Drive: ${oldFileId}`)
+      try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${oldFileId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        })
+      } catch (delErr) {
+        console.error(`Failed to delete old file version ${oldFileId}:`, delErr)
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      file_id: driveFile.id,
+      file_name: driveFile.name,
+      mime_type: driveFile.mimeType
+    })
+
+  } catch (err) {
+    console.error('Upload Proxy Error:', err)
+    return res.status(400).json({ error: err.message || 'An unexpected upload error occurred.' })
+  }
+})
+
 // Helper function to refresh Google Access Token
 async function refreshGoogleToken(userId, refreshToken, supabaseAdmin) {
   const clientId = process.env.GOOGLE_CLIENT_ID
