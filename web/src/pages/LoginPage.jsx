@@ -37,7 +37,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#030712] text-gray-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 font-['Plus_Jakarta_Sans'] relative overflow-hidden">
+    <div className="min-h-screen w-full bg-[#030712] text-gray-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 font-['Plus_Jakarta_Sans'] relative overflow-hidden">
       {/* Import Premium Fonts */}
       <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 
@@ -91,7 +91,7 @@ export default function LoginPage() {
         </div>
 
         {/* Right Side: Interactive Login Interface */}
-        <div className="w-full md:w-1/2 p-8 sm:p-10 md:p-12 flex flex-col justify-between">
+        <div className="w-full md:w-1/2 p-6 sm:p-10 md:p-12 flex flex-col justify-between">
           
           {/* Logo fallback for mobile view */}
           <div className="flex md:hidden items-center justify-center gap-3 mb-8">

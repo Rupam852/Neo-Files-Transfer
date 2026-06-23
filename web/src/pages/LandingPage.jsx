@@ -203,7 +203,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#030712] text-gray-100 font-['Plus_Jakarta_Sans'] relative overflow-hidden selection:bg-indigo-500/30 selection:text-white">
+    <div className="min-h-screen w-full bg-[#030712] text-gray-100 font-['Plus_Jakarta_Sans'] relative overflow-hidden selection:bg-indigo-500/30 selection:text-white">
       {/* Import Premium Fonts */}
       <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 
@@ -248,7 +248,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero & Registration Section */}
-      <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-28 pb-24 lg:pt-36 lg:pb-32">
+      <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-28 pb-24 lg:pt-36 lg:pb-32 w-full">
         <div className="grid lg:grid-cols-12 gap-16 lg:gap-8 items-center">
           
           {/* Left Side: Headline & Copy */}
@@ -295,7 +295,7 @@ export default function LandingPage() {
               <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 rounded-2xl filter blur-2xl opacity-80 pointer-events-none animate-pulse-glow" />
 
               {/* Center Main Card: Sleek Developer Portal Form */}
-              <div className="relative bg-slate-950/85 backdrop-blur-3xl border border-slate-800 shadow-2xl p-8 rounded-2xl space-y-6 z-10">
+              <div className="relative bg-slate-950/85 backdrop-blur-3xl border border-slate-800 shadow-2xl p-6 sm:p-8 rounded-2xl space-y-6 z-10 w-full">
                 <div className="space-y-2 text-center lg:text-left">
                   <h3 className="text-2xl font-bold text-white font-['Space_Grotesk'] flex items-center justify-center lg:justify-start gap-2">
                     <UserCheck size={22} className="text-indigo-400 animate-pulse" />
