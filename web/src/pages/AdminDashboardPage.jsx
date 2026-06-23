@@ -11,7 +11,7 @@ import {
 import { formatDate } from '../utils/helpers'
 
 export default function AdminDashboardPage() {
-  const { profile, signOut } = useAuth()
+  const { profile, adminRecord, signOut } = useAuth()
   const navigate = useNavigate()
   const [pendingUsers, setPendingUsers] = useState([])
   const [approvedUsers, setApprovedUsers] = useState([])
@@ -20,6 +20,8 @@ export default function AdminDashboardPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [systemSettings, setSystemSettings] = useState({})
+  const [newAdminEmail, setNewAdminEmail] = useState('')
+  const [addingAdmin, setAddingAdmin] = useState(false)
 
   useEffect(() => {
     fetchData(true)
@@ -233,6 +235,107 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function handleAddAdmin(e) {
+    e.preventDefault()
+    if (!newAdminEmail.trim()) return
+
+    const emailToPromote = newAdminEmail.trim().toLowerCase()
+
+    if (adminRecord?.role !== 'super_admin') {
+      toast.error('Only the Super Administrator can add other administrators.')
+      return
+    }
+
+    setAddingAdmin(true)
+    try {
+      // 1. Find user in user_profiles
+      const { data: userProfile, error: profileErr } = await supabase
+        .from('user_profiles')
+        .select('id, email')
+        .eq('email', emailToPromote)
+        .maybeSingle()
+
+      if (profileErr) throw profileErr
+
+      if (!userProfile) {
+        toast.error('User must sign up and log in once before being promoted to admin.')
+        setAddingAdmin(false)
+        return
+      }
+
+      // 2. Check if already an admin
+      const isAlreadyAdmin = adminsList.some(a => a.email.toLowerCase() === emailToPromote)
+      if (isAlreadyAdmin) {
+        toast.error('This user is already an administrator.')
+        setAddingAdmin(false)
+        return
+      }
+
+      // 3. Insert into admins table
+      const { error: insertErr } = await supabase
+        .from('admins')
+        .insert({
+          user_id: userProfile.id,
+          email: userProfile.email,
+          role: 'admin',
+        })
+
+      if (insertErr) throw insertErr
+
+      // 4. Log admin activity
+      await supabase.from('admin_activity_logs').insert({
+        admin_id: profile?.id,
+        action: 'admin_added',
+        details: `Promoted user ${emailToPromote} to admin`,
+      })
+
+      toast.success(`${emailToPromote} has been promoted to Admin`)
+      setNewAdminEmail('')
+      fetchData()
+    } catch (err) {
+      console.error(err)
+      toast.error(`Failed to add admin: ${err.message || JSON.stringify(err)}`)
+    } finally {
+      setAddingAdmin(false)
+    }
+  }
+
+  async function handleDeleteAdmin(admin) {
+    if (adminRecord?.role !== 'super_admin') {
+      toast.error('Only the Super Administrator can remove administrators.')
+      return
+    }
+
+    if (admin.email.toLowerCase() === profile?.email?.toLowerCase()) {
+      toast.error('You cannot remove yourself as an administrator.')
+      return
+    }
+
+    if (!confirm(`Are you sure you want to remove administrator access for ${admin.email}?`)) return
+
+    try {
+      const { error: deleteErr } = await supabase
+        .from('admins')
+        .delete()
+        .eq('id', admin.id)
+
+      if (deleteErr) throw deleteErr
+
+      // Log admin activity
+      await supabase.from('admin_activity_logs').insert({
+        admin_id: profile?.id,
+        action: 'admin_removed',
+        details: `Removed admin: ${admin.email}`,
+      })
+
+      toast.success(`Removed administrator access for ${admin.email}`)
+      fetchData()
+    } catch (err) {
+      console.error(err)
+      toast.error(`Failed to remove admin: ${err.message || JSON.stringify(err)}`)
+    }
+  }
+
   async function toggleSetting(key) {
     const newVal = !systemSettings[key]
     try {
@@ -332,6 +435,15 @@ export default function AdminDashboardPage() {
             Approved ({approvedCount})
           </button>
           <button
+            onClick={() => setActiveTab('admins')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'admins' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
+            }`}
+          >
+            <ShieldCheck size={16} className="inline mr-1" />
+            Admins ({adminsList.length})
+          </button>
+          <button
             onClick={() => setActiveTab('settings')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === 'settings' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
@@ -343,7 +455,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Search */}
-        {activeTab !== 'settings' && (
+        {activeTab !== 'settings' && activeTab !== 'admins' && (
           <div className="mb-4">
             <div className="relative max-w-md">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -502,6 +614,105 @@ export default function AdminDashboardPage() {
                       )}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+
+            {/* Admins Tab */}
+            {activeTab === 'admins' && (
+              <div className="space-y-6">
+                {/* Add Admin Form (visible only to super_admin) */}
+                {adminRecord?.role === 'super_admin' ? (
+                  <div className="card max-w-lg">
+                    <h3 className="font-semibold text-gray-100 flex items-center gap-2 mb-4">
+                      <ShieldCheck size={18} className="text-primary-400" /> Promote User to Admin
+                    </h3>
+                    <form onSubmit={handleAddAdmin} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
+                          User Email Address
+                        </label>
+                        <input
+                          type="email"
+                          placeholder="user@example.com"
+                          className="input-field"
+                          value={newAdminEmail}
+                          onChange={e => setNewAdminEmail(e.target.value)}
+                          required
+                          disabled={addingAdmin}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          The user must have logged into the system at least once before they can be promoted.
+                        </p>
+                      </div>
+                      <button
+                        type="submit"
+                        className="btn-primary flex items-center justify-center gap-2 w-full"
+                        disabled={addingAdmin}
+                      >
+                        {addingAdmin ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : 'Promote to Admin'}
+                      </button>
+                    </form>
+                  </div>
+                ) : (
+                  <div className="card max-w-lg bg-dark-600/50 border border-amber-900/30">
+                    <p className="text-sm text-amber-400 flex items-center gap-2">
+                      <ShieldCheck size={16} /> Only the Super Administrator can add or remove other administrators.
+                    </p>
+                  </div>
+                )}
+
+                {/* Admins List */}
+                <div className="bg-dark-600 rounded-xl border border-dark-300 overflow-hidden">
+                  <div className="px-4 py-3 bg-dark-500 border-b border-dark-300 flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-100">Administrators List</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-dark-500 border-b border-dark-300">
+                          <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Email</th>
+                          <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Role</th>
+                          <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Added At</th>
+                          {adminRecord?.role === 'super_admin' && (
+                            <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3">Actions</th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-dark-400">
+                        {adminsList.map(admin => (
+                          <tr key={admin.id} className="hover:bg-dark-500">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-100">{admin.email}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                admin.role === 'super_admin' ? 'bg-purple-900/30 text-purple-400' : 'bg-primary-900/30 text-primary-400'
+                              }`}>
+                                {admin.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-400">{formatDate(admin.created_at)}</td>
+                            {adminRecord?.role === 'super_admin' && (
+                              <td className="px-4 py-3 text-sm">
+                                {admin.email.toLowerCase() !== profile?.email?.toLowerCase() && admin.role !== 'super_admin' ? (
+                                  <button
+                                    onClick={() => handleDeleteAdmin(admin)}
+                                    className="p-1.5 text-red-400 hover:bg-dark-500 rounded-lg transition-colors"
+                                    title="Revoke Admin Access"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                ) : (
+                                  <span className="text-xs text-gray-500 italic">No actions available</span>
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}

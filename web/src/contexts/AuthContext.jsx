@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [adminRecord, setAdminRecord] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export function AuthProvider({ children }) {
         } else {
           setProfile(null)
           setIsAdmin(false)
+          setAdminRecord(null)
           setLoading(false)
         }
       }
@@ -79,6 +81,7 @@ export function AuthProvider({ children }) {
 
       const isUserAdmin = !!adminData
       setIsAdmin(isUserAdmin)
+      setAdminRecord(adminData)
 
       // If the user is not an admin, check if their email is in the approved_users list
       if (!isUserAdmin) {
@@ -120,6 +123,7 @@ export function AuthProvider({ children }) {
     setUser(null)
     setProfile(null)
     setIsAdmin(false)
+    setAdminRecord(null)
   }
 
   async function refreshProfile() {
@@ -133,6 +137,7 @@ export function AuthProvider({ children }) {
       user,
       profile,
       isAdmin,
+      adminRecord,
       loading,
       signInWithGoogle,
       signOut,
