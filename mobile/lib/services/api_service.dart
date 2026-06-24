@@ -68,7 +68,7 @@ class ApiService {
     if (tokenVal == null) throw Exception('No active session.');
 
     final response = await _dio.post(
-      '${AppConfig.supabaseUrl}/functions/v1/verify-folder',
+      '${AppConfig.supabaseUrl}/functions/v1/validate-folder',
       data: {
         'folder_id': folderId,
       },
@@ -81,7 +81,7 @@ class ApiService {
     );
 
     if (response.statusCode == 200) {
-      return response.data['verified'] == true;
+      return response.data['success'] == true;
     } else {
       throw Exception(response.data['error'] ?? 'Failed to verify folder.');
     }
