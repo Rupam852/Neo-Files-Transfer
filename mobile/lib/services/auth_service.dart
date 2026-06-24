@@ -266,6 +266,7 @@ class AuthService extends ChangeNotifier {
         'access_type': 'offline',
         if (forceConsent) 'prompt': 'consent',
       },
+      authScreenLaunchMode: LaunchMode.inAppWebView,
     );
   }
 
