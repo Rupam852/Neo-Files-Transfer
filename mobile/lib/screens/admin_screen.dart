@@ -85,7 +85,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'system_settings',
-          callback: (payload) => _loadAdminData(showSpinner: false),
+          callback: (payload) => _loadSettingsData(),
         );
     _settingsChannel?.subscribe();
 
@@ -221,6 +221,23 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       if (showSpinner) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _loadSettingsData() async {
+    try {
+      final settingsRes = await _client.from('system_settings').select();
+      final Map<String, bool> settingsMap = {};
+      for (final s in settingsRes) {
+        settingsMap[s['key'] as String] = s['value'] == true;
+      }
+      if (mounted) {
+        setState(() {
+          _settings = settingsMap;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load system settings: $e');
     }
   }
 
@@ -378,7 +395,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           ),
         );
       }
-      await _loadAdminData(showSpinner: false);
+      await _loadSettingsData();
     } catch (e) {
       // Revert on failure
       setState(() {

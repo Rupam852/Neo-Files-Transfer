@@ -90,8 +90,15 @@ export default function AdminDashboardPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'system_settings' },
-        () => {
-          fetchData(false)
+        async () => {
+          try {
+            const { data } = await supabase.from('system_settings').select('*')
+            const settings = {}
+            data?.forEach(s => { settings[s.key] = s.value })
+            setSystemSettings(settings)
+          } catch (e) {
+            console.error('Failed to sync settings:', e)
+          }
         }
       )
       .subscribe()
