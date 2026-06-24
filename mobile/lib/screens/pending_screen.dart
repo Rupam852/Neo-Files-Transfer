@@ -148,8 +148,11 @@ class PendingScreen extends StatelessWidget {
                                   Navigator.pop(context); // Close dialog
                                   authService.signOut();
                                 },
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                                child: const Text('Logout'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.redAccent,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
                               ),
                             ],
                           ),

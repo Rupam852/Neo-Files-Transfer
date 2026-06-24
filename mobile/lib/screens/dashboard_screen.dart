@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 import 'package:intl/intl.dart';
 import '../models/shared_file.dart';
@@ -548,8 +550,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo.shade600),
-            child: const Text('Create'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.indigo.shade600,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Create', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -597,8 +602,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo.shade600),
-            child: const Text('Rename'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.indigo.shade600,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Rename', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -867,8 +875,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       final dio = Dio();
-      final appDir = await getTemporaryDirectory();
-      final savePath = '${appDir.path}/${file.fileName}';
+      
+      // Request storage permission on Android (specifically for SDK < 33)
+      if (Platform.isAndroid) {
+        final deviceInfo = DeviceInfoPlugin();
+        final androidInfo = await deviceInfo.androidInfo;
+        final sdkInt = androidInfo.version.sdkInt;
+
+        if (sdkInt < 33) {
+          final status = await Permission.storage.request();
+          if (!status.isGranted) {
+            throw Exception('Storage permission is required to save downloads.');
+          }
+        }
+      }
+
+      Directory? downloadsDir;
+      if (Platform.isAndroid) {
+        downloadsDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadsDir.exists()) {
+          downloadsDir = await getDownloadsDirectory();
+        }
+      } else {
+        downloadsDir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      }
+
+      if (downloadsDir == null) {
+        throw Exception('Could not resolve downloads directory.');
+      }
+
+      // Check if downloads directory exists, if not create it
+      if (!await downloadsDir.exists()) {
+        await downloadsDir.create(recursive: true);
+      }
+
+      final savePath = '${downloadsDir.path}/${file.fileName}';
 
       final tokenVal = Supabase.instance.client.auth.currentSession?.accessToken;
       if (tokenVal == null) {
@@ -965,8 +1006,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text('Delete'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
