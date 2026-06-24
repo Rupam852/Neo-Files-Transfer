@@ -975,14 +975,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       _refreshFiles();
 
-      // Open the downloaded file natively
-      final result = await OpenFilex.open(savePath);
-      if (result.type != ResultType.done) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('File saved to cache. Could not open: ${result.message}')),
-          );
-        }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${file.fileName} downloaded successfully to Downloads folder.'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
       }
     } catch (e) {
       setState(() {
