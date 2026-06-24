@@ -207,13 +207,13 @@ export default function LandingPage() {
       {/* Import Premium Fonts */}
       <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 
-      {/* Futuristic Background Mesh Gradients */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 blur-[130px] pointer-events-none md:animate-float opacity-80" />
-      <div className="absolute bottom-0 right-0 translate-x-1/4 translate-y-1/4 w-[50%] h-[50%] rounded-full bg-purple-600/10 blur-[150px] pointer-events-none md:animate-float-delayed opacity-75" />
-      <div className="absolute top-[30%] left-[40%] w-[300px] h-[300px] rounded-full bg-cyan-500/5 blur-[100px] pointer-events-none md:animate-float opacity-50" />
-
-      {/* Subtle Grid Overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)] bg-[size:30px_30px] pointer-events-none" />
+      {/* Futuristic Background Mesh Gradients & Grid */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 blur-[130px] md:animate-float opacity-80" />
+        <div className="absolute bottom-0 right-0 translate-x-1/4 w-[50%] h-[400px] rounded-full bg-purple-600/10 blur-[150px] md:animate-float-delayed opacity-75" />
+        <div className="absolute top-[30%] left-[40%] w-[300px] h-[300px] rounded-full bg-cyan-500/5 blur-[100px] md:animate-float opacity-50" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)] bg-[size:30px_30px]" />
+      </div>
 
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-[#030712]/70 backdrop-blur-md shadow-lg shadow-black/20">
