@@ -9,7 +9,15 @@ export function AuthProvider({ children }) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminRecord, setAdminRecord] = useState(null)
   const [isPaused, setIsPaused] = useState(false)
+  const [isSessionInvalidated, setIsSessionInvalidated] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const generateSessionId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  }
 
   useEffect(() => {
     // Check active session
@@ -54,6 +62,7 @@ export function AuthProvider({ children }) {
           setProfile(null)
           setIsAdmin(false)
           setAdminRecord(null)
+          setIsSessionInvalidated(false)
           setLoading(false)
         }
       }
@@ -111,9 +120,34 @@ export function AuthProvider({ children }) {
       )
       .subscribe()
 
+    // Subscribe to realtime updates for the current user's entry in the user_profiles table
+    const profileChannel = supabase
+      .channel(`profile-status-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        async (payload) => {
+          console.log('Realtime profile status change:', payload)
+          if (payload.new) {
+            const newWebSession = payload.new.active_web_session_id
+            const localSession = localStorage.getItem('active_web_session_id')
+            if (newWebSession && localSession && newWebSession !== localSession) {
+              setIsSessionInvalidated(true)
+            }
+          }
+        }
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(adminChannel)
       supabase.removeChannel(approvedChannel)
+      supabase.removeChannel(profileChannel)
     }
   }, [user])
 
@@ -173,6 +207,31 @@ export function AuthProvider({ children }) {
         }
       }
 
+      // Establish & Validate active Web Session
+      let localSessionId = localStorage.getItem('active_web_session_id')
+      if (!localSessionId) {
+        localSessionId = generateSessionId()
+        localStorage.setItem('active_web_session_id', localSessionId)
+      }
+
+      const claimActiveSession = sessionStorage.getItem('claim_active_session') === 'true'
+      if (claimActiveSession || !profileData.active_web_session_id) {
+        // Claim active session
+        await supabase
+          .from('user_profiles')
+          .update({ active_web_session_id: localSessionId })
+          .eq('id', authUser.id)
+        
+        sessionStorage.removeItem('claim_active_session')
+        profileData.active_web_session_id = localSessionId
+        setIsSessionInvalidated(false)
+      } else if (profileData.active_web_session_id !== localSessionId) {
+        // Logged out because another session is active
+        setIsSessionInvalidated(true)
+        setLoading(false)
+        return
+      }
+
       setProfile(profileData)
 
       // Check if user is admin
@@ -201,6 +260,7 @@ export function AuthProvider({ children }) {
           setProfile(null)
           setIsAdmin(false)
           setIsPaused(false)
+          setIsSessionInvalidated(false)
           return
         }
         setIsPaused(approvedData.is_paused || false)
@@ -236,6 +296,10 @@ export function AuthProvider({ children }) {
     setIsAdmin(false)
     setAdminRecord(null)
     setIsPaused(false)
+    setIsSessionInvalidated(false)
+    try {
+      localStorage.removeItem('active_web_session_id')
+    } catch (e) {}
   }
 
   async function refreshProfile() {
@@ -251,6 +315,7 @@ export function AuthProvider({ children }) {
       isAdmin,
       adminRecord,
       isPaused,
+      isSessionInvalidated,
       loading,
       signInWithGoogle,
       signOut,

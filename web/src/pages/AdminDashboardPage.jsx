@@ -119,15 +119,24 @@ export default function AdminDashboardPage() {
   async function fetchData(showSpinner = false) {
     if (showSpinner) setLoading(true)
     try {
-      const [pendingRes, approvedRes, settingsRes, adminsRes] = await Promise.all([
+      const [pendingRes, approvedRes, settingsRes, adminsRes, profilesRes] = await Promise.all([
         supabase.from('pending_registrations').select('*').order('submitted_at', { ascending: false }),
         supabase.from('approved_users').select('*').order('approved_at', { ascending: false }),
         supabase.from('system_settings').select('*'),
         supabase.from('admins').select('*'),
+        supabase.from('user_profiles').select('id, avatar_url'),
       ])
       setPendingUsers(pendingRes.data || [])
       setApprovedUsers(approvedRes.data || [])
-      setAdminsList(adminsRes.data || [])
+      
+      const profiles = profilesRes.data || []
+      const profileMap = new Map(profiles.map(p => [p.id, p.avatar_url]))
+      const adminsWithAvatars = (adminsRes.data || []).map(admin => ({
+        ...admin,
+        avatar_url: profileMap.get(admin.user_id) || ''
+      }))
+      setAdminsList(adminsWithAvatars)
+
       const settings = {}
       settingsRes.data?.forEach(s => { settings[s.key] = s.value })
       setSystemSettings(settings)
@@ -468,6 +477,13 @@ export default function AdminDashboardPage() {
           <span className="font-semibold text-gray-100">Admin Dashboard</span>
         </div>
         <div className="flex items-center gap-3">
+          {profile?.avatar_url && (
+            <img
+              src={profile.avatar_url}
+              alt="Avatar"
+              className="w-8 h-8 rounded-full border border-dark-300 object-cover"
+            />
+          )}
           <span className="text-sm text-gray-400 hidden sm:block">{profile?.email}</span>
           <button
             onClick={handleSignOut}
@@ -782,7 +798,20 @@ export default function AdminDashboardPage() {
                       <tbody className="divide-y divide-dark-400">
                         {adminsList.map(admin => (
                           <tr key={admin.id} className="hover:bg-dark-500">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-100 truncate max-w-[150px] sm:max-w-xs">{admin.email}</td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-100 flex items-center gap-2 truncate max-w-[150px] sm:max-w-xs">
+                              {admin.avatar_url ? (
+                                <img
+                                  src={admin.avatar_url}
+                                  alt="Avatar"
+                                  className="w-6 h-6 rounded-full border border-dark-300 object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-6 h-6 bg-primary-600/25 border border-primary-500/20 text-primary-400 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                                  A
+                                </div>
+                              )}
+                              <span>{admin.email}</span>
+                            </td>
                             <td className="px-4 py-3 text-sm">
                               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                 admin.role === 'super_admin' ? 'bg-purple-900/30 text-purple-400' : 'bg-primary-900/30 text-primary-400'

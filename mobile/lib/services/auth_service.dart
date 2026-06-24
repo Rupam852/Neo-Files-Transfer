@@ -9,13 +9,16 @@ class AuthService extends ChangeNotifier {
   UserProfile? _profile;
   bool _isAdmin = false;
   bool _isPaused = false;
+  bool _isSessionInvalidated = false;
   bool _isLoading = true;
   String? _loginError;
+  String? _localMobileSessionId;
 
   User? get currentUser => _user;
   UserProfile? get profile => _profile;
   bool get isAdmin => _isAdmin;
   bool get isPaused => _isPaused;
+  bool get isSessionInvalidated => _isSessionInvalidated;
   bool get isLoading => _isLoading;
   String? get loginError => _loginError;
 
@@ -58,6 +61,20 @@ class AuthService extends ChangeNotifier {
 
   RealtimeChannel? _adminChannel;
   RealtimeChannel? _approvedChannel;
+  RealtimeChannel? _profileChannel;
+
+  Future<String> _getOrCreateLocalMobileSessionId() async {
+    if (_localMobileSessionId != null) return _localMobileSessionId!;
+    final prefs = await SharedPreferences.getInstance();
+    var sessionId = prefs.getString('active_mobile_session_id');
+    if (sessionId == null) {
+      sessionId = DateTime.now().millisecondsSinceEpoch.toString() + '_' + 
+                  UniqueKey().hashCode.toString();
+      await prefs.setString('active_mobile_session_id', sessionId);
+    }
+    _localMobileSessionId = sessionId;
+    return sessionId;
+  }
 
   void _setupRealtimeListeners() {
     _clearRealtimeListeners();
@@ -105,6 +122,28 @@ class AuthService extends ChangeNotifier {
               }
             });
     _approvedChannel?.subscribe();
+
+    _profileChannel = _client
+        .channel('profile-status-${_user!.id}')
+        .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'user_profiles',
+            callback: (payload) async {
+              if (_user == null) return;
+              final Map<String, dynamic>? newRecord = payload.newRecord;
+              if (newRecord != null) {
+                final newMobileSession = newRecord['active_mobile_session_id'] as String?;
+                final localSession = _localMobileSessionId;
+                if (newMobileSession != null &&
+                    localSession != null &&
+                    newMobileSession != localSession) {
+                  _isSessionInvalidated = true;
+                  notifyListeners();
+                }
+              }
+            });
+    _profileChannel?.subscribe();
   }
 
   void _clearRealtimeListeners() {
@@ -115,6 +154,10 @@ class AuthService extends ChangeNotifier {
     if (_approvedChannel != null) {
       _client.removeChannel(_approvedChannel!);
       _approvedChannel = null;
+    }
+    if (_profileChannel != null) {
+      _client.removeChannel(_profileChannel!);
+      _profileChannel = null;
     }
   }
 
@@ -186,6 +229,26 @@ class AuthService extends ChangeNotifier {
       }
 
       _profile = profileData;
+
+      if (profileData != null) {
+        final localSessionId = await _getOrCreateLocalMobileSessionId();
+        final dbMobileSessionId = response?['active_mobile_session_id'] as String?;
+
+        final bool isFreshSignIn = sessionTokens != null;
+
+        if (isFreshSignIn || dbMobileSessionId == null) {
+          await _client
+              .from('user_profiles')
+              .update({'active_mobile_session_id': localSessionId})
+              .eq('id', authUser.id);
+          _isSessionInvalidated = false;
+        } else if (dbMobileSessionId != localSessionId) {
+          _isSessionInvalidated = true;
+          _isLoading = false;
+          notifyListeners();
+          return;
+        }
+      }
 
       // Check if user is Admin
       final adminResponse = await _client
@@ -280,6 +343,7 @@ class AuthService extends ChangeNotifier {
     _profile = null;
     _isAdmin = false;
     _isPaused = false;
+    _isSessionInvalidated = false;
     _isLoading = false;
     if (clearError) {
       _loginError = null;

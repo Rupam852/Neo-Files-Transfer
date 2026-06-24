@@ -96,6 +96,8 @@ export default function FilesPage({ onViewVersions }) {
   const lastSelectedIdx = useRef(null)
   const activeXhrRef = useRef(null)
   const isCancelledRef = useRef(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const dragCounterRef = useRef(0)
 
   function handleCancelUpload() {
     isCancelledRef.current = true
@@ -491,10 +493,7 @@ export default function FilesPage({ onViewVersions }) {
     loadFiles()
   }
 
-  async function handleUpload(e) {
-    const filesSelected = Array.from(e.target.files)
-    if (filesSelected.length === 0) return
-
+  async function processFiles(filesSelected) {
     if (!profile?.drive_folder_id) {
       toast.error('Please configure your Google Drive folder in Settings first')
       return
@@ -540,8 +539,49 @@ export default function FilesPage({ onViewVersions }) {
     if (currentBatch.length > 0) {
       await uploadBatch(currentBatch)
     }
+  }
 
+  async function handleUpload(e) {
+    const filesSelected = Array.from(e.target.files)
+    if (filesSelected.length === 0) return
+    await processFiles(filesSelected)
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function handleDragEnter(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current++
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true)
+    }
+  }
+
+  function handleDragLeave(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current--
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false)
+    }
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  async function handleDrop(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    dragCounterRef.current = 0
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const filesSelected = Array.from(e.dataTransfer.files)
+      await processFiles(filesSelected)
+      e.dataTransfer.clearData()
+    }
   }
 
   async function handleUploadRemaining() {
@@ -936,7 +976,26 @@ export default function FilesPage({ onViewVersions }) {
   }
 
   return (
-    <div className="space-y-4 flex flex-col min-h-[calc(100vh-150px)] lg:min-h-[calc(100vh-180px)]">
+    <div
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className="space-y-4 flex flex-col min-h-[calc(100vh-150px)] lg:min-h-[calc(100vh-180px)] relative"
+    >
+      {isDragging && (
+        <div className="absolute inset-0 bg-[#030712]/80 backdrop-blur-md border-2 border-dashed border-primary-500/50 rounded-3xl z-50 flex flex-col items-center justify-center pointer-events-none transition-all duration-300">
+          <div className="p-6 bg-primary-500/10 border border-primary-500/25 rounded-2xl flex items-center justify-center text-primary-400 mb-4 animate-bounce">
+            <Upload size={48} />
+          </div>
+          <h3 className="text-xl font-bold text-white font-['Space_Grotesk'] mb-1">
+            Drag and Drop your Files Here
+          </h3>
+          <p className="text-slate-400 text-sm">
+            Release to upload them directly to your folder
+          </p>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         {/* Title / Breadcrumb navigation */}

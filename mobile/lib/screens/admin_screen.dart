@@ -30,6 +30,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   String _searchQuery = '';
   bool _isLoading = false;
   bool _isAddingAdmin = false;
+  bool _isDeletingLogs = false;
 
   // Realtime channels
   RealtimeChannel? _pendingChannel;
@@ -130,6 +131,28 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       final List<Map<String, dynamic>> adminsList = List<Map<String, dynamic>>.from(adminsRes as List);
       final Set<String> adminEmails = Set<String>.from(adminsList.map((a) => (a['email'] as String).toLowerCase()));
 
+      // Fetch user profiles for admins to get avatar_url
+      final adminUserIds = adminsList.map((a) => a['user_id'] as String).toSet().toList();
+      Map<String, String> adminAvatarsMap = {};
+      if (adminUserIds.isNotEmpty) {
+        final profilesRes = await _client
+            .from('user_profiles')
+            .select('id, avatar_url')
+            .inFilter('id', adminUserIds);
+        for (final p in (profilesRes as List)) {
+          adminAvatarsMap[p['id'] as String] = (p['avatar_url'] ?? '') as String;
+        }
+      }
+
+      // Merge avatar_url into admins list
+      final List<Map<String, dynamic>> mergedAdminsList = adminsList.map((a) {
+        final userId = a['user_id'] as String;
+        return {
+          ...a,
+          'avatar_url': adminAvatarsMap[userId] ?? '',
+        };
+      }).toList();
+
       // 3. Fetch pending registrations (filtering out admins)
       final regRes = await _client
           .from('pending_registrations')
@@ -188,7 +211,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       setState(() {
         _registrations = filteredPending;
         _approvedUsers = filteredApproved;
-        _admins = adminsList;
+        _admins = mergedAdminsList;
         _settings = settingsMap;
         _logs = mergedLogs;
       });
@@ -501,6 +524,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   }
 
   Widget? _buildDrawer() {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final profile = auth.profile;
     final currentUser = _client.auth.currentUser;
     final email = currentUser?.email ?? '';
     final role = _currentAdminRecord?['role'] ?? 'admin';
@@ -519,15 +544,15 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.indigoAccent.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.indigoAccent.withOpacity(0.2)),
-                    ),
-                    child: const Icon(LucideIcons.shield, color: Colors.indigoAccent, size: 24),
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Colors.indigoAccent.withOpacity(0.1),
+                    backgroundImage: profile?.avatarUrl != null && profile!.avatarUrl!.isNotEmpty
+                        ? NetworkImage(profile.avatarUrl!)
+                        : null,
+                    child: profile?.avatarUrl == null || profile!.avatarUrl!.isEmpty
+                        ? const Icon(LucideIcons.shield, color: Colors.indigoAccent, size: 24)
+                        : null,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -732,11 +757,10 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                           ),
                           Row(
                             children: [
-                              if (_logs.isNotEmpty)
+                              if (_logs.isNotEmpty && !_isDeletingLogs)
                                 TextButton.icon(
                                   onPressed: () async {
-                                    await _showClearLogsConfirmDialog();
-                                    setBottomSheetState(() {});
+                                    await _showClearLogsConfirmDialog(setBottomSheetState);
                                   },
                                   icon: const Icon(LucideIcons.trash2, size: 14, color: Colors.redAccent),
                                   label: const Text(
@@ -755,64 +779,68 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                     ),
                     const Divider(color: Colors.white10, height: 1),
                     Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: () async {
-                          await _loadAdminData(showSpinner: false);
-                          setBottomSheetState(() {});
-                        },
-                        color: Colors.indigoAccent,
-                        backgroundColor: const Color(0xFF0F172A),
-                        child: _logs.isEmpty
-                            ? _buildEmptyState('No logs found.')
-                            : ListView.builder(
-                                controller: scrollController,
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
-                                itemCount: _logs.length,
-                                itemBuilder: (context, index) {
-                                  final log = _logs[index];
-                                  final profile = log['user_profiles'];
-                                  final action = log['action'];
-                                  final details = log['details'] ?? '';
-                                  final date = DateFormat('MMM dd, hh:mm a').format(DateTime.parse(log['created_at']));
+                      child: _isDeletingLogs
+                          ? const Center(
+                              child: CircularProgressIndicator(color: Colors.indigoAccent),
+                            )
+                          : RefreshIndicator(
+                              onRefresh: () async {
+                                await _loadAdminData(showSpinner: false);
+                                setBottomSheetState(() {});
+                              },
+                              color: Colors.indigoAccent,
+                              backgroundColor: const Color(0xFF0F172A),
+                              child: _logs.isEmpty
+                                  ? _buildEmptyState('No logs found.', scrollController)
+                                  : ListView.builder(
+                                      controller: scrollController,
+                                      physics: const AlwaysScrollableScrollPhysics(),
+                                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+                                      itemCount: _logs.length,
+                                      itemBuilder: (context, index) {
+                                        final log = _logs[index];
+                                        final profile = log['user_profiles'];
+                                        final action = log['action'];
+                                        final details = log['details'] ?? '';
+                                        final date = DateFormat('MMM dd, hh:mm a').format(DateTime.parse(log['created_at']));
 
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 12.0),
-                                    padding: const EdgeInsets.all(12.0),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF030712).withOpacity(0.3),
-                                      borderRadius: BorderRadius.circular(12.0),
-                                      border: Border.all(color: Colors.white.withOpacity(0.02)),
+                                        return Container(
+                                          margin: const EdgeInsets.only(bottom: 12.0),
+                                          padding: const EdgeInsets.all(12.0),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF030712).withOpacity(0.3),
+                                            borderRadius: BorderRadius.circular(12.0),
+                                            border: Border.all(color: Colors.white.withOpacity(0.02)),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Text(
+                                                    action.toString().toUpperCase(),
+                                                    style: const TextStyle(color: Colors.indigoAccent, fontWeight: FontWeight.bold, fontSize: 10.5),
+                                                  ),
+                                                  Text(date, style: const TextStyle(color: Colors.white30, fontSize: 10)),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                details,
+                                                style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'By: ${profile?['name'] ?? profile?['email'] ?? 'System'}',
+                                                style: const TextStyle(color: Colors.white30, fontSize: 10.5),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
                                     ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              action.toString().toUpperCase(),
-                                              style: const TextStyle(color: Colors.indigoAccent, fontWeight: FontWeight.bold, fontSize: 10.5),
-                                            ),
-                                            Text(date, style: const TextStyle(color: Colors.white30, fontSize: 10)),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          details,
-                                          style: const TextStyle(color: Colors.white70, fontSize: 12.5),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'By: ${profile?['name'] ?? profile?['email'] ?? 'System'}',
-                                          style: const TextStyle(color: Colors.white30, fontSize: 10.5),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
+                            ),
                     ),
                   ],
                 );
@@ -1222,6 +1250,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               final email = admin['email'] as String;
               final role = admin['role'] ?? 'admin';
               final isSelf = email.toLowerCase() == _client.auth.currentUser?.email?.toLowerCase();
+              final avatarUrl = admin['avatar_url'] as String?;
+              final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+              final String initials = email.isNotEmpty ? email[0].toUpperCase() : 'A';
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 12.0),
@@ -1233,6 +1264,22 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                 ),
                 child: Row(
                   children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Colors.indigoAccent.withOpacity(0.1),
+                      backgroundImage: hasAvatar ? NetworkImage(avatarUrl) : null,
+                      child: !hasAvatar
+                          ? Text(
+                              initials,
+                              style: const TextStyle(
+                                color: Colors.indigoAccent,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1320,7 +1367,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     );
   }
 
-  Future<void> _showClearLogsConfirmDialog() async {
+  Future<void> _showClearLogsConfirmDialog(StateSetter setBottomSheetState) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1350,9 +1397,12 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
 
     if (confirm == true) {
       try {
-        setState(() => _isLoading = true);
+        setState(() {
+          _isDeletingLogs = true;
+        });
+        setBottomSheetState(() {}); // Show loader in bottom sheet!
         
-        await _client.from('activity_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await _client.from('activity_logs').delete().neq('action', 'non_existent_action_placeholder');
         
         await _client.from('admin_activity_logs').insert({
           'admin_id': _client.auth.currentUser?.id,
@@ -1360,7 +1410,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           'details': 'Cleared all activity/audit logs',
         });
 
-        _loadAdminData(showSpinner: true);
+        await _loadAdminData(showSpinner: false);
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1375,15 +1425,19 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
         }
       } finally {
         if (mounted) {
-          setState(() => _isLoading = false);
+          setState(() {
+            _isDeletingLogs = false;
+          });
+          setBottomSheetState(() {}); // Hide loader in bottom sheet!
         }
       }
     }
   }
 
-  Widget _buildEmptyState(String text) {
+  Widget _buildEmptyState(String text, [ScrollController? controller]) {
     return Center(
       child: SingleChildScrollView(
+        controller: controller,
         physics: const AlwaysScrollableScrollPhysics(),
         child: Container(
           height: 300,
