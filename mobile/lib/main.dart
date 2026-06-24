@@ -110,6 +110,10 @@ class HomeRouteResolver extends StatelessWidget {
       return const LoginScreen();
     }
 
+    if (auth.isAdmin) {
+      return const AdminScreen();
+    }
+
 
     if (auth.isPaused) {
       return const PendingScreen();

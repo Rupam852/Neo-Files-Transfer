@@ -73,8 +73,8 @@ class AuthService extends ChangeNotifier {
               if (_user != null) {
                 final newRecord = payload.newRecord;
                 final oldRecord = payload.oldRecord;
-                final newUserId = newRecord['user_id']?.toString();
-                final oldUserId = oldRecord['user_id']?.toString();
+                final newUserId = newRecord?['user_id']?.toString();
+                final oldUserId = oldRecord?['user_id']?.toString();
                 if (newUserId == _user!.id || oldUserId == _user!.id) {
                   await loadProfile(_user!);
                 }
