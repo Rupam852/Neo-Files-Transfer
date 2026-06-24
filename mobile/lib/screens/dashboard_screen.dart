@@ -870,12 +870,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final appDir = await getTemporaryDirectory();
       final savePath = '${appDir.path}/${file.fileName}';
 
+      final tokenVal = Supabase.instance.client.auth.currentSession?.accessToken;
+      if (tokenVal == null) {
+        throw Exception('No active session. Please sign in again.');
+      }
+
       final downloadUrl = '${AppConfig.proxyUrl}/download/direct/${file.googleDriveFileId}';
 
       DateTime? lastUpdate;
       await dio.download(
         downloadUrl,
         savePath,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $tokenVal',
+          },
+        ),
         onReceiveProgress: (received, total) {
           if (total > 0) {
             final now = DateTime.now();

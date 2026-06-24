@@ -439,6 +439,151 @@ app.get('/download-file', async (req, res) => {
   }
 })
 
+// Direct download endpoint for mobile clients (authenticated)
+app.get('/download/direct/:driveFileId', async (req, res) => {
+  const driveFileId = req.params.driveFileId
+  const isStream = req.query.stream === 'true'
+
+  if (!driveFileId) {
+    return res.status(400).json({ error: 'Google Drive File ID Required' })
+  }
+
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase environment variables are missing on the proxy server.')
+    }
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Authenticate user via Supabase JWT
+    const user = await getAuthenticatedUser(req, supabaseAdmin)
+
+    // 1. Resolve file metadata by google_drive_file_id
+    const { data: file, error: fileError } = await supabaseAdmin
+      .from('shared_files')
+      .select('id, file_name, mime_type, sharing_status, current_version_num, google_drive_file_id, is_folder, user_id, file_size')
+      .eq('google_drive_file_id', driveFileId)
+      .maybeSingle()
+
+    if (fileError || !file) {
+      return res.status(404).json({ error: 'The requested file does not exist or has been removed.' })
+    }
+
+    // 2. Security check: User must own the file OR the file must be public
+    if (file.user_id !== user.id && file.sharing_status !== 'public') {
+      return res.status(403).json({ error: 'Access denied: You do not have permission to download this file.' })
+    }
+
+    // 3. Check system setting for downloads
+    const { data: downloadSetting } = await supabaseAdmin
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'downloads_enabled')
+      .maybeSingle()
+
+    if (downloadSetting && downloadSetting.value === false) {
+      return res.status(503).json({ error: 'Downloads are currently disabled by the administrator.' })
+    }
+
+    // 4. Resolve correct Google Drive file ID (latest version)
+    const { data: latestVersion } = await supabaseAdmin
+      .from('file_versions')
+      .select('google_drive_file_id')
+      .eq('file_id', file.id)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const targetDriveFileId = latestVersion?.google_drive_file_id || file.google_drive_file_id
+
+    // 5. Get Owner's Google Tokens
+    const { data: ownerProfile, error: ownerError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('google_access_token, google_refresh_token')
+      .eq('id', file.user_id)
+      .single()
+
+    if (ownerError || !ownerProfile) {
+      throw new Error('Failed to retrieve file owner credentials.')
+    }
+
+    let accessToken = ownerProfile.google_access_token
+    const refreshToken = ownerProfile.google_refresh_token
+
+    if (!accessToken && refreshToken) {
+      accessToken = await refreshGoogleToken(file.user_id, refreshToken, supabaseAdmin)
+    } else if (!accessToken) {
+      throw new Error("Owner's Google authentication connection is missing.")
+    }
+
+    // Fetch stream from Google Drive
+    let driveResponse = await fetchMediaFromDriveNode(targetDriveFileId, accessToken)
+
+    if (driveResponse.statusCode === 401 && refreshToken) {
+      try {
+        destroyStream(driveResponse)
+        accessToken = await refreshGoogleToken(file.user_id, refreshToken, supabaseAdmin)
+        driveResponse = await fetchMediaFromDriveNode(targetDriveFileId, accessToken)
+      } catch (refreshErr) {
+        console.error('Token refresh failed during download retry:', refreshErr)
+      }
+    }
+
+    if (driveResponse.statusCode !== 200) {
+      console.error('Google Drive alt=media fetch failed with status:', driveResponse.statusCode)
+      destroyStream(driveResponse)
+      const downloadUrl = `https://drive.google.com/uc?export=download&id=${targetDriveFileId}`
+      if (isStream) {
+        return res.status(400).json({
+          error: `Failed to fetch file content from Google Drive (HTTP ${driveResponse.statusCode})`,
+          fallbackUrl: downloadUrl
+        })
+      }
+      return res.redirect(downloadUrl)
+    }
+
+    // Set correct headers
+    const contentType = file.mime_type || driveResponse.headers['content-type'] || 'application/octet-stream'
+    res.setHeader('Content-Type', contentType)
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.file_name)}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`)
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+
+    const gDriveContentLength = driveResponse.headers['content-length']
+    if (gDriveContentLength) {
+      res.setHeader('Content-Length', gDriveContentLength)
+    } else if (file.file_size) {
+      res.setHeader('Content-Length', file.file_size)
+    }
+
+    // Increment download count in database asynchronously
+    (async () => {
+      try {
+        await supabaseAdmin.rpc('increment_download_count', { file_id: file.id })
+      } catch (err) {
+        if (err.message && err.message.includes('aborted')) return
+        console.error('Failed to increment download count:', err)
+      }
+    })()
+
+    // Listen for client abort to clean up stream and prevent socket leak
+    res.on('close', () => {
+      console.log('Client aborted single file download. Destroying Drive response stream.')
+      destroyStream(driveResponse)
+    })
+
+    // Stream directly from Drive to Client
+    driveResponse.pipe(res)
+
+  } catch (error) {
+    console.error('Direct Download Proxy Error:', error)
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message || 'An unexpected proxy server error occurred.' })
+    }
+  }
+})
+
+
 // Helper to authenticate user using Supabase JWT token
 async function getAuthenticatedUser(req, supabaseAdmin) {
   const authHeader = req.headers.authorization || req.headers.Authorization
