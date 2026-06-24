@@ -63,7 +63,7 @@ const ICON_MAP = {
 }
 
 export default function FilesPage({ onViewVersions }) {
-  const { user, profile } = useAuth()
+  const { user, profile, sharingEnabled } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const folderInputRef = useRef(null)
@@ -1452,27 +1452,33 @@ export default function FilesPage({ onViewVersions }) {
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={async () => {
-                    try {
-                      const newHash = crypto.randomUUID().replace(/-/g, '').substring(0, 12)
-                      const { error } = await supabase
-                        .from('shared_files')
-                        .update({ unique_share_hash: newHash, sharing_status: 'public' })
-                        .eq('id', shareModal.id)
-                      if (error) throw error
-                      // Refresh local files list and update modal state with new hash
-                      setShareModal(prev => ({ ...prev, unique_share_hash: newHash, sharing_status: 'public' }))
-                      loadFiles()
-                      toast.success('Share links generated!')
-                    } catch (err) {
-                      toast.error('Failed to generate share link: ' + err.message)
-                    }
-                  }}
-                  className="w-full btn-primary py-3 flex items-center justify-center gap-2 font-semibold"
-                >
-                  <Share2 size={16} /> Generate Share Links
-                </button>
+                {sharingEnabled ? (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const newHash = crypto.randomUUID().replace(/-/g, '').substring(0, 12)
+                        const { error } = await supabase
+                          .from('shared_files')
+                          .update({ unique_share_hash: newHash, sharing_status: 'public' })
+                          .eq('id', shareModal.id)
+                        if (error) throw error
+                        // Refresh local files list and update modal state with new hash
+                        setShareModal(prev => ({ ...prev, unique_share_hash: newHash, sharing_status: 'public' }))
+                        loadFiles()
+                        toast.success('Share links generated!')
+                      } catch (err) {
+                        toast.error('Failed to generate share link: ' + err.message)
+                      }
+                    }}
+                    className="w-full btn-primary py-3 flex items-center justify-center gap-2 font-semibold"
+                  >
+                    <Share2 size={16} /> Generate Share Links
+                  </button>
+                ) : (
+                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-4 text-xs font-medium text-center">
+                    Generating new sharing links has been disabled by the administrator.
+                  </div>
+                )}
               </div>
             ) : (
               /* Links already generated */
@@ -1492,7 +1498,12 @@ export default function FilesPage({ onViewVersions }) {
                   )}
                   {/* Inline toggle button */}
                   <button
+                    disabled={!sharingEnabled && shareModal.sharing_status === 'private'}
                     onClick={async () => {
+                      if (!sharingEnabled && shareModal.sharing_status === 'private') {
+                        toast.error('Sharing has been disabled by the administrator.')
+                        return
+                      }
                       const newStatus = shareModal.sharing_status === 'public' ? 'private' : 'public'
                       try {
                         const { error } = await supabase
@@ -1507,17 +1518,27 @@ export default function FilesPage({ onViewVersions }) {
                         toast.error('Failed to update: ' + err.message)
                       }
                     }}
-                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${shareModal.sharing_status === 'public'
+                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      !sharingEnabled && shareModal.sharing_status === 'private'
+                        ? 'bg-dark-500 text-gray-500 border-dark-400 cursor-not-allowed opacity-50'
+                        : shareModal.sharing_status === 'public'
                         ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
                         : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                      }`}
+                    }`}
                   >
                     {shareModal.sharing_status === 'public' ? '🔒 Make Private' : '🌐 Make Public'}
                   </button>
                 </div>
 
+                {/* Sharing Disabled Warning */}
+                {!sharingEnabled && (
+                  <div className="bg-red-500/5 border border-red-500/15 rounded-lg px-3 py-2 text-xs text-red-400 font-semibold leading-relaxed">
+                    ⚠️ Sharing features are temporarily disabled by the administrator. You cannot generate new links or activate private links.
+                  </div>
+                )}
+
                 {/* Private warning */}
-                {shareModal.sharing_status === 'private' && (
+                {shareModal.sharing_status === 'private' && sharingEnabled && (
                   <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg px-3 py-2 text-xs text-amber-300/80 leading-relaxed">
                     ⚠️ Link is currently <strong>blocked</strong>. Anyone visiting this link will see an "Access Denied" page. Click <strong>Make Public</strong> above to re-enable it. The link URL will not change.
                   </div>

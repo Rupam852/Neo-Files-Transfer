@@ -11,6 +11,8 @@ export function AuthProvider({ children }) {
   const [isPaused, setIsPaused] = useState(false)
   const [isSessionInvalidated, setIsSessionInvalidated] = useState(false)
   const [isUnderMaintenance, setIsUnderMaintenance] = useState(false)
+  const [downloadsEnabled, setDownloadsEnabled] = useState(true)
+  const [sharingEnabled, setSharingEnabled] = useState(true)
   const [loading, setLoading] = useState(true)
 
   const generateSessionId = () => {
@@ -42,7 +44,7 @@ export function AuthProvider({ children }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setUser(session?.user ?? null)
         if (session?.user) {
           const sessionTokens = {}
@@ -54,7 +56,8 @@ export function AuthProvider({ children }) {
             sessionTokens.google_refresh_token = session.provider_refresh_token
             localStorage.setItem('google_refresh_token', session.provider_refresh_token)
           }
-          loadProfile(session.user, sessionTokens)
+          const isFresh = event === 'SIGNED_IN'
+          loadProfile(session.user, sessionTokens, isFresh)
         } else {
           try {
             localStorage.removeItem('google_provider_token')
@@ -153,7 +156,7 @@ export function AuthProvider({ children }) {
     }
   }, [user])
 
-  // Realtime listener for system_settings (maintenance mode)
+  // Realtime listener for system_settings (maintenance mode & downloads & sharing)
   useEffect(() => {
     if (!user) return
 
@@ -167,6 +170,10 @@ export function AuthProvider({ children }) {
             const { data } = await supabase.from('system_settings').select('key, value')
             const maintenance = data?.find(s => s.key === 'maintenance_mode')?.value || false
             setIsUnderMaintenance(maintenance)
+            const downloads = data?.find(s => s.key === 'downloads_enabled')?.value !== false
+            setDownloadsEnabled(downloads)
+            const sharing = data?.find(s => s.key === 'sharing_enabled')?.value !== false
+            setSharingEnabled(sharing)
           } catch (e) {
             console.error('Failed to refresh settings:', e)
           }
@@ -178,7 +185,7 @@ export function AuthProvider({ children }) {
   }, [user])
 
 
-  async function loadProfile(authUser, sessionTokens = {}) {
+  async function loadProfile(authUser, sessionTokens = {}, isFreshSignIn = false) {
     try {
       // Load user profile
       let { data: profileData, error: profileError } = await supabase
@@ -240,7 +247,7 @@ export function AuthProvider({ children }) {
         localStorage.setItem('active_web_session_id', localSessionId)
       }
 
-      const claimActiveSession = sessionStorage.getItem('claim_active_session') === 'true'
+      const claimActiveSession = sessionStorage.getItem('claim_active_session') === 'true' || isFreshSignIn
       if (claimActiveSession || !profileData.active_web_session_id) {
         // Claim active session
         await supabase
@@ -276,6 +283,10 @@ export function AuthProvider({ children }) {
         const { data: settingsData } = await supabase.from('system_settings').select('key, value')
         const maintenance = settingsData?.find(s => s.key === 'maintenance_mode')?.value || false
         setIsUnderMaintenance(maintenance)
+        const downloads = settingsData?.find(s => s.key === 'downloads_enabled')?.value !== false
+        setDownloadsEnabled(downloads)
+        const sharing = settingsData?.find(s => s.key === 'sharing_enabled')?.value !== false
+        setSharingEnabled(sharing)
       } catch (e) {
         console.error('Failed to fetch settings:', e)
       }
@@ -310,6 +321,7 @@ export function AuthProvider({ children }) {
   }
 
   async function signInWithGoogle(forceConsent = false) {
+    sessionStorage.setItem('claim_active_session', 'true')
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -333,6 +345,8 @@ export function AuthProvider({ children }) {
     setIsPaused(false)
     setIsSessionInvalidated(false)
     setIsUnderMaintenance(false)
+    setDownloadsEnabled(true)
+    setSharingEnabled(true)
     try {
       localStorage.removeItem('active_web_session_id')
     } catch (e) {}
@@ -353,6 +367,8 @@ export function AuthProvider({ children }) {
       isPaused,
       isSessionInvalidated,
       isUnderMaintenance,
+      downloadsEnabled,
+      sharingEnabled,
       loading,
       signInWithGoogle,
       signOut,

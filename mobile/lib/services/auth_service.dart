@@ -11,6 +11,8 @@ class AuthService extends ChangeNotifier {
   bool _isPaused = false;
   bool _isSessionInvalidated = false;
   bool _isUnderMaintenance = false;
+  bool _isDownloadsEnabled = true;
+  bool _isSharingEnabled = true;
   bool _isLoading = true;
   String? _loginError;
   String? _localMobileSessionId;
@@ -21,6 +23,8 @@ class AuthService extends ChangeNotifier {
   bool get isPaused => _isPaused;
   bool get isSessionInvalidated => _isSessionInvalidated;
   bool get isUnderMaintenance => _isUnderMaintenance;
+  bool get isDownloadsEnabled => _isDownloadsEnabled;
+  bool get isSharingEnabled => _isSharingEnabled;
   bool get isLoading => _isLoading;
   String? get loginError => _loginError;
 
@@ -42,10 +46,15 @@ class AuthService extends ChangeNotifier {
         if (session.providerRefreshToken != null) {
           await prefs.setString('google_refresh_token', session.providerRefreshToken!);
         }
-        await loadProfile(session.user, {
-          'google_access_token': session.providerToken,
-          'google_refresh_token': session.providerRefreshToken,
-        });
+        final bool isFresh = data.event == AuthChangeEvent.signedIn;
+        await loadProfile(
+          session.user,
+          {
+            'google_access_token': session.providerToken,
+            'google_refresh_token': session.providerRefreshToken,
+          },
+          isFresh,
+        );
         _setupRealtimeListeners();
       } else {
         _clearRealtimeListeners();
@@ -160,13 +169,20 @@ class AuthService extends ChangeNotifier {
               try {
                 final settingsRes = await _client.from('system_settings').select();
                 bool maintenance = false;
+                bool downloads = true;
+                bool sharing = true;
                 for (final s in settingsRes) {
                   if (s['key'] == 'maintenance_mode') {
                     maintenance = s['value'] == true;
-                    break;
+                  } else if (s['key'] == 'downloads_enabled') {
+                    downloads = s['value'] != false;
+                  } else if (s['key'] == 'sharing_enabled') {
+                    sharing = s['value'] != false;
                   }
                 }
                 _isUnderMaintenance = maintenance;
+                _isDownloadsEnabled = downloads;
+                _isSharingEnabled = sharing;
                 notifyListeners();
               } catch (e) {
                 debugPrint('Failed to refresh settings: $e');
@@ -194,7 +210,7 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<void> loadProfile(User authUser, [Map<String, String?>? sessionTokens]) async {
+  Future<void> loadProfile(User authUser, [Map<String, String?>? sessionTokens, bool isFreshSignIn = false]) async {
     try {
       _isLoading = true;
       notifyListeners();
@@ -267,14 +283,25 @@ class AuthService extends ChangeNotifier {
         final localSessionId = await _getOrCreateLocalMobileSessionId();
         final dbMobileSessionId = response?['active_mobile_session_id'] as String?;
 
-        final bool isFreshSignIn = sessionTokens != null;
-
         if (isFreshSignIn || dbMobileSessionId == null) {
           await _client
               .from('user_profiles')
               .update({'active_mobile_session_id': localSessionId})
               .eq('id', authUser.id);
           _isSessionInvalidated = false;
+          profileData = UserProfile(
+            id: profileData.id,
+            email: profileData.email,
+            name: profileData.name,
+            avatarUrl: profileData.avatarUrl,
+            driveFolderId: profileData.driveFolderId,
+            isFolderVerified: profileData.isFolderVerified,
+            googleRefreshToken: profileData.googleRefreshToken,
+            activeWebSessionId: profileData.activeWebSessionId,
+            activeMobileSessionId: localSessionId,
+            createdAt: profileData.createdAt,
+            updatedAt: profileData.updatedAt,
+          );
         } else if (dbMobileSessionId != localSessionId) {
           _isSessionInvalidated = true;
           _isLoading = false;
@@ -296,10 +323,15 @@ class AuthService extends ChangeNotifier {
       try {
         final settingsRes = await _client.from('system_settings').select();
         _isUnderMaintenance = false;
+        _isDownloadsEnabled = true;
+        _isSharingEnabled = true;
         for (final s in settingsRes) {
           if (s['key'] == 'maintenance_mode') {
             _isUnderMaintenance = s['value'] == true;
-            break;
+          } else if (s['key'] == 'downloads_enabled') {
+            _isDownloadsEnabled = s['value'] != false;
+          } else if (s['key'] == 'sharing_enabled') {
+            _isSharingEnabled = s['value'] != false;
           }
         }
       } catch (e) {
@@ -392,6 +424,8 @@ class AuthService extends ChangeNotifier {
     _isPaused = false;
     _isSessionInvalidated = false;
     _isUnderMaintenance = false;
+    _isDownloadsEnabled = true;
+    _isSharingEnabled = true;
     _isLoading = false;
     if (clearError) {
       _loginError = null;

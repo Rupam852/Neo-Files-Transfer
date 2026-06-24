@@ -353,6 +353,12 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
 
   Future<void> _toggleSetting(String key, bool currentVal) async {
     final newVal = !currentVal;
+    
+    // Update local state immediately for responsiveness
+    setState(() {
+      _settings[key] = newVal;
+    });
+
     try {
       await _client
           .from('system_settings')
@@ -364,17 +370,25 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
         'details': 'Toggled $key: $newVal',
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${key.replaceAll("_", " ").toUpperCase()} ${newVal ? "enabled" : "disabled"}'),
-          backgroundColor: const Color(0xFF10B981),
-        ),
-      );
-      _loadAdminData(showSpinner: false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${key.replaceAll("_", " ").toUpperCase()} ${newVal ? "enabled" : "disabled"}'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      }
+      await _loadAdminData(showSpinner: false);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update setting: $e'), backgroundColor: Colors.redAccent),
-      );
+      // Revert on failure
+      setState(() {
+        _settings[key] = currentVal;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update setting: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
     }
   }
 
@@ -870,12 +884,6 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            leading: canPop
-                ? IconButton(
-                    icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  )
-                : null,
             title: const Text(
               'Admin Dashboard',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),

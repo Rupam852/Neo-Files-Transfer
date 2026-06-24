@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 
 import { ShieldAlert, LogOut, Wrench } from 'lucide-react'
@@ -181,6 +181,9 @@ function HomeRoute() {
 }
 
 export default function App() {
+  const location = useLocation()
+  const { isAdmin, isUnderMaintenance, loading } = useAuth()
+
   useEffect(() => {
     let timeout;
     const handleScroll = () => {
@@ -198,6 +201,10 @@ export default function App() {
       clearTimeout(timeout);
     };
   }, []);
+
+  if (!loading && isUnderMaintenance && !isAdmin && !location.pathname.startsWith('/admin')) {
+    return <MaintenanceScreen />
+  }
 
   return (
     <Routes>

@@ -121,6 +121,13 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
     final newIsUnderMaintenance = _authService!.isUnderMaintenance;
     final newUserId = _authService!.currentUser?.id;
 
+    final maintenanceChanged = newIsUnderMaintenance != _lastIsUnderMaintenance;
+    final shouldPop = (newIsAdmin != _lastIsAdmin) ||
+        (newIsPaused != _lastIsPaused) ||
+        (newIsSessionInvalidated != _lastIsSessionInvalidated) ||
+        (newUserId != _lastUserId) ||
+        (maintenanceChanged && !newIsAdmin);
+
     if (newIsAdmin != _lastIsAdmin ||
         newIsPaused != _lastIsPaused ||
         newIsSessionInvalidated != _lastIsSessionInvalidated ||
@@ -132,9 +139,11 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
       _lastIsUnderMaintenance = newIsUnderMaintenance;
       _lastUserId = newUserId;
 
-      final navigator = Navigator.of(context);
-      if (navigator.canPop()) {
-        navigator.popUntil((route) => route.isFirst);
+      if (shouldPop) {
+        final navigator = Navigator.of(context);
+        if (navigator.canPop()) {
+          navigator.popUntil((route) => route.isFirst);
+        }
       }
     }
   }

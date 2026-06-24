@@ -614,9 +614,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _handleToggleSharing(SharedFile file) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
     final fileService = Provider.of<FileService>(context, listen: false);
     final isPublic = file.sharingStatus == 'public';
     final nextStatus = isPublic ? 'private' : 'public';
+
+    if (!isPublic && !authService.isSharingEnabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sharing features have been disabled by the administrator.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+      return;
+    }
 
     try {
       if (!isPublic && (file.uniqueShareHash == null || file.uniqueShareHash!.isEmpty)) {

@@ -414,7 +414,17 @@ export default function AdminDashboardPage() {
   }
 
   async function toggleSetting(key) {
-    const newVal = !systemSettings[key]
+    let currentVal
+    if (key === 'maintenance_mode') {
+      currentVal = !!systemSettings[key]
+    } else {
+      currentVal = systemSettings[key] !== false
+    }
+    const newVal = !currentVal
+
+    // Update local state immediately for instant feedback
+    setSystemSettings(prev => ({ ...prev, [key]: newVal }))
+
     try {
       await supabase
         .from('system_settings')
@@ -427,9 +437,10 @@ export default function AdminDashboardPage() {
         details: `Toggled ${key}: ${newVal}`,
       })
 
-      setSystemSettings({ ...systemSettings, [key]: newVal })
-      toast.success(`${key} ${newVal ? 'enabled' : 'disabled'}`)
+      toast.success(`${key.replaceAll('_', ' ')} ${newVal ? 'enabled' : 'disabled'}`)
     } catch (err) {
+      // Revert state on error
+      setSystemSettings(prev => ({ ...prev, [key]: currentVal }))
       toast.error('Failed to update setting')
     }
   }
