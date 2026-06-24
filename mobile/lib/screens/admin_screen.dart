@@ -40,9 +40,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
-      setState(() {}); // Rebuild search bar visibility when switching tabs
+      setState(() {});
     });
     _loadAdminData();
     _setupRealtimeListeners();
@@ -500,6 +500,330 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     }
   }
 
+  Widget? _buildDrawer() {
+    final currentUser = _client.auth.currentUser;
+    final email = currentUser?.email ?? '';
+    final role = _currentAdminRecord?['role'] ?? 'admin';
+    final isSuperAdmin = role == 'super_admin';
+
+    return Drawer(
+      backgroundColor: const Color(0xFF0F172A),
+      elevation: 16,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.04))),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.indigoAccent.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.indigoAccent.withOpacity(0.2)),
+                    ),
+                    child: const Icon(LucideIcons.shield, color: Colors.indigoAccent, size: 24),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14.5),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isSuperAdmin
+                                ? Colors.purple.withOpacity(0.1)
+                                : Colors.indigoAccent.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6.0),
+                          ),
+                          child: Text(
+                            isSuperAdmin ? 'SUPER ADMIN' : 'ADMIN',
+                            style: TextStyle(
+                              color: isSuperAdmin ? Colors.purpleAccent : Colors.indigoAccent.shade100,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(LucideIcons.settings, color: Colors.indigoAccent),
+              title: const Text('System Settings', style: TextStyle(color: Colors.white, fontSize: 14)),
+              subtitle: const Text('Configure maintenance mode & sharing features', style: TextStyle(color: Colors.white30, fontSize: 11)),
+              onTap: () {
+                Navigator.pop(context);
+                _showSettingsBottomSheet();
+              },
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.activity, color: Colors.tealAccent),
+              title: const Text('Audit Logs', style: TextStyle(color: Colors.white, fontSize: 14)),
+              subtitle: const Text('View and clear administration activity history', style: TextStyle(color: Colors.white30, fontSize: 11)),
+              onTap: () {
+                Navigator.pop(context);
+                _showLogsBottomSheet();
+              },
+            ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+              child: ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: Colors.redAccent.withOpacity(0.08),
+                leading: const Icon(LucideIcons.logOut, color: Colors.redAccent),
+                title: const Text('Sign Out', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showLogoutDialog(context);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSettingsBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setBottomSheetState) {
+            final maintenanceMode = _settings['maintenance_mode'] == true;
+            final downloadsEnabled = _settings['downloads_enabled'] != false;
+            final sharingEnabled = _settings['sharing_enabled'] != false;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'System Controls',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(LucideIcons.x, color: Colors.white60),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16.0),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF030712).withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(16.0),
+                      border: Border.all(color: Colors.white.withOpacity(0.04)),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildSettingToggle(
+                          label: 'Maintenance Mode',
+                          description: 'Show a maintenance notification screen to all users.',
+                          checked: maintenanceMode,
+                          onChange: () async {
+                            await _toggleSetting('maintenance_mode', maintenanceMode);
+                            setBottomSheetState(() {});
+                          },
+                        ),
+                        const Divider(color: Colors.white10),
+                        _buildSettingToggle(
+                          label: 'Downloads Enabled',
+                          description: 'Allow clients to download files through shared URLs.',
+                          checked: downloadsEnabled,
+                          onChange: () async {
+                            await _toggleSetting('downloads_enabled', downloadsEnabled);
+                            setBottomSheetState(() {});
+                          },
+                        ),
+                        const Divider(color: Colors.white10),
+                        _buildSettingToggle(
+                          label: 'Sharing Enabled',
+                          description: 'Allow normal users to generate public sharing links.',
+                          checked: sharingEnabled,
+                          onChange: () async {
+                            await _toggleSetting('sharing_enabled', sharingEnabled);
+                            setBottomSheetState(() {});
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showLogsBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setBottomSheetState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.8,
+              minChildSize: 0.5,
+              maxChildSize: 0.95,
+              expand: false,
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Audit Logs',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              if (_logs.isNotEmpty)
+                                TextButton.icon(
+                                  onPressed: () async {
+                                    await _showClearLogsConfirmDialog();
+                                    setBottomSheetState(() {});
+                                  },
+                                  icon: const Icon(LucideIcons.trash2, size: 14, color: Colors.redAccent),
+                                  label: const Text(
+                                    'Clear',
+                                    style: TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              IconButton(
+                                icon: const Icon(LucideIcons.x, color: Colors.white60),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(color: Colors.white10, height: 1),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: () async {
+                          await _loadAdminData(showSpinner: false);
+                          setBottomSheetState(() {});
+                        },
+                        color: Colors.indigoAccent,
+                        backgroundColor: const Color(0xFF0F172A),
+                        child: _logs.isEmpty
+                            ? _buildEmptyState('No logs found.')
+                            : ListView.builder(
+                                controller: scrollController,
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+                                itemCount: _logs.length,
+                                itemBuilder: (context, index) {
+                                  final log = _logs[index];
+                                  final profile = log['user_profiles'];
+                                  final action = log['action'];
+                                  final details = log['details'] ?? '';
+                                  final date = DateFormat('MMM dd, hh:mm a').format(DateTime.parse(log['created_at']));
+
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 12.0),
+                                    padding: const EdgeInsets.all(12.0),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF030712).withOpacity(0.3),
+                                      borderRadius: BorderRadius.circular(12.0),
+                                      border: Border.all(color: Colors.white.withOpacity(0.02)),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              action.toString().toUpperCase(),
+                                              style: const TextStyle(color: Colors.indigoAccent, fontWeight: FontWeight.bold, fontSize: 10.5),
+                                            ),
+                                            Text(date, style: const TextStyle(color: Colors.white30, fontSize: 10)),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          details,
+                                          style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'By: ${profile?['name'] ?? profile?['email'] ?? 'System'}',
+                                          style: const TextStyle(color: Colors.white30, fontSize: 10.5),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.canPop(context);
@@ -508,102 +832,100 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       behavior: HitTestBehavior.opaque,
       child: PopScope(
         canPop: canPop,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        SystemNavigator.pop();
-      },
-      child: Scaffold(
-        backgroundColor: const Color(0xFF030712),
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: canPop
-              ? IconButton(
-                  icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                )
-              : null,
-          title: const Text(
-            'Admin Dashboard',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          bottom: TabBar(
-            controller: _tabController,
-            indicatorColor: Colors.indigoAccent,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white60,
-            isScrollable: true,
-            tabs: [
-              Tab(text: 'Requests (${_registrations.length})'),
-              Tab(text: 'Approved (${_approvedUsers.length})'),
-              Tab(text: 'Admins (${_admins.length})'),
-              const Tab(text: 'Settings'),
-              const Tab(text: 'Audit Logs'),
-            ],
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(LucideIcons.refreshCw, size: 18),
-              onPressed: () => _loadAdminData(showSpinner: true),
-              tooltip: 'Refresh Data',
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          SystemNavigator.pop();
+        },
+        child: Scaffold(
+          backgroundColor: const Color(0xFF030712),
+          drawer: _buildDrawer(),
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: canPop
+                ? IconButton(
+                    icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  )
+                : null,
+            title: const Text(
+              'Admin Dashboard',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
-            IconButton(
-              icon: const Icon(LucideIcons.logOut, size: 18, color: Colors.redAccent),
-              onPressed: () => _showLogoutDialog(context),
-              tooltip: 'Sign Out',
+            bottom: TabBar(
+              controller: _tabController,
+              indicatorColor: Colors.indigoAccent,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white60,
+              isScrollable: true,
+              tabs: [
+                Tab(text: 'Requests (${_registrations.length})'),
+                Tab(text: 'Approved (${_approvedUsers.length})'),
+                Tab(text: 'Admins (${_admins.length})'),
+              ],
             ),
-          ],
-        ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.indigoAccent))
-          : Column(
-              children: [
-                if (_tabController.index != 3 && _tabController.index != 4) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-                    child: TextFormField(
-                      controller: _searchController,
-                      style: const TextStyle(color: Colors.white, fontSize: 13.5),
-                      onChanged: (val) {
-                        setState(() {
-                          _searchQuery = val;
-                        });
-                      },
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(LucideIcons.search, color: Colors.white38, size: 16),
-                        hintText: 'Search by name or email...',
-                        hintStyle: const TextStyle(color: Colors.white30, fontSize: 12.5),
-                        filled: true,
-                        fillColor: const Color(0xFF0F172A).withOpacity(0.5),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
+          ),
+          body: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: Colors.indigoAccent))
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                      child: TextFormField(
+                        controller: _searchController,
+                        style: const TextStyle(color: Colors.white, fontSize: 13.5),
+                        onChanged: (val) {
+                          setState(() {
+                            _searchQuery = val;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(LucideIcons.search, color: Colors.white38, size: 16),
+                          hintText: 'Search by name or email...',
+                          hintStyle: const TextStyle(color: Colors.white30, fontSize: 12.5),
+                          filled: true,
+                          fillColor: const Color(0xFF0F172A).withOpacity(0.5),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildRequestsTab(),
-                      _buildApprovedTab(),
-                      _buildAdminsTab(),
-                      _buildSettingsTab(),
-                      _buildLogsTab(),
-                    ],
-                  ),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          RefreshIndicator(
+                            onRefresh: () => _loadAdminData(showSpinner: false),
+                            color: Colors.indigoAccent,
+                            backgroundColor: const Color(0xFF0F172A),
+                            child: _buildRequestsTab(),
+                          ),
+                          RefreshIndicator(
+                            onRefresh: () => _loadAdminData(showSpinner: false),
+                            color: Colors.indigoAccent,
+                            backgroundColor: const Color(0xFF0F172A),
+                            child: _buildApprovedTab(),
+                          ),
+                          RefreshIndicator(
+                            onRefresh: () => _loadAdminData(showSpinner: false),
+                            color: Colors.indigoAccent,
+                            backgroundColor: const Color(0xFF0F172A),
+                            child: _buildAdminsTab(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+        ),
       ),
-    ),
-  );
+    );
   }
 
   Widget _buildRequestsTab() {
@@ -957,56 +1279,6 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildSettingsTab() {
-    final maintenanceMode = _settings['maintenance_mode'] == true;
-    final downloadsEnabled = _settings['downloads_enabled'] != false; // default true
-    final sharingEnabled = _settings['sharing_enabled'] != false; // default true
-
-    return ListView(
-      padding: const EdgeInsets.all(20.0),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F172A).withOpacity(0.5),
-            borderRadius: BorderRadius.circular(16.0),
-            border: Border.all(color: Colors.white.withOpacity(0.04)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'SYSTEM CONTROLS',
-                style: TextStyle(color: Colors.indigoAccent, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-              ),
-              const SizedBox(height: 16),
-              _buildSettingToggle(
-                label: 'Maintenance Mode',
-                description: 'Show a maintenance notification screen to all users.',
-                checked: maintenanceMode,
-                onChange: () => _toggleSetting('maintenance_mode', maintenanceMode),
-              ),
-              const Divider(color: Colors.white10),
-              _buildSettingToggle(
-                label: 'Downloads Enabled',
-                description: 'Allow clients to download files through shared URLs.',
-                checked: downloadsEnabled,
-                onChange: () => _toggleSetting('downloads_enabled', downloadsEnabled),
-              ),
-              const Divider(color: Colors.white10),
-              _buildSettingToggle(
-                label: 'Sharing Enabled',
-                description: 'Allow normal users to generate public sharing links.',
-                checked: sharingEnabled,
-                onChange: () => _toggleSetting('sharing_enabled', sharingEnabled),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildSettingToggle({
     required String label,
     required String description,
@@ -1080,10 +1352,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       try {
         setState(() => _isLoading = true);
         
-        // Delete all rows in activity_logs
         await _client.from('activity_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         
-        // Log this action
         await _client.from('admin_activity_logs').insert({
           'admin_id': _client.auth.currentUser?.id,
           'action': 'logs_cleared',
@@ -1111,85 +1381,18 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     }
   }
 
-  Widget _buildLogsTab() {
-    return Column(
-      children: [
-        if (_logs.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: _showClearLogsConfirmDialog,
-                  icon: const Icon(LucideIcons.trash2, size: 14, color: Colors.redAccent),
-                  label: const Text(
-                    'Clear Logs',
-                    style: TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        Expanded(
-          child: _logs.isEmpty
-              ? _buildEmptyState('No logs found.')
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
-                  itemCount: _logs.length,
-                  itemBuilder: (context, index) {
-                    final log = _logs[index];
-                    final profile = log['user_profiles'];
-                    final action = log['action'];
-                    final details = log['details'] ?? '';
-                    final date = DateFormat('MMM dd, hh:mm a').format(DateTime.parse(log['created_at']));
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12.0),
-                      padding: const EdgeInsets.all(12.0),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A).withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(12.0),
-                        border: Border.all(color: Colors.white.withOpacity(0.02)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                action.toString().toUpperCase(),
-                                style: const TextStyle(color: Colors.indigoAccent, fontWeight: FontWeight.bold, fontSize: 10.5),
-                              ),
-                              Text(date, style: const TextStyle(color: Colors.white30, fontSize: 10)),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            details,
-                            style: const TextStyle(color: Colors.white70, fontSize: 12.5),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'By: ${profile?['name'] ?? profile?['email'] ?? 'System'}',
-                            style: const TextStyle(color: Colors.white30, fontSize: 10.5),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildEmptyState(String text) {
     return Center(
-      child: Text(
-        text,
-        style: const TextStyle(color: Colors.white38, fontSize: 13.5),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Container(
+          height: 300,
+          alignment: Alignment.center,
+          child: Text(
+            text,
+            style: const TextStyle(color: Colors.white38, fontSize: 13.5),
+          ),
+        ),
       ),
     );
   }
