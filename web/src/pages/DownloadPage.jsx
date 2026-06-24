@@ -272,9 +272,7 @@ export default function DownloadPage() {
               <Download size={16} /> Save File Again
             </button>
             <p className="text-xs text-slate-500">
-              <Link to="/" className="text-indigo-400 hover:text-indigo-300 hover:underline">
-                Go back to Neo Files Transfer
-              </Link>
+              Powered by Neo Files Transfer
             </p>
           </div>
         )}
