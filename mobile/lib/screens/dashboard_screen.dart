@@ -876,14 +876,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final dio = Dio();
       
-      // Request storage permission on Android (specifically for SDK < 33)
+      // Request storage permission on Android
       if (Platform.isAndroid) {
         final deviceInfo = DeviceInfoPlugin();
         final androidInfo = await deviceInfo.androidInfo;
         final sdkInt = androidInfo.version.sdkInt;
 
-        if (sdkInt < 33) {
-          final status = await Permission.storage.request();
+        if (sdkInt >= 30) {
+          var status = await Permission.manageExternalStorage.status;
+          if (!status.isGranted) {
+            status = await Permission.manageExternalStorage.request();
+          }
+          if (!status.isGranted) {
+            throw Exception('All files access permission is required to save downloads on this Android version.');
+          }
+        } else {
+          var status = await Permission.storage.status;
+          if (!status.isGranted) {
+            status = await Permission.storage.request();
+          }
           if (!status.isGranted) {
             throw Exception('Storage permission is required to save downloads.');
           }
@@ -945,6 +956,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _downloadingFileName = '';
       });
+
+      // Scan the file so it shows up in system downloads list / gallery
+      if (Platform.isAndroid) {
+        try {
+          const platform = MethodChannel('com.neofiles.transfer/media_scanner');
+          await platform.invokeMethod('scanFile', {'path': savePath});
+        } catch (scanError) {
+          debugPrint('Media scan failed: $scanError');
+        }
+      }
 
       // Increment download count locally
       await Supabase.instance.client
