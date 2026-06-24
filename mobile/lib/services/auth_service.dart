@@ -71,8 +71,8 @@ class AuthService extends ChangeNotifier {
             table: 'admins',
             callback: (payload) async {
               if (_user != null) {
-                final newUserId = payload.newRecord?['user_id']?.toString();
-                final oldUserId = payload.oldRecord?['user_id']?.toString();
+                final newUserId = payload.newRecord['user_id']?.toString();
+                final oldUserId = payload.oldRecord['user_id']?.toString();
                 if (newUserId == _user!.id || oldUserId == _user!.id) {
                   await loadProfile(_user!);
                 }
@@ -90,14 +90,14 @@ class AuthService extends ChangeNotifier {
               if (_user == null) return;
               final targetEmail = _user!.email?.toLowerCase();
               if (payload.eventType == PostgresChangeEvent.delete) {
-                final oldEmail = payload.oldRecord?['email']?.toString().toLowerCase();
+                final oldEmail = payload.oldRecord['email']?.toString().toLowerCase();
                 if (oldEmail == targetEmail) {
                   await signOut();
                 }
-              } else if (payload.newRecord != null) {
-                final newEmail = payload.newRecord?['email']?.toString().toLowerCase();
+              } else {
+                final newEmail = payload.newRecord['email']?.toString().toLowerCase();
                 if (newEmail == targetEmail) {
-                  _isPaused = payload.newRecord?['is_paused'] == true;
+                  _isPaused = payload.newRecord['is_paused'] == true;
                   notifyListeners();
                 }
               }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,43 +14,144 @@ class AdminScreen extends StatefulWidget {
 class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStateMixin {
   final _client = Supabase.instance.client;
   late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _newAdminEmailController = TextEditingController();
 
   List<Map<String, dynamic>> _registrations = [];
   List<Map<String, dynamic>> _approvedUsers = [];
+  List<Map<String, dynamic>> _admins = [];
+  Map<String, bool> _settings = {};
   List<Map<String, dynamic>> _logs = [];
 
+  Map<String, dynamic>? _currentAdminRecord;
+  String _searchQuery = '';
   bool _isLoading = false;
+  bool _isAddingAdmin = false;
+
+  // Realtime channels
+  RealtimeChannel? _pendingChannel;
+  RealtimeChannel? _approvedChannel;
+  RealtimeChannel? _settingsChannel;
+  RealtimeChannel? _adminsChannel;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
+    _tabController.addListener(() {
+      setState(() {}); // Rebuild search bar visibility when switching tabs
+    });
     _loadAdminData();
+    _setupRealtimeListeners();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
+    _newAdminEmailController.dispose();
+    _clearRealtimeListeners();
     super.dispose();
   }
 
-  Future<void> _loadAdminData() async {
-    setState(() => _isLoading = true);
+  void _setupRealtimeListeners() {
+    _pendingChannel = _client
+        .channel('admin-pending-changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'pending_registrations',
+          callback: (payload) => _loadAdminData(showSpinner: false),
+        );
+    _pendingChannel?.subscribe();
+
+    _approvedChannel = _client
+        .channel('admin-approved-changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'approved_users',
+          callback: (payload) => _loadAdminData(showSpinner: false),
+        );
+    _approvedChannel?.subscribe();
+
+    _settingsChannel = _client
+        .channel('admin-settings-changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'system_settings',
+          callback: (payload) => _loadAdminData(showSpinner: false),
+        );
+    _settingsChannel?.subscribe();
+
+    _adminsChannel = _client
+        .channel('admin-admins-list-changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'admins',
+          callback: (payload) => _loadAdminData(showSpinner: false),
+        );
+    _adminsChannel?.subscribe();
+  }
+
+  void _clearRealtimeListeners() {
+    if (_pendingChannel != null) _client.removeChannel(_pendingChannel!);
+    if (_approvedChannel != null) _client.removeChannel(_approvedChannel!);
+    if (_settingsChannel != null) _client.removeChannel(_settingsChannel!);
+    if (_adminsChannel != null) _client.removeChannel(_adminsChannel!);
+  }
+
+  Future<void> _loadAdminData({bool showSpinner = true}) async {
+    if (showSpinner) {
+      setState(() => _isLoading = true);
+    }
     try {
-      // 1. Load pending registrations
+      // 1. Fetch current admin role
+      final currentUserId = _client.auth.currentUser?.id;
+      if (currentUserId != null) {
+        final adminRes = await _client
+            .from('admins')
+            .select()
+            .eq('user_id', currentUserId)
+            .maybeSingle();
+        _currentAdminRecord = adminRes;
+      }
+
+      // 2. Fetch admins list
+      final adminsRes = await _client
+          .from('admins')
+          .select()
+          .order('created_at', ascending: false);
+      final List<Map<String, dynamic>> adminsList = List<Map<String, dynamic>>.from(adminsRes as List);
+      final Set<String> adminEmails = Set<String>.from(adminsList.map((a) => (a['email'] as String).toLowerCase()));
+
+      // 3. Fetch pending registrations (filtering out admins)
       final regRes = await _client
           .from('pending_registrations')
           .select()
           .eq('status', 'pending')
           .order('submitted_at', ascending: false);
+      final List<Map<String, dynamic>> pendingList = List<Map<String, dynamic>>.from(regRes as List);
+      final filteredPending = pendingList.where((u) => !adminEmails.contains((u['email'] as String).toLowerCase())).toList();
 
-      // 2. Load approved users
+      // 4. Fetch approved users (filtering out admins)
       final userRes = await _client
           .from('approved_users')
           .select()
           .order('approved_at', ascending: false);
+      final List<Map<String, dynamic>> approvedList = List<Map<String, dynamic>>.from(userRes as List);
+      final filteredApproved = approvedList.where((u) => !adminEmails.contains((u['email'] as String).toLowerCase())).toList();
 
-      // 3. Load activity logs
+      // 5. Fetch system settings
+      final settingsRes = await _client.from('system_settings').select();
+      final Map<String, bool> settingsMap = {};
+      for (final s in settingsRes) {
+        settingsMap[s['key'] as String] = s['value'] == true;
+      }
+
+      // 6. Fetch activity logs
       final logRes = await _client
           .from('activity_logs')
           .select('*, user_profiles(name, email)')
@@ -57,14 +159,18 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           .limit(50);
 
       setState(() {
-        _registrations = List<Map<String, dynamic>>.from(regRes as List);
-        _approvedUsers = List<Map<String, dynamic>>.from(userRes as List);
+        _registrations = filteredPending;
+        _approvedUsers = filteredApproved;
+        _admins = adminsList;
+        _settings = settingsMap;
         _logs = List<Map<String, dynamic>>.from(logRes as List);
       });
     } catch (e) {
       debugPrint('Failed to load admin data: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (showSpinner) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -95,7 +201,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Approved user: $email'), backgroundColor: const Color(0xFF10B981)),
       );
-      _loadAdminData();
+      _loadAdminData(showSpinner: false);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to approve: $e'), backgroundColor: Colors.redAccent),
@@ -122,7 +228,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Rejected user request: $email')),
       );
-      _loadAdminData();
+      _loadAdminData(showSpinner: false);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to reject: $e'), backgroundColor: Colors.redAccent),
@@ -131,6 +237,13 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   }
 
   Future<void> _toggleUserPause(Map<String, dynamic> user) async {
+    if (_currentAdminRecord?['role'] != 'super_admin') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the Super Administrator can pause/resume users.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
     final userId = user['id'];
     final email = user['email'];
     final isPaused = user['is_paused'] == true;
@@ -153,7 +266,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           backgroundColor: isPaused ? const Color(0xFF10B981) : Colors.amber,
         ),
       );
-      _loadAdminData();
+      _loadAdminData(showSpinner: false);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update status: $e'), backgroundColor: Colors.redAccent),
@@ -168,6 +281,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     try {
       await _client.from('approved_users').delete().eq('id', userId);
 
+      // Also clean up pending_registrations for this email
+      await _client.from('pending_registrations').delete().eq('email', email);
+
       await _client.from('admin_activity_logs').insert({
         'admin_id': _client.auth.currentUser?.id,
         'action': 'revoke_user',
@@ -177,10 +293,143 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Revoked access for user: $email'), backgroundColor: Colors.redAccent),
       );
-      _loadAdminData();
+      _loadAdminData(showSpinner: false);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to revoke user: $e'), backgroundColor: Colors.redAccent),
+      );
+    }
+  }
+
+  Future<void> _toggleSetting(String key, bool currentVal) async {
+    final newVal = !currentVal;
+    try {
+      await _client
+          .from('system_settings')
+          .upsert({'key': key, 'value': newVal}, onConflict: 'key');
+
+      await _client.from('admin_activity_logs').insert({
+        'admin_id': _client.auth.currentUser?.id,
+        'action': newVal ? '${key}_enabled' : '${key}_disabled',
+        'details': 'Toggled $key: $newVal',
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${key.replaceAll("_", " ").toUpperCase()} ${newVal ? "enabled" : "disabled"}'),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
+      _loadAdminData(showSpinner: false);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update setting: $e'), backgroundColor: Colors.redAccent),
+      );
+    }
+  }
+
+  Future<void> _addAdmin(String email) async {
+    final targetEmail = email.trim().toLowerCase();
+    if (targetEmail.isEmpty) return;
+
+    setState(() => _isAddingAdmin = true);
+    try {
+      if (_currentAdminRecord?['role'] != 'super_admin') {
+        throw Exception('Only the Super Administrator can add other administrators.');
+      }
+
+      final userRes = await _client
+          .from('user_profiles')
+          .select('id, email')
+          .eq('email', targetEmail)
+          .maybeSingle();
+
+      if (userRes == null) {
+        throw Exception('User must sign up and log in once before being promoted to admin.');
+      }
+
+      final isAlreadyAdmin = _admins.any((a) => (a['email'] as String).toLowerCase() == targetEmail);
+      if (isAlreadyAdmin) {
+        throw Exception('This user is already an administrator.');
+      }
+
+      await _client.from('admins').insert({
+        'user_id': userRes['id'],
+        'email': targetEmail,
+        'role': 'admin',
+      });
+
+      await _client.from('admin_activity_logs').insert({
+        'admin_id': _client.auth.currentUser?.id,
+        'action': 'admin_added',
+        'details': 'Promoted user $targetEmail to admin',
+      });
+
+      _newAdminEmailController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$targetEmail promoted to Admin successfully!'), backgroundColor: const Color(0xFF10B981)),
+      );
+      _loadAdminData(showSpinner: false);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.redAccent),
+      );
+    } finally {
+      setState(() => _isAddingAdmin = false);
+    }
+  }
+
+  Future<void> _deleteAdmin(Map<String, dynamic> admin) async {
+    final adminEmail = admin['email'] as String;
+    if (_currentAdminRecord?['role'] != 'super_admin') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the Super Administrator can remove administrators.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    if (adminEmail.toLowerCase() == _client.auth.currentUser?.email?.toLowerCase()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You cannot remove yourself as an administrator.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        title: const Text('Remove Administrator', style: TextStyle(color: Colors.white)),
+        content: Text('Are you sure you want to remove administrator access for $adminEmail?', style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel', style: TextStyle(color: Colors.white60))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _client.from('admins').delete().eq('id', admin['id']);
+
+      await _client.from('admin_activity_logs').insert({
+        'admin_id': _client.auth.currentUser?.id,
+        'action': 'admin_removed',
+        'details': 'Removed admin: $adminEmail',
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Removed admin access for $adminEmail'), backgroundColor: const Color(0xFF10B981)),
+      );
+      _loadAdminData(showSpinner: false);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to remove admin: $e'), backgroundColor: Colors.redAccent),
       );
     }
   }
@@ -205,41 +454,89 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           indicatorColor: Colors.indigoAccent,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
-          tabs: const [
-            Tab(text: 'Requests'),
-            Tab(text: 'Approved'),
-            Tab(text: 'Audit Logs'),
+          isScrollable: true,
+          tabs: [
+            Tab(text: 'Requests (${_registrations.length})'),
+            Tab(text: 'Approved (${_approvedUsers.length})'),
+            Tab(text: 'Admins (${_admins.length})'),
+            const Tab(text: 'Settings'),
+            const Tab(text: 'Audit Logs'),
           ],
         ),
         actions: [
           IconButton(
             icon: const Icon(LucideIcons.refreshCw, size: 18),
-            onPressed: _loadAdminData,
+            onPressed: () => _loadAdminData(showSpinner: true),
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.indigoAccent))
-          : TabBarView(
-              controller: _tabController,
+          : Column(
               children: [
-                _buildRequestsTab(),
-                _buildApprovedTab(),
-                _buildLogsTab(),
+                if (_tabController.index != 3 && _tabController.index != 4) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                    child: TextFormField(
+                      controller: _searchController,
+                      style: const TextStyle(color: Colors.white, fontSize: 13.5),
+                      onChanged: (val) {
+                        setState(() {
+                          _searchQuery = val;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(LucideIcons.search, color: Colors.white38, size: 16),
+                        hintText: 'Search by name or email...',
+                        hintStyle: const TextStyle(color: Colors.white30, fontSize: 12.5),
+                        filled: true,
+                        fillColor: const Color(0xFF0F172A).withOpacity(0.5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildRequestsTab(),
+                      _buildApprovedTab(),
+                      _buildAdminsTab(),
+                      _buildSettingsTab(),
+                      _buildLogsTab(),
+                    ],
+                  ),
+                ),
               ],
             ),
     );
   }
 
   Widget _buildRequestsTab() {
-    if (_registrations.isEmpty) {
+    final filtered = _registrations.where((r) {
+      final query = _searchQuery.toLowerCase();
+      final name = (r['name'] ?? '').toString().toLowerCase();
+      final email = (r['email'] ?? '').toString().toLowerCase();
+      return name.contains(query) || email.contains(query);
+    }).toList();
+
+    if (filtered.isEmpty) {
       return _buildEmptyState('No pending registrations found.');
     }
+
     return ListView.builder(
-      padding: const EdgeInsets.all(20.0),
-      itemCount: _registrations.length,
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+      itemCount: filtered.length,
       itemBuilder: (context, index) {
-        final reg = _registrations[index];
+        final reg = filtered[index];
         final formattedDate = DateFormat('MMM dd, hh:mm a').format(DateTime.parse(reg['submitted_at']));
 
         return Container(
@@ -304,14 +601,21 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   }
 
   Widget _buildApprovedTab() {
-    if (_approvedUsers.isEmpty) {
+    final filtered = _approvedUsers.where((u) {
+      final query = _searchQuery.toLowerCase();
+      final email = (u['email'] ?? '').toString().toLowerCase();
+      return email.contains(query);
+    }).toList();
+
+    if (filtered.isEmpty) {
       return _buildEmptyState('No approved users yet.');
     }
+
     return ListView.builder(
-      padding: const EdgeInsets.all(20.0),
-      itemCount: _approvedUsers.length,
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+      itemCount: filtered.length,
       itemBuilder: (context, index) {
-        final user = _approvedUsers[index];
+        final user = filtered[index];
         final isPaused = user['is_paused'] == true;
 
         return Container(
@@ -385,12 +689,280 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     );
   }
 
+  Widget _buildAdminsTab() {
+    final isSuperAdmin = _currentAdminRecord?['role'] == 'super_admin';
+
+    final filtered = _admins.where((a) {
+      final query = _searchQuery.toLowerCase();
+      final email = (a['email'] ?? '').toString().toLowerCase();
+      return email.contains(query);
+    }).toList();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isSuperAdmin) ...[
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A).withOpacity(0.5),
+                borderRadius: BorderRadius.circular(16.0),
+                border: Border.all(color: Colors.white.withOpacity(0.04)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'PROMOTE USER TO ADMIN',
+                    style: TextStyle(color: Colors.indigoAccent, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _newAdminEmailController,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'Enter email address...',
+                            hintStyle: const TextStyle(color: Colors.white24, fontSize: 12.5),
+                            filled: true,
+                            fillColor: const Color(0xFF080D1A).withOpacity(0.8),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      ElevatedButton(
+                        onPressed: _isAddingAdmin
+                            ? null
+                            : () => _addAdmin(_newAdminEmailController.text),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo.shade600,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                        ),
+                        child: _isAddingAdmin
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Add', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'The user must have logged into the app at least once before they can be promoted.',
+                    style: TextStyle(color: Colors.white30, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(12.0),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12.0),
+                border: Border.all(color: Colors.amber.withOpacity(0.1)),
+              ),
+              child: Row(
+                children: const [
+                  Icon(LucideIcons.shieldAlert, color: Colors.amber, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Only the Super Administrator can add or remove other administrators.',
+                      style: TextStyle(color: Colors.amber, fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+          const Text(
+            'ADMINISTRATORS LIST',
+            style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          ),
+          const SizedBox(height: 12),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filtered.length,
+            itemBuilder: (context, index) {
+              final admin = filtered[index];
+              final email = admin['email'] as String;
+              final role = admin['role'] ?? 'admin';
+              final isSelf = email.toLowerCase() == _client.auth.currentUser?.email?.toLowerCase();
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12.0),
+                padding: const EdgeInsets.all(14.0),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A).withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12.0),
+                  border: Border.all(color: Colors.white.withOpacity(0.04)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            email,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: role == 'super_admin'
+                                  ? Colors.purple.withOpacity(0.1)
+                                  : Colors.indigoAccent.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4.0),
+                            ),
+                            child: Text(
+                              role == 'super_admin' ? 'Super Admin' : 'Admin',
+                              style: TextStyle(
+                                color: role == 'super_admin' ? Colors.purpleAccent : Colors.indigoAccent.shade100,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isSuperAdmin && !isSelf && role != 'super_admin') ...[
+                      IconButton(
+                        icon: const Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                        onPressed: () => _deleteAdmin(admin),
+                        tooltip: 'Revoke Admin privileges',
+                      ),
+                    ]
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsTab() {
+    final maintenanceMode = _settings['maintenance_mode'] == true;
+    final downloadsEnabled = _settings['downloads_enabled'] != false; // default true
+    final sharingEnabled = _settings['sharing_enabled'] != false; // default true
+
+    return ListView(
+      padding: const EdgeInsets.all(20.0),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A).withOpacity(0.5),
+            borderRadius: BorderRadius.circular(16.0),
+            border: Border.all(color: Colors.white.withOpacity(0.04)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'SYSTEM CONTROLS',
+                style: TextStyle(color: Colors.indigoAccent, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              ),
+              const SizedBox(height: 16),
+              _buildSettingToggle(
+                label: 'Maintenance Mode',
+                description: 'Show a maintenance notification screen to all users.',
+                checked: maintenanceMode,
+                onChange: () => _toggleSetting('maintenance_mode', maintenanceMode),
+              ),
+              const Divider(color: Colors.white10),
+              _buildSettingToggle(
+                label: 'Downloads Enabled',
+                description: 'Allow clients to download files through shared URLs.',
+                checked: downloadsEnabled,
+                onChange: () => _toggleSetting('downloads_enabled', downloadsEnabled),
+              ),
+              const Divider(color: Colors.white10),
+              _buildSettingToggle(
+                label: 'Sharing Enabled',
+                description: 'Allow normal users to generate public sharing links.',
+                checked: sharingEnabled,
+                onChange: () => _toggleSetting('sharing_enabled', sharingEnabled),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingToggle({
+    required String label,
+    required String description,
+    required bool checked,
+    required VoidCallback onChange,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: const TextStyle(color: Colors.white38, fontSize: 11.5),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Switch(
+            value: checked,
+            onChanged: (val) => onChange(),
+            activeColor: Colors.indigoAccent,
+            activeTrackColor: Colors.indigoAccent.withOpacity(0.3),
+            inactiveThumbColor: Colors.grey,
+            inactiveTrackColor: Colors.white10,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLogsTab() {
     if (_logs.isEmpty) {
       return _buildEmptyState('No logs found.');
     }
     return ListView.builder(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
       itemCount: _logs.length,
       itemBuilder: (context, index) {
         final log = _logs[index];
