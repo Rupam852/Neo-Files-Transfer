@@ -98,15 +98,14 @@ class AuthService extends ChangeNotifier {
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'admins',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'user_id',
+              value: _user!.id,
+            ),
             callback: (payload) async {
               if (_user != null) {
-                final Map<String, dynamic>? newRecord = payload.newRecord;
-                final Map<String, dynamic>? oldRecord = payload.oldRecord;
-                final newUserId = newRecord?['user_id']?.toString();
-                final oldUserId = oldRecord?['user_id']?.toString();
-                if (newUserId == _user!.id || oldUserId == _user!.id) {
-                  await loadProfile(_user!);
-                }
+                await loadProfile(_user!);
               }
             });
     _adminChannel?.subscribe();
