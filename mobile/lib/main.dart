@@ -12,6 +12,7 @@ import 'screens/pending_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/admin_screen.dart';
 import 'screens/session_invalidated_screen.dart';
+import 'screens/maintenance_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -86,6 +87,7 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
   bool? _lastIsAdmin;
   bool? _lastIsPaused;
   bool? _lastIsSessionInvalidated;
+  bool? _lastIsUnderMaintenance;
   String? _lastUserId;
 
   @override
@@ -99,6 +101,7 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
       _lastIsAdmin = auth.isAdmin;
       _lastIsPaused = auth.isPaused;
       _lastIsSessionInvalidated = auth.isSessionInvalidated;
+      _lastIsUnderMaintenance = auth.isUnderMaintenance;
       _lastUserId = auth.currentUser?.id;
     }
   }
@@ -115,15 +118,18 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
     final newIsAdmin = _authService!.isAdmin;
     final newIsPaused = _authService!.isPaused;
     final newIsSessionInvalidated = _authService!.isSessionInvalidated;
+    final newIsUnderMaintenance = _authService!.isUnderMaintenance;
     final newUserId = _authService!.currentUser?.id;
 
     if (newIsAdmin != _lastIsAdmin ||
         newIsPaused != _lastIsPaused ||
         newIsSessionInvalidated != _lastIsSessionInvalidated ||
+        newIsUnderMaintenance != _lastIsUnderMaintenance ||
         newUserId != _lastUserId) {
       _lastIsAdmin = newIsAdmin;
       _lastIsPaused = newIsPaused;
       _lastIsSessionInvalidated = newIsSessionInvalidated;
+      _lastIsUnderMaintenance = newIsUnderMaintenance;
       _lastUserId = newUserId;
 
       final navigator = Navigator.of(context);
@@ -173,6 +179,11 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
 
     if (auth.isAdmin) {
       return const AdminScreen();
+    }
+
+    // Maintenance mode: show screen to regular users (admins bypass it)
+    if (auth.isUnderMaintenance) {
+      return const MaintenanceScreen();
     }
 
     if (auth.isPaused) {

@@ -10,6 +10,7 @@ class AuthService extends ChangeNotifier {
   bool _isAdmin = false;
   bool _isPaused = false;
   bool _isSessionInvalidated = false;
+  bool _isUnderMaintenance = false;
   bool _isLoading = true;
   String? _loginError;
   String? _localMobileSessionId;
@@ -19,6 +20,7 @@ class AuthService extends ChangeNotifier {
   bool get isAdmin => _isAdmin;
   bool get isPaused => _isPaused;
   bool get isSessionInvalidated => _isSessionInvalidated;
+  bool get isUnderMaintenance => _isUnderMaintenance;
   bool get isLoading => _isLoading;
   String? get loginError => _loginError;
 
@@ -62,6 +64,7 @@ class AuthService extends ChangeNotifier {
   RealtimeChannel? _adminChannel;
   RealtimeChannel? _approvedChannel;
   RealtimeChannel? _profileChannel;
+  RealtimeChannel? _settingsChannel;
 
   Future<String> _getOrCreateLocalMobileSessionId() async {
     if (_localMobileSessionId != null) return _localMobileSessionId!;
@@ -144,6 +147,32 @@ class AuthService extends ChangeNotifier {
               }
             });
     _profileChannel?.subscribe();
+
+    // Listen to system_settings for maintenance mode changes
+    _settingsChannel = _client
+        .channel('auth-settings-changes')
+        .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'system_settings',
+            callback: (payload) async {
+              // Re-fetch all settings to get the latest state
+              try {
+                final settingsRes = await _client.from('system_settings').select();
+                bool maintenance = false;
+                for (final s in settingsRes) {
+                  if (s['key'] == 'maintenance_mode') {
+                    maintenance = s['value'] == true;
+                    break;
+                  }
+                }
+                _isUnderMaintenance = maintenance;
+                notifyListeners();
+              } catch (e) {
+                debugPrint('Failed to refresh settings: $e');
+              }
+            });
+    _settingsChannel?.subscribe();
   }
 
   void _clearRealtimeListeners() {
@@ -158,6 +187,10 @@ class AuthService extends ChangeNotifier {
     if (_profileChannel != null) {
       _client.removeChannel(_profileChannel!);
       _profileChannel = null;
+    }
+    if (_settingsChannel != null) {
+      _client.removeChannel(_settingsChannel!);
+      _settingsChannel = null;
     }
   }
 
@@ -259,6 +292,20 @@ class AuthService extends ChangeNotifier {
 
       _isAdmin = adminResponse != null;
 
+      // Fetch maintenance mode setting
+      try {
+        final settingsRes = await _client.from('system_settings').select();
+        _isUnderMaintenance = false;
+        for (final s in settingsRes) {
+          if (s['key'] == 'maintenance_mode') {
+            _isUnderMaintenance = s['value'] == true;
+            break;
+          }
+        }
+      } catch (e) {
+        debugPrint('Failed to fetch settings: $e');
+      }
+
       // Check if user is Paused (if not Admin)
       if (!_isAdmin) {
         final approvedResponse = await _client
@@ -344,6 +391,7 @@ class AuthService extends ChangeNotifier {
     _isAdmin = false;
     _isPaused = false;
     _isSessionInvalidated = false;
+    _isUnderMaintenance = false;
     _isLoading = false;
     if (clearError) {
       _loginError = null;
