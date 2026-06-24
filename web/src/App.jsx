@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 
-import { ShieldAlert, LogOut } from 'lucide-react'
+import { ShieldAlert, LogOut, Wrench } from 'lucide-react'
 
 // Layouts
 import MainLayout from './layouts/MainLayout'
@@ -112,9 +112,47 @@ function SessionInvalidatedScreen() {
   )
 }
 
+function MaintenanceScreen() {
+  const { signOut } = useAuth()
+
+  return (
+    <div className="min-h-screen w-full bg-[#030712] text-gray-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 font-['Plus_Jakarta_Sans'] relative overflow-hidden">
+      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+
+      {/* Amber glow blobs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-amber-500/5 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-amber-500/5 blur-[120px] pointer-events-none" />
+
+      {/* Main Card */}
+      <div className="w-full max-w-md bg-slate-950/80 backdrop-blur-3xl border border-amber-500/10 rounded-3xl p-6 sm:p-10 shadow-2xl relative z-10 text-center space-y-6">
+        <div className="w-20 h-20 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center mx-auto text-amber-400">
+          <Wrench size={38} className="animate-pulse" />
+        </div>
+
+        <div className="space-y-3">
+          <h2 className="text-2xl font-bold text-white font-['Space_Grotesk']">Under Maintenance</h2>
+          <p className="text-sm text-slate-400 leading-relaxed">
+            The platform is temporarily unavailable while we perform scheduled maintenance. Your files and data remain safe.
+          </p>
+          <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-3 text-xs text-amber-400 font-semibold">
+            We'll be back shortly. Thank you for your patience.
+          </div>
+        </div>
+
+        <button
+          onClick={signOut}
+          className="w-full bg-dark-500 hover:bg-dark-400 border border-dark-300 text-gray-300 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300 active:scale-[0.98]"
+        >
+          <LogOut size={18} /> Sign Out
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // HomeRoute resolves the base URL page dynamically based on login and roles
 function HomeRoute() {
-  const { user, isAdmin, isPaused, isSessionInvalidated, loading } = useAuth()
+  const { user, isAdmin, isPaused, isSessionInvalidated, isUnderMaintenance, loading } = useAuth()
 
   if (loading) return <LoadingScreen />
 
@@ -128,6 +166,11 @@ function HomeRoute() {
 
   if (isAdmin) {
     return <AdminDashboardPage />
+  }
+
+  // Maintenance mode: admins bypass, regular users see maintenance screen
+  if (isUnderMaintenance) {
+    return <MaintenanceScreen />
   }
 
   if (isPaused) {

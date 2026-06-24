@@ -10,6 +10,7 @@ export function AuthProvider({ children }) {
   const [adminRecord, setAdminRecord] = useState(null)
   const [isPaused, setIsPaused] = useState(false)
   const [isSessionInvalidated, setIsSessionInvalidated] = useState(false)
+  const [isUnderMaintenance, setIsUnderMaintenance] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const generateSessionId = () => {
@@ -63,6 +64,7 @@ export function AuthProvider({ children }) {
           setIsAdmin(false)
           setAdminRecord(null)
           setIsSessionInvalidated(false)
+          setIsUnderMaintenance(false)
           setLoading(false)
         }
       }
@@ -149,6 +151,30 @@ export function AuthProvider({ children }) {
       supabase.removeChannel(approvedChannel)
       supabase.removeChannel(profileChannel)
     }
+  }, [user])
+
+  // Realtime listener for system_settings (maintenance mode)
+  useEffect(() => {
+    if (!user) return
+
+    const settingsChannel = supabase
+      .channel('auth-settings-maintenance')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'system_settings' },
+        async () => {
+          try {
+            const { data } = await supabase.from('system_settings').select('key, value')
+            const maintenance = data?.find(s => s.key === 'maintenance_mode')?.value || false
+            setIsUnderMaintenance(maintenance)
+          } catch (e) {
+            console.error('Failed to refresh settings:', e)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(settingsChannel)
   }, [user])
 
 
@@ -245,6 +271,15 @@ export function AuthProvider({ children }) {
       setIsAdmin(isUserAdmin)
       setAdminRecord(adminData)
 
+      // Fetch maintenance mode setting
+      try {
+        const { data: settingsData } = await supabase.from('system_settings').select('key, value')
+        const maintenance = settingsData?.find(s => s.key === 'maintenance_mode')?.value || false
+        setIsUnderMaintenance(maintenance)
+      } catch (e) {
+        console.error('Failed to fetch settings:', e)
+      }
+
       // If the user is not an admin, check if their email is in the approved_users list
       if (!isUserAdmin) {
         const { data: approvedData } = await supabase
@@ -297,6 +332,7 @@ export function AuthProvider({ children }) {
     setAdminRecord(null)
     setIsPaused(false)
     setIsSessionInvalidated(false)
+    setIsUnderMaintenance(false)
     try {
       localStorage.removeItem('active_web_session_id')
     } catch (e) {}
@@ -316,6 +352,7 @@ export function AuthProvider({ children }) {
       adminRecord,
       isPaused,
       isSessionInvalidated,
+      isUnderMaintenance,
       loading,
       signInWithGoogle,
       signOut,
