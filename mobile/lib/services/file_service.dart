@@ -92,7 +92,7 @@ class FileService extends ChangeNotifier {
   }
 
   // Create standard DB folder
-  Future<void> createFolder(String name, String? parentDbFolderId) async {
+  Future<Map<String, String>> createFolder(String name, String? parentDbFolderId) async {
     final userId = _authService.currentUser?.id;
     final driveFolderId = _authService.profile?.driveFolderId;
     if (userId == null || driveFolderId == null) throw Exception('Drive folder or user profile not loaded.');
@@ -107,24 +107,53 @@ class FileService extends ChangeNotifier {
       parentDriveFolderId = parentFolder['google_drive_file_id'] as String;
     }
 
-    final driveFileId = await _apiService.createDriveFolder(name, parentDriveFolderId);
+    // Resolve duplicate folder name in target folder
+    String finalFolderName = name.trim();
+    var nameQuery = _client.from('shared_files').select('file_name').eq('user_id', userId).eq('is_folder', true);
+    if (parentDbFolderId != null) {
+      nameQuery = nameQuery.eq('parent_folder_id', parentDbFolderId);
+    } else {
+      nameQuery = nameQuery.filter('parent_folder_id', 'is', null);
+    }
+    
+    final nameResponse = await nameQuery;
+    final existingFolderNames = (nameResponse as List)
+        .map((f) => (f['file_name'] as String).toLowerCase())
+        .toSet();
 
-    await _client.from('shared_files').insert({
+    if (existingFolderNames.contains(finalFolderName.toLowerCase())) {
+      int counter = 1;
+      while (existingFolderNames.contains('${name.trim()} ($counter)'.toLowerCase())) {
+        counter++;
+      }
+      finalFolderName = '${name.trim()} ($counter)';
+    }
+
+    final driveFileId = await _apiService.createDriveFolder(finalFolderName, parentDriveFolderId);
+
+    final insertResponse = await _client.from('shared_files').insert({
       'user_id': userId,
       'google_drive_file_id': driveFileId,
-      'file_name': name,
+      'file_name': finalFolderName,
       'mime_type': 'application/vnd.google-apps.folder',
       'is_folder': true,
       'current_version_num': 1,
       'sharing_status': 'private',
       'parent_folder_id': parentDbFolderId,
-    });
+    }).select('id').single();
+
+    final dbFolderId = insertResponse['id'] as String;
 
     await _client.from('activity_logs').insert({
       'user_id': userId,
       'action': 'create_folder',
-      'details': 'Created folder: $name',
+      'details': 'Created folder: $finalFolderName',
     });
+
+    return {
+      'dbId': dbFolderId,
+      'driveId': driveFileId,
+    };
   }
 
   // Upload file (resumable connection with progress callback)
@@ -142,6 +171,35 @@ class FileService extends ChangeNotifier {
     final targetDriveFolderId = parentDriveFolderId ?? _authService.profile?.driveFolderId;
     if (targetDriveFolderId == null) throw Exception('Drive folder not configured.');
 
+    // Resolve duplicate name in target folder
+    String finalFileName = fileName;
+    var nameQuery = _client.from('shared_files').select('file_name').eq('user_id', userId);
+    if (parentDbFolderId != null) {
+      nameQuery = nameQuery.eq('parent_folder_id', parentDbFolderId);
+    } else {
+      nameQuery = nameQuery.filter('parent_folder_id', 'is', null);
+    }
+    
+    final nameResponse = await nameQuery;
+    final existingNames = (nameResponse as List)
+        .map((f) => (f['file_name'] as String).toLowerCase())
+        .toSet();
+
+    if (existingNames.contains(finalFileName.toLowerCase())) {
+      final lastDotIndex = fileName.lastIndexOf('.');
+      String baseName = fileName;
+      String ext = '';
+      if (lastDotIndex != -1) {
+        baseName = fileName.substring(0, lastDotIndex);
+        ext = fileName.substring(lastDotIndex);
+      }
+      int counter = 1;
+      while (existingNames.contains('${baseName} ($counter)$ext'.toLowerCase())) {
+        counter++;
+      }
+      finalFileName = '${baseName} ($counter)$ext';
+    }
+
     // Step 1: Request resumable session from Google Drive
     String googleToken = await _authService.getGoogleAccessToken() ?? '';
     String uploadUrl = '';
@@ -152,7 +210,7 @@ class FileService extends ChangeNotifier {
       return await dio.post(
         'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
         data: {
-          'name': fileName,
+          'name': finalFileName,
           'parents': [targetDriveFolderId]
         },
         options: Options(
@@ -217,7 +275,7 @@ class FileService extends ChangeNotifier {
     final insertResponse = await _client.from('shared_files').insert({
       'user_id': userId,
       'google_drive_file_id': driveFileId,
-      'file_name': fileName,
+      'file_name': finalFileName,
       'file_size': len,
       'mime_type': driveData['mimeType'] ?? '',
       'current_version_num': 1,
@@ -236,7 +294,7 @@ class FileService extends ChangeNotifier {
     await _client.from('activity_logs').insert({
       'user_id': userId,
       'action': 'upload',
-      'details': 'Uploaded file: $fileName',
+      'details': 'Uploaded file: $finalFileName',
     });
   }
 

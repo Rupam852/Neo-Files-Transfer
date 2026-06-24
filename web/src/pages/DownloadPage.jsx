@@ -256,7 +256,7 @@ export default function DownloadPage() {
               <CheckCircle2 size={36} className="animate-scale-in" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-white font-['Space_Grotesk']">Download Complete</h2>
+              <h2 className="text-2xl font-bold text-white font-['Space_Grotesk']">Download Started</h2>
               <p className="text-sm text-slate-400">{fileInfo?.file_name}</p>
             </div>
             <div className="bg-slate-900/40 rounded-xl p-4 text-sm text-slate-300 leading-relaxed border border-slate-900">

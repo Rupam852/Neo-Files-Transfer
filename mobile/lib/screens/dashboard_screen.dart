@@ -119,56 +119,320 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
-    final result = await FilePicker.platform.pickFiles(allowMultiple: false);
+    final result = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (result == null || result.files.isEmpty) return;
 
-    final picked = result.files.first;
-    final file = File(picked.path!);
+    final blockedExtensions = ['exe', 'bat', 'cmd', 'msi', 'scr'];
 
     setState(() {
       _isUploading = true;
-      _uploadingFileName = picked.name;
+      _uploadingFileName = 'Initializing...';
       _uploadProgress = 0.0;
       _uploadCancelToken = CancelToken();
     });
 
     try {
       final fileService = Provider.of<FileService>(context, listen: false);
-      _lastUploadProgressUpdate = null;
-      await fileService.uploadFile(
-        file: file,
-        fileName: picked.name,
-        parentDbFolderId: _currentFolder?.id,
-        parentDriveFolderId: _currentFolder?.googleDriveFileId,
-        cancelToken: _uploadCancelToken!,
-        onProgress: (pct) {
-          final now = DateTime.now();
-          if (_lastUploadProgressUpdate == null ||
-              now.difference(_lastUploadProgressUpdate!).inMilliseconds > 100 ||
-              pct == 1.0) {
-            _lastUploadProgressUpdate = now;
-            setState(() {
-              _uploadProgress = pct;
-            });
+      
+      int successCount = 0;
+      for (int i = 0; i < result.files.length; i++) {
+        final picked = result.files[i];
+        if (picked.path == null) continue;
+        
+        final ext = picked.name.split('.').last.toLowerCase();
+        if (blockedExtensions.contains(ext)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('File ${picked.name} has a blocked extension and was skipped.'),
+                backgroundColor: Colors.orangeAccent,
+              ),
+            );
           }
-        },
-      );
+          continue;
+        }
 
-      if (mounted) {
+        final uploadLimit = AppConfig.proxyUrl.isNotEmpty ? 250 * 1024 * 1024 : 100 * 1024 * 1024;
+        final limitLabel = AppConfig.proxyUrl.isNotEmpty ? '250MB' : '100MB';
+        if (picked.size > uploadLimit) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('File ${picked.name} exceeds $limitLabel and was skipped.'),
+                backgroundColor: Colors.orangeAccent,
+              ),
+            );
+          }
+          continue;
+        }
+
+        final file = File(picked.path!);
+
+        setState(() {
+          _uploadingFileName = 'Uploading ${i + 1} of ${result.files.length}: ${picked.name}';
+          _uploadProgress = 0.0;
+        });
+
+        _lastUploadProgressUpdate = null;
+        await fileService.uploadFile(
+          file: file,
+          fileName: picked.name,
+          parentDbFolderId: _currentFolder?.id,
+          parentDriveFolderId: _currentFolder?.googleDriveFileId,
+          cancelToken: _uploadCancelToken!,
+          onProgress: (pct) {
+            final now = DateTime.now();
+            if (_lastUploadProgressUpdate == null ||
+                now.difference(_lastUploadProgressUpdate!).inMilliseconds > 100 ||
+                pct == 1.0) {
+              _lastUploadProgressUpdate = now;
+              setState(() {
+                _uploadProgress = pct;
+              });
+            }
+          },
+        );
+        successCount++;
+      }
+
+      if (mounted && successCount > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${picked.name} uploaded successfully!'),
+            content: Text('Successfully uploaded $successCount files!'),
             backgroundColor: const Color(0xFF10B981),
           ),
         );
       }
       _refreshFiles();
     } catch (e) {
+      final errorMsg = _formatError(e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Upload failed: ${e.toString()}'),
-            backgroundColor: Colors.redAccent,
+            content: Text(errorMsg),
+            backgroundColor: errorMsg.contains('cancel') ? Colors.orangeAccent : Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isUploading = false;
+        _uploadCancelToken = null;
+      });
+    }
+  }
+
+  Future<void> _handleUploadFolder() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    if (authService.profile?.isFolderVerified != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please configure and verify your Google Drive folder in Settings first.')),
+      );
+      return;
+    }
+
+    final selectedDirectory = await FilePicker.platform.getDirectoryPath();
+    if (selectedDirectory == null) return;
+
+    final rootDir = Directory(selectedDirectory);
+    if (!rootDir.existsSync()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selected directory does not exist.')),
+      );
+      return;
+    }
+
+    final rootName = rootDir.path.split(Platform.pathSeparator).last;
+    if (rootName.isEmpty) return;
+
+    setState(() {
+      _isUploading = true;
+      _uploadingFileName = 'Analyzing folder structure...';
+      _uploadProgress = 0.0;
+      _uploadCancelToken = CancelToken();
+    });
+
+    try {
+      final fileService = Provider.of<FileService>(context, listen: false);
+      
+      // 1. List files and directories recursively
+      List<FileSystemEntity> entities = [];
+      try {
+        entities = rootDir.listSync(recursive: true);
+      } catch (e) {
+        throw Exception('Failed to read folder contents: $e');
+      }
+
+      // 2. Resolve duplicate name for root folder
+      String uniqueRootName = rootName;
+      final userId = authService.currentUser?.id;
+      if (userId == null) throw Exception('User not logged in.');
+
+      final supabase = Supabase.instance.client;
+      var rootNameQuery = supabase.from('shared_files').select('file_name').eq('user_id', userId).eq('is_folder', true);
+      if (_currentFolder?.id != null) {
+        rootNameQuery = rootNameQuery.eq('parent_folder_id', _currentFolder!.id);
+      } else {
+        rootNameQuery = rootNameQuery.filter('parent_folder_id', 'is', null);
+      }
+
+      final rootNameResponse = await rootNameQuery;
+      final existingFolderNames = (rootNameResponse as List)
+          .map((f) => (f['file_name'] as String).toLowerCase())
+          .toSet();
+
+      if (existingFolderNames.contains(uniqueRootName.toLowerCase())) {
+        int counter = 1;
+        while (existingFolderNames.contains('${rootName} ($counter)'.toLowerCase())) {
+          counter++;
+        }
+        uniqueRootName = '${rootName} ($counter)';
+      }
+
+      // 3. Helper to get normalized relative path starting with uniqueRootName
+      final parentPath = rootDir.parent.path;
+      String getRelativePath(String path) {
+        String relPath = path.substring(parentPath.length);
+        if (relPath.startsWith(Platform.pathSeparator)) {
+          relPath = relPath.substring(1);
+        }
+        relPath = relPath.replaceAll(Platform.pathSeparator, '/');
+        if (uniqueRootName != rootName) {
+          final firstSlash = relPath.indexOf('/');
+          if (firstSlash != -1) {
+            relPath = uniqueRootName + relPath.substring(firstSlash);
+          } else {
+            relPath = uniqueRootName;
+          }
+        }
+        return relPath;
+      }
+
+      // 4. Gather subfolder paths and sort them by hierarchy depth
+      final List<String> folderPaths = [uniqueRootName];
+      for (final entity in entities) {
+        if (entity is Directory) {
+          folderPaths.add(getRelativePath(entity.path));
+        }
+      }
+      folderPaths.sort((a, b) => a.split('/').length.compareTo(b.split('/').length));
+
+      // 5. Create folders sequentially
+      final Map<String, Map<String, String>> pathLookup = {};
+      final driveFolderId = authService.profile?.driveFolderId;
+      if (driveFolderId == null) throw Exception('Drive folder not configured.');
+
+      for (final path in folderPaths) {
+        if (_uploadCancelToken?.isCancelled == true) {
+          throw DioException(
+            requestOptions: RequestOptions(path: ''),
+            type: DioExceptionType.cancel,
+          );
+        }
+
+        final parts = path.split('/');
+        final fName = parts.last;
+
+        String? parentDbId = _currentFolder?.id;
+
+        if (parts.length > 1) {
+          parts.removeLast();
+          final parentPathStr = parts.join('/');
+          final parentInfo = pathLookup[parentPathStr];
+          if (parentInfo != null) {
+            parentDbId = parentInfo['dbId'];
+          }
+        }
+
+        setState(() {
+          _uploadingFileName = 'Creating folder: $path';
+          _uploadProgress = 0.0;
+        });
+
+        final folderResult = await fileService.createFolder(fName, parentDbId);
+        pathLookup[path] = folderResult;
+      }
+
+      // 6. Gather all files and upload them sequentially
+      final List<File> filesToUpload = entities.whereType<File>().toList();
+      final blockedExtensions = ['exe', 'bat', 'cmd', 'msi', 'scr'];
+      int successCount = 0;
+
+      for (int i = 0; i < filesToUpload.length; i++) {
+        if (_uploadCancelToken?.isCancelled == true) {
+          throw DioException(
+            requestOptions: RequestOptions(path: ''),
+            type: DioExceptionType.cancel,
+          );
+        }
+
+        final fileEntity = filesToUpload[i];
+        final fileName = fileEntity.path.split(Platform.pathSeparator).last;
+
+        final ext = fileName.split('.').last.toLowerCase();
+        if (blockedExtensions.contains(ext)) {
+          continue;
+        }
+
+        final len = await fileEntity.length();
+        final uploadLimit = AppConfig.proxyUrl.isNotEmpty ? 250 * 1024 * 1024 : 100 * 1024 * 1024;
+        if (len > uploadLimit) {
+          continue;
+        }
+
+        // Get relative folder path of parent
+        final relFilePath = getRelativePath(fileEntity.path);
+        final parts = relFilePath.split('/');
+        parts.removeLast();
+        final parentPathStr = parts.join('/');
+
+        final parentInfo = pathLookup[parentPathStr];
+        final parentDbId = parentInfo?['dbId'];
+        final parentDriveId = parentInfo?['driveId'];
+
+        setState(() {
+          _uploadingFileName = 'Uploading file ${i + 1} of ${filesToUpload.length}: $fileName';
+          _uploadProgress = 0.0;
+        });
+
+        _lastUploadProgressUpdate = null;
+        await fileService.uploadFile(
+          file: fileEntity,
+          fileName: fileName,
+          parentDbFolderId: parentDbId,
+          parentDriveFolderId: parentDriveId,
+          cancelToken: _uploadCancelToken!,
+          onProgress: (pct) {
+            final now = DateTime.now();
+            if (_lastUploadProgressUpdate == null ||
+                now.difference(_lastUploadProgressUpdate!).inMilliseconds > 100 ||
+                pct == 1.0) {
+              _lastUploadProgressUpdate = now;
+              setState(() {
+                _uploadProgress = pct;
+              });
+            }
+          },
+        );
+        successCount++;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Successfully uploaded folder structure with $successCount files!'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      }
+      _refreshFiles();
+    } catch (e) {
+      final errorMsg = _formatError(e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: errorMsg.contains('cancel') ? Colors.orangeAccent : Colors.redAccent,
           ),
         );
       }
@@ -186,6 +450,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isUploading = false;
       _uploadCancelToken = null;
     });
+  }
+
+  String _formatError(dynamic e) {
+    final errString = e.toString().toLowerCase();
+    
+    if (errString.contains('cancel') || errString.contains('cancelled')) {
+      return 'Upload cancelled by user.';
+    }
+    if (errString.contains('socketexception') || 
+        errString.contains('network') || 
+        errString.contains('connection timed out') || 
+        errString.contains('failed host lookup') ||
+        errString.contains('handshake') ||
+        errString.contains('connection closed') ||
+        errString.contains('unreachable')) {
+      return 'Connection failed. Please check your internet connection.';
+    }
+    if (errString.contains('quotaexceeded') || errString.contains('storage limit') || (errString.contains('403') && errString.contains('quota'))) {
+      return 'Your Google Drive storage limit has been exceeded. Please free up space and try again.';
+    }
+    if (errString.contains('401') || errString.contains('unauthorized') || errString.contains('google drive connection expired')) {
+      return 'Google Drive session expired. Please reconnect in settings.';
+    }
+    if (errString.contains('permission') || errString.contains('denied') || errString.contains('forbidden')) {
+      return 'Permission denied. Please verify your Google Drive settings.';
+    }
+
+    String msg = e.toString();
+    if (msg.startsWith('Exception: ')) {
+      msg = msg.substring('Exception: '.length);
+    }
+    if (msg.startsWith('Initiating Google upload session failed: ')) {
+      msg = msg.substring('Initiating Google upload session failed: '.length);
+    }
+    if (msg.startsWith('Exception: Initiating Google upload session failed: ')) {
+      msg = msg.substring('Exception: Initiating Google upload session failed: '.length);
+    }
+    if (msg.startsWith('Failed to create folder: ')) {
+      msg = msg.substring('Failed to create folder: '.length);
+    }
+    if (msg.startsWith('Failed to rename: ')) {
+      msg = msg.substring('Failed to rename: '.length);
+    }
+    if (msg.startsWith('Failed to toggle sharing: ')) {
+      msg = msg.substring('Failed to toggle sharing: '.length);
+    }
+    if (msg.startsWith('Failed to delete: ')) {
+      msg = msg.substring('Failed to delete: '.length);
+    }
+    return msg;
   }
 
   Future<void> _handleCreateFolder() async {
@@ -229,7 +543,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to create folder: $e'), backgroundColor: Colors.redAccent),
+                    SnackBar(content: Text('Failed to create folder: ${_formatError(e)}'), backgroundColor: Colors.redAccent),
                   );
                 }
               }
@@ -278,7 +592,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to rename: $e'), backgroundColor: Colors.redAccent),
+                    SnackBar(content: Text('Failed to rename: ${_formatError(e)}'), backgroundColor: Colors.redAccent),
                   );
                 }
               }
@@ -328,7 +642,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to toggle sharing: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text('Failed to toggle sharing: ${_formatError(e)}'), backgroundColor: Colors.redAccent),
         );
       }
     }
@@ -636,7 +950,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to delete: $e'), backgroundColor: Colors.redAccent),
+                    SnackBar(content: Text('Failed to delete: ${_formatError(e)}'), backgroundColor: Colors.redAccent),
                   );
                 }
               }
@@ -743,10 +1057,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         ListTile(
                           leading: const Icon(LucideIcons.filePlus, color: Colors.indigoAccent),
-                          title: const Text('Upload File', style: TextStyle(color: Colors.white)),
+                          title: const Text('Upload Files', style: TextStyle(color: Colors.white)),
                           onTap: () {
                             Navigator.pop(context);
                             _handleUploadFile();
+                          },
+                        ),
+                        ListTile(
+                          leading: const Icon(LucideIcons.folder, color: Colors.teal),
+                          title: const Text('Upload Folder', style: TextStyle(color: Colors.white)),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _handleUploadFolder();
                           },
                         ),
                         ListTile(
