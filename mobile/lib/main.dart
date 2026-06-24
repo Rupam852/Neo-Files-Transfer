@@ -10,6 +10,7 @@ import 'services/file_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/pending_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/admin_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -107,6 +108,10 @@ class HomeRouteResolver extends StatelessWidget {
 
     if (auth.currentUser == null) {
       return const LoginScreen();
+    }
+
+    if (auth.isAdmin) {
+      return const AdminScreen();
     }
 
     if (auth.isPaused) {

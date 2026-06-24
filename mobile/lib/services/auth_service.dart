@@ -41,7 +41,9 @@ class AuthService extends ChangeNotifier {
           'google_access_token': session.providerToken,
           'google_refresh_token': session.providerRefreshToken,
         });
+        _setupRealtimeListeners();
       } else {
+        _clearRealtimeListeners();
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('google_provider_token');
         await prefs.remove('google_refresh_token');
@@ -52,15 +54,13 @@ class AuthService extends ChangeNotifier {
         notifyListeners();
       }
     });
-
-    // Realtime listeners for admin/approved status changes
-    _setupRealtimeListeners();
   }
 
   RealtimeChannel? _adminChannel;
   RealtimeChannel? _approvedChannel;
 
   void _setupRealtimeListeners() {
+    _clearRealtimeListeners();
     if (_user == null) return;
 
     _adminChannel = _client
@@ -71,8 +71,10 @@ class AuthService extends ChangeNotifier {
             table: 'admins',
             callback: (payload) async {
               if (_user != null) {
-                final newUserId = payload.newRecord['user_id']?.toString();
-                final oldUserId = payload.oldRecord['user_id']?.toString();
+                final newRecord = payload.newRecord;
+                final oldRecord = payload.oldRecord;
+                final newUserId = newRecord['user_id']?.toString();
+                final oldUserId = oldRecord['user_id']?.toString();
                 if (newUserId == _user!.id || oldUserId == _user!.id) {
                   await loadProfile(_user!);
                 }

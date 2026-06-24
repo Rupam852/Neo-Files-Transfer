@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({Key? key}) : super(key: key);
@@ -154,16 +157,40 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       // 6. Fetch activity logs
       final logRes = await _client
           .from('activity_logs')
-          .select('*, user_profiles(name, email)')
+          .select()
           .order('created_at', ascending: false)
           .limit(50);
+      final List<Map<String, dynamic>> logsList = List<Map<String, dynamic>>.from(logRes as List);
+
+      // Fetch user profiles for these logs
+      final userIds = logsList.map((log) => log['user_id'] as String).toSet().toList();
+      Map<String, Map<String, dynamic>> profilesMap = {};
+      if (userIds.isNotEmpty) {
+        final profilesRes = await _client
+            .from('user_profiles')
+            .select('id, name, email')
+            .inFilter('id', userIds);
+        for (final p in (profilesRes as List)) {
+          profilesMap[p['id'] as String] = p as Map<String, dynamic>;
+        }
+      }
+
+      // Merge profiles into logs
+      final mergedLogs = logsList.map((log) {
+        final userId = log['user_id'] as String;
+        final profile = profilesMap[userId];
+        return {
+          ...log,
+          'user_profiles': profile,
+        };
+      }).toList();
 
       setState(() {
         _registrations = filteredPending;
         _approvedUsers = filteredApproved;
         _admins = adminsList;
         _settings = settingsMap;
-        _logs = List<Map<String, dynamic>>.from(logRes as List);
+        _logs = mergedLogs;
       });
     } catch (e) {
       debugPrint('Failed to load admin data: $e');
@@ -434,42 +461,90 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF030712),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Admin Dashboard',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.indigoAccent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          isScrollable: true,
-          tabs: [
-            Tab(text: 'Requests (${_registrations.length})'),
-            Tab(text: 'Approved (${_approvedUsers.length})'),
-            Tab(text: 'Admins (${_admins.length})'),
-            const Tab(text: 'Settings'),
-            const Tab(text: 'Audit Logs'),
-          ],
+  Future<void> _showLogoutDialog(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Logout Session', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        content: const Text(
+          'Are you sure you want to sign out of your session?',
+          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.refreshCw, size: 18),
-            onPressed: () => _loadAdminData(showSpinner: true),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Logout'),
           ),
         ],
       ),
+    );
+
+    if (confirm == true) {
+      if (mounted) {
+        final authService = Provider.of<AuthService>(context, listen: false);
+        await authService.signOut();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        SystemNavigator.pop();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF030712),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: canPop
+              ? IconButton(
+                  icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                )
+              : null,
+          title: const Text(
+            'Admin Dashboard',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          bottom: TabBar(
+            controller: _tabController,
+            indicatorColor: Colors.indigoAccent,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white60,
+            isScrollable: true,
+            tabs: [
+              Tab(text: 'Requests (${_registrations.length})'),
+              Tab(text: 'Approved (${_approvedUsers.length})'),
+              Tab(text: 'Admins (${_admins.length})'),
+              const Tab(text: 'Settings'),
+              const Tab(text: 'Audit Logs'),
+            ],
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(LucideIcons.refreshCw, size: 18),
+              onPressed: () => _loadAdminData(showSpinner: true),
+              tooltip: 'Refresh Data',
+            ),
+            IconButton(
+              icon: const Icon(LucideIcons.logOut, size: 18, color: Colors.redAccent),
+              onPressed: () => _showLogoutDialog(context),
+              tooltip: 'Sign Out',
+            ),
+          ],
+        ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.indigoAccent))
           : Column(
@@ -517,6 +592,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                 ),
               ],
             ),
+      ),
     );
   }
 
