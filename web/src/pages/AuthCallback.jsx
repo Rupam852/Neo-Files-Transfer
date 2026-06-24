@@ -40,9 +40,28 @@ export default function AuthCallback() {
         .maybeSingle()
 
       if (!approved && !admin) {
+        let errorMessage = 'Access denied. Please submit a registration request first.'
+        try {
+          const { data: registration } = await supabase
+            .from('pending_registrations')
+            .select('status')
+            .eq('email', userEmail.toLowerCase())
+            .maybeSingle()
+
+          if (registration) {
+            if (registration.status === 'rejected') {
+              errorMessage = 'Your access request has been rejected by an administrator.'
+            } else {
+              errorMessage = 'Your access request is pending administrator approval.'
+            }
+          }
+        } catch (e) {
+          console.error('Error fetching registration status:', e)
+        }
+
         await supabase.auth.signOut()
-        toast.error('Your account has not been approved yet. Please contact an admin.')
-        navigate('/login', { replace: true })
+        toast.error(errorMessage)
+        navigate('/login', { replace: true, state: { error: errorMessage } })
         return
       }
 

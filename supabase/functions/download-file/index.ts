@@ -248,8 +248,8 @@ serve(async (req) => {
       }
 
       // Increment download count in database asynchronously
-      supabaseAdmin.rpc("increment_download_count", { file_id: file.id }).catch((err) => {
-        console.error("Failed to increment download count:", err)
+      supabaseAdmin.rpc("increment_download_count", { file_id: file.id }).then(({ error }) => {
+        if (error) console.error("Failed to increment download count:", error)
       })
 
       return new Response(zippedBytes, {
@@ -309,8 +309,8 @@ serve(async (req) => {
     }
 
     // Increment download count in database asynchronously
-    supabaseAdmin.rpc("increment_download_count", { file_id: file.id }).catch((err) => {
-      console.error("Failed to increment download count:", err)
+    supabaseAdmin.rpc("increment_download_count", { file_id: file.id }).then(({ error }) => {
+      if (error) console.error("Failed to increment download count:", error)
     })
 
     // Stream the body directly to the client

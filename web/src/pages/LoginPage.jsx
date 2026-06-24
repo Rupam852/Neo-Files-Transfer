@@ -1,5 +1,5 @@
 import { useAuth } from '../contexts/AuthContext'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
@@ -8,6 +8,8 @@ import { Shield, ArrowLeft, AlertTriangle, LogIn } from 'lucide-react'
 export default function LoginPage() {
   const { signInWithGoogle, user, loading } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const errorMsg = location.state?.error
 
   useEffect(() => {
     if (user && !loading) {
@@ -119,6 +121,16 @@ export default function LoginPage() {
 
           {/* Google Login Action block */}
           <div className="space-y-6 my-auto">
+            {errorMsg && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
+                <AlertTriangle size={18} className="text-red-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Access Restrained</h4>
+                  <p className="text-xs text-red-300/90 leading-relaxed">{errorMsg}</p>
+                </div>
+              </div>
+            )}
+
             <button
               onClick={handleLogin}
               className="w-full flex items-center justify-center gap-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-gray-200 hover:text-white font-semibold py-3.5 px-4 rounded-xl transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-black/20 cursor-pointer"
