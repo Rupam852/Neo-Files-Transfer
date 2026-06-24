@@ -1133,16 +1133,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
-          if (authService.isAdmin) ...[
-            IconButton(
-              icon: const Icon(LucideIcons.shield, color: Colors.indigoAccent, size: 20),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AdminScreen()),
-              ),
-              tooltip: 'Admin Console',
-            ),
-          ],
           IconButton(
             icon: const Icon(LucideIcons.settings, color: Colors.white, size: 20),
             onPressed: () => Navigator.push(

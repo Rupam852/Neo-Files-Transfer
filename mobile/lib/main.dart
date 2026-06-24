@@ -73,8 +73,59 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class HomeRouteResolver extends StatelessWidget {
+class HomeRouteResolver extends StatefulWidget {
   const HomeRouteResolver({Key? key}) : super(key: key);
+
+  @override
+  State<HomeRouteResolver> createState() => _HomeRouteResolverState();
+}
+
+class _HomeRouteResolverState extends State<HomeRouteResolver> {
+  AuthService? _authService;
+  bool? _lastIsAdmin;
+  bool? _lastIsPaused;
+  String? _lastUserId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = Provider.of<AuthService>(context);
+    if (_authService != auth) {
+      _authService?.removeListener(_onAuthChanged);
+      _authService = auth;
+      _authService?.addListener(_onAuthChanged);
+      _lastIsAdmin = auth.isAdmin;
+      _lastIsPaused = auth.isPaused;
+      _lastUserId = auth.currentUser?.id;
+    }
+  }
+
+  @override
+  void dispose() {
+    _authService?.removeListener(_onAuthChanged);
+    super.dispose();
+  }
+
+  void _onAuthChanged() {
+    if (!mounted || _authService == null) return;
+
+    final newIsAdmin = _authService!.isAdmin;
+    final newIsPaused = _authService!.isPaused;
+    final newUserId = _authService!.currentUser?.id;
+
+    if (newIsAdmin != _lastIsAdmin ||
+        newIsPaused != _lastIsPaused ||
+        newUserId != _lastUserId) {
+      _lastIsAdmin = newIsAdmin;
+      _lastIsPaused = newIsPaused;
+      _lastUserId = newUserId;
+
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) {
+        navigator.popUntil((route) => route.isFirst);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,7 +164,6 @@ class HomeRouteResolver extends StatelessWidget {
     if (auth.isAdmin) {
       return const AdminScreen();
     }
-
 
     if (auth.isPaused) {
       return const PendingScreen();

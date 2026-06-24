@@ -744,29 +744,34 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                   if (val == 'revoke') _revokeUser(user);
                 },
                 icon: const Icon(LucideIcons.moreVertical, color: Colors.white54, size: 20),
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'pause',
-                    child: Row(
-                      children: [
-                        Icon(isPaused ? LucideIcons.checkCircle : LucideIcons.pause, color: Colors.white70, size: 16),
-                        const SizedBox(width: 10),
-                        Text(isPaused ? 'Resume' : 'Pause', style: const TextStyle(color: Colors.white70, fontSize: 13.5)),
-                      ],
+                itemBuilder: (context) {
+                  final isSuperAdmin = _currentAdminRecord?['role'] == 'super_admin';
+                  return [
+                    if (isSuperAdmin) ...[
+                      PopupMenuItem(
+                        value: 'pause',
+                        child: Row(
+                          children: [
+                            Icon(isPaused ? LucideIcons.checkCircle : LucideIcons.pause, color: Colors.white70, size: 16),
+                            const SizedBox(width: 10),
+                            Text(isPaused ? 'Resume' : 'Pause', style: const TextStyle(color: Colors.white70, fontSize: 13.5)),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                    ],
+                    const PopupMenuItem(
+                      value: 'revoke',
+                      child: Row(
+                        children: [
+                          Icon(LucideIcons.trash2, color: Colors.redAccent, size: 16),
+                          SizedBox(width: 10),
+                          Text('Revoke', style: TextStyle(color: Colors.redAccent, fontSize: 13.5)),
+                        ],
+                      ),
                     ),
-                  ),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem(
-                    value: 'revoke',
-                    child: Row(
-                      children: [
-                        Icon(LucideIcons.trash2, color: Colors.redAccent, size: 16),
-                        SizedBox(width: 10),
-                        Text('Revoke', style: TextStyle(color: Colors.redAccent, fontSize: 13.5)),
-                      ],
-                    ),
-                  ),
-                ],
+                  ];
+                },
               )
             ],
           ),
