@@ -327,9 +327,7 @@ export default function DownloadPage() {
                 The requested file hash does not resolve to an active storage link or has been removed.
               </p>
             </div>
-            <Link to="/" className="w-full btn-primary py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
-              Request Console Access
-            </Link>
+            {/* Button removed as requested */}
           </div>
         )}
 
