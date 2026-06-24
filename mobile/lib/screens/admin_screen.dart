@@ -503,8 +503,11 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.canPop(context);
-    return PopScope(
-      canPop: canPop,
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: PopScope(
+        canPop: canPop,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         SystemNavigator.pop();
@@ -599,7 +602,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               ],
             ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildRequestsTab() {
@@ -1039,55 +1043,140 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildLogsTab() {
-    if (_logs.isEmpty) {
-      return _buildEmptyState('No logs found.');
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
-      itemCount: _logs.length,
-      itemBuilder: (context, index) {
-        final log = _logs[index];
-        final profile = log['user_profiles'];
-        final action = log['action'];
-        final details = log['details'] ?? '';
-        final date = DateFormat('MMM dd, hh:mm a').format(DateTime.parse(log['created_at']));
+  Future<void> _showClearLogsConfirmDialog() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Clear Audit Logs', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        content: const Text(
+          'Are you sure you want to clear all activity and audit logs? This action is permanent and cannot be undone.',
+          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Clear All', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12.0),
-          padding: const EdgeInsets.all(12.0),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F172A).withOpacity(0.3),
-            borderRadius: BorderRadius.circular(12.0),
-            border: Border.all(color: Colors.white.withOpacity(0.02)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    action.toString().toUpperCase(),
-                    style: const TextStyle(color: Colors.indigoAccent, fontWeight: FontWeight.bold, fontSize: 10.5),
+    if (confirm == true) {
+      try {
+        setState(() => _isLoading = true);
+        
+        // Delete all rows in activity_logs
+        await _client.from('activity_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        
+        // Log this action
+        await _client.from('admin_activity_logs').insert({
+          'admin_id': _client.auth.currentUser?.id,
+          'action': 'logs_cleared',
+          'details': 'Cleared all activity/audit logs',
+        });
+
+        _loadAdminData(showSpinner: true);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Audit logs cleared successfully.'), backgroundColor: Color(0xFF10B981)),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to clear logs: $e'), backgroundColor: Colors.redAccent),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
+    }
+  }
+
+  Widget _buildLogsTab() {
+    return Column(
+      children: [
+        if (_logs.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: _showClearLogsConfirmDialog,
+                  icon: const Icon(LucideIcons.trash2, size: 14, color: Colors.redAccent),
+                  label: const Text(
+                    'Clear Logs',
+                    style: TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
                   ),
-                  Text(date, style: const TextStyle(color: Colors.white30, fontSize: 10)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                details,
-                style: const TextStyle(color: Colors.white70, fontSize: 12.5),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'By: ${profile?['name'] ?? profile?['email'] ?? 'System'}',
-                style: const TextStyle(color: Colors.white30, fontSize: 10.5),
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
-        );
-      },
+        Expanded(
+          child: _logs.isEmpty
+              ? _buildEmptyState('No logs found.')
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+                  itemCount: _logs.length,
+                  itemBuilder: (context, index) {
+                    final log = _logs[index];
+                    final profile = log['user_profiles'];
+                    final action = log['action'];
+                    final details = log['details'] ?? '';
+                    final date = DateFormat('MMM dd, hh:mm a').format(DateTime.parse(log['created_at']));
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12.0),
+                      padding: const EdgeInsets.all(12.0),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A).withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(12.0),
+                        border: Border.all(color: Colors.white.withOpacity(0.02)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                action.toString().toUpperCase(),
+                                style: const TextStyle(color: Colors.indigoAccent, fontWeight: FontWeight.bold, fontSize: 10.5),
+                              ),
+                              Text(date, style: const TextStyle(color: Colors.white30, fontSize: 10)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            details,
+                            style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'By: ${profile?['name'] ?? profile?['email'] ?? 'System'}',
+                            style: const TextStyle(color: Colors.white30, fontSize: 10.5),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 

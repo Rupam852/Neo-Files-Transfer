@@ -15,6 +15,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [showFolderChangeConfirm, setShowFolderChangeConfirm] = useState(false)
+  const [pendingFolderId, setPendingFolderId] = useState('')
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
@@ -52,8 +54,33 @@ export default function SettingsPage() {
       return
     }
 
+    if (profile?.drive_folder_id && profile.drive_folder_id !== folderId) {
+      setPendingFolderId(folderId)
+      setShowFolderChangeConfirm(true)
+    } else {
+      await executeFolderVerification(folderId, false)
+    }
+  }
+
+  async function confirmFolderChange() {
+    setShowFolderChangeConfirm(false)
+    const folderId = pendingFolderId
+    setPendingFolderId('')
+    await executeFolderVerification(folderId, true)
+  }
+
+  async function executeFolderVerification(folderId, deleteExisting) {
     setVerifying(true)
     try {
+      if (deleteExisting) {
+        const { error: deleteError } = await supabase
+          .from('shared_files')
+          .delete()
+          .eq('user_id', profile.id)
+
+        if (deleteError) throw deleteError
+      }
+
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
 
@@ -303,6 +330,50 @@ export default function SettingsPage() {
                 className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-semibold transition-colors shadow-lg shadow-red-600/20"
               >
                 Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Folder Change Confirmation Modal */}
+      {showFolderChangeConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-dark-600 border border-dark-400 rounded-2xl max-w-md w-full p-6 space-y-6 shadow-2xl animate-scale-in">
+            <div className="space-y-3">
+              <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center justify-center mx-auto text-amber-400">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-semibold text-center text-gray-50 font-['Space_Grotesk']">Change Google Drive Folder?</h3>
+              <p className="text-xs text-gray-400 text-center leading-relaxed">
+                You are connecting a new Google Drive folder. By doing this, all previously stored metadata and shared files from your current folder will be <strong>permanently deleted</strong> from the database.
+              </p>
+              <div className="bg-dark-500/50 border border-dark-300 rounded-xl p-3 space-y-1.5 text-xs text-gray-300">
+                <p className="font-semibold text-amber-400">What will be deleted:</p>
+                <ul className="list-disc pl-4 space-y-1 text-gray-400">
+                  <li>All shared files and folder structures in this app.</li>
+                  <li>All file version histories.</li>
+                  <li>All active public share links (they will stop working immediately).</li>
+                </ul>
+              </div>
+              <p className="text-[11px] text-red-400 text-center font-medium">
+                Note: Files on your Google Drive will not be touched.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowFolderChangeConfirm(false)
+                  setPendingFolderId('')
+                }}
+                className="flex-1 py-2.5 bg-dark-500 hover:bg-dark-400 border border-dark-300 text-gray-200 rounded-xl text-sm font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmFolderChange}
+                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-sm font-semibold transition-colors shadow-lg shadow-amber-600/20"
+              >
+                Proceed
               </button>
             </div>
           </div>

@@ -39,6 +39,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentFolderId = authService.profile?.driveFolderId;
+
+    if (currentFolderId != null && currentFolderId.isNotEmpty && currentFolderId != folderId) {
+      final confirm = await _showFolderChangeConfirmDialog();
+      if (confirm == true) {
+        await _executeVerifyAndSave(folderId, deleteExisting: true);
+      }
+    } else {
+      await _executeVerifyAndSave(folderId, deleteExisting: false);
+    }
+  }
+
+  Future<bool?> _showFolderChangeConfirmDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(LucideIcons.alertTriangle, color: Colors.amber, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Change target folder?',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You are connecting a new Google Drive folder. By doing this, all previously stored metadata and shared files from your current folder will be permanently deleted from the database.',
+              style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'What will be deleted:',
+              style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '• All shared files and folder structures\n• All file version histories\n• All active public share links',
+              style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.5),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Note: Files on your Google Drive will not be affected.',
+              style: TextStyle(color: Colors.white38, fontSize: 10.5, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Proceed', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _executeVerifyAndSave(String folderId, {required bool deleteExisting}) async {
     setState(() => _isSaving = true);
 
     try {
@@ -49,10 +122,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final verified = await apiService.verifyDriveFolder(folderId);
 
       if (verified) {
-        // Step 2: Save to Supabase table
         final userId = authService.currentUser?.id;
         if (userId == null) return;
 
+        // Step 2: If changing folders, delete old records
+        if (deleteExisting) {
+          await _client.from('shared_files').delete().eq('user_id', userId);
+        }
+
+        // Step 3: Save to Supabase table
         await _client.from('user_profiles').update({
           'drive_folder_id': folderId,
           'is_folder_verified': true,
@@ -123,8 +201,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final authService = Provider.of<AuthService>(context);
     final profile = authService.profile;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF030712),
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -416,6 +497,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }

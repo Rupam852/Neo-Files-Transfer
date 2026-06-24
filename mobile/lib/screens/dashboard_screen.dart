@@ -1112,8 +1112,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return f.fileName.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF030712),
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -1339,7 +1342,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               : _buildSharedFilesTab(),
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildBreadcrumbs() {
