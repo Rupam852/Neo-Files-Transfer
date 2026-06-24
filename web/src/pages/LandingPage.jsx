@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { 
   Cloud, Shield, Link2, ArrowRight, AlertTriangle, 
   LogIn, UserCheck, HardDrive, Share2, Layers, CheckCircle2,
-  User, Phone, Mail, FileText, Activity, Database, Copy, Plus
+  User, Phone, Mail, FileText, Activity, Database, Copy, Plus, Folder
 } from 'lucide-react'
 
 const COUNTRIES = [
@@ -493,14 +493,14 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Card 1 */}
             <div className="relative bg-slate-950/40 backdrop-blur-xl border border-slate-900 p-8 rounded-2xl space-y-4 hover:border-indigo-500/30 hover:bg-slate-900/40 transition-all duration-300 group hover:-translate-y-1 overflow-hidden animate-fade-in-up animation-delay-100">
               <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-indigo-500 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="w-12 h-12 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                 <HardDrive size={24} className="text-indigo-400" />
               </div>
-              <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">Google Drive Backed</h3>
+              <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">Google Drive Storage</h3>
               <p className="text-gray-400 text-sm leading-relaxed">
                 Connect your Drive folder to serve as the backend storage. Benefit from Google's reliable infrastructure with no file limit constraints.
               </p>
@@ -510,11 +510,11 @@ export default function LandingPage() {
             <div className="relative bg-slate-950/40 backdrop-blur-xl border border-slate-900 p-8 rounded-2xl space-y-4 hover:border-purple-500/30 hover:bg-slate-900/40 transition-all duration-300 group hover:-translate-y-1 overflow-hidden animate-fade-in-up animation-delay-200">
               <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="w-12 h-12 bg-purple-600/10 border border-purple-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                <Share2 size={24} className="text-purple-400" />
+                <Folder size={24} className="text-purple-400" />
               </div>
-              <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">Proxy Share Links</h3>
+              <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">Folder ZIP Generation</h3>
               <p className="text-gray-400 text-sm leading-relaxed">
-                Keep primary download links hidden behind our proxy server. Manage access controls and revoke download permissions at any time.
+                Create and upload nested directories recursively. Download full folders on-the-fly dynamically compressed as standard ZIP archives.
               </p>
             </div>
 
@@ -522,11 +522,47 @@ export default function LandingPage() {
             <div className="relative bg-slate-950/40 backdrop-blur-xl border border-slate-900 p-8 rounded-2xl space-y-4 hover:border-cyan-500/30 hover:bg-slate-900/40 transition-all duration-300 group hover:-translate-y-1 overflow-hidden animate-fade-in-up animation-delay-300">
               <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-cyan-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="w-12 h-12 bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                <Layers size={24} className="text-cyan-400" />
+                <Link2 size={24} className="text-cyan-400" />
               </div>
-              <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">Automatic Versioning</h3>
+              <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">Dual-Link Sharing</h3>
               <p className="text-gray-400 text-sm leading-relaxed">
-                Update files easily without breaking existing shares. The platform tracks previous versions and always displays the latest release to users.
+                Distribute links as either a premium Web Download Page (with real-time progress indicators) or a Direct API stream link for background downloading.
+              </p>
+            </div>
+
+            {/* Card 4 */}
+            <div className="relative bg-slate-950/40 backdrop-blur-xl border border-slate-900 p-8 rounded-2xl space-y-4 hover:border-emerald-500/30 hover:bg-slate-900/40 transition-all duration-300 group hover:-translate-y-1 overflow-hidden animate-fade-in-up animation-delay-100">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-emerald-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <Layers size={24} className="text-emerald-400" />
+              </div>
+              <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">Version Automation</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                Update files easily without breaking existing shares. The platform purges old files from Google Drive automatically to prevent disk storage bloat.
+              </p>
+            </div>
+
+            {/* Card 5 */}
+            <div className="relative bg-slate-950/40 backdrop-blur-xl border border-slate-900 p-8 rounded-2xl space-y-4 hover:border-pink-500/30 hover:bg-slate-900/40 transition-all duration-300 group hover:-translate-y-1 overflow-hidden animate-fade-in-up animation-delay-200">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-pink-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="w-12 h-12 bg-pink-500/10 border border-pink-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <Shield size={24} className="text-pink-400" />
+              </div>
+              <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">Real-time Permissions</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                Administrators can approve registrations, monitor audit logs, toggle download states, and suspend accounts instantly in real-time.
+              </p>
+            </div>
+
+            {/* Card 6 */}
+            <div className="relative bg-slate-950/40 backdrop-blur-xl border border-slate-900 p-8 rounded-2xl space-y-4 hover:border-amber-500/30 hover:bg-slate-900/40 transition-all duration-300 group hover:-translate-y-1 overflow-hidden animate-fade-in-up animation-delay-300">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-amber-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <Activity size={24} className="text-amber-400" />
+              </div>
+              <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">High-Speed Streaming</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                Secure streaming directly from regional Edge servers bypasses Google warning screens and account pickers to saturate the user's connection.
               </p>
             </div>
           </div>
