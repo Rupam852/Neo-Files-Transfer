@@ -15,7 +15,7 @@ export default function AuthCallback() {
         return
       }
 
-      sessionStorage.setItem('claim_active_session', 'true')
+      localStorage.setItem('claim_active_session', 'true')
 
       // Capture and save Google provider token and refresh token immediately
       if (session.provider_token) {

@@ -182,7 +182,7 @@ function HomeRoute() {
 
 export default function App() {
   const location = useLocation()
-  const { isAdmin, isUnderMaintenance, loading } = useAuth()
+  const { isAdmin, isUnderMaintenance, isSessionInvalidated, loading } = useAuth()
 
   useEffect(() => {
     let timeout;
@@ -201,6 +201,10 @@ export default function App() {
       clearTimeout(timeout);
     };
   }, []);
+
+  if (!loading && isSessionInvalidated) {
+    return <SessionInvalidatedScreen />
+  }
 
   if (!loading && isUnderMaintenance && !isAdmin && !location.pathname.startsWith('/admin')) {
     return <MaintenanceScreen />

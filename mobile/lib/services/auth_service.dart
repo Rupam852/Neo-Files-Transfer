@@ -282,7 +282,13 @@ class AuthService extends ChangeNotifier {
         final localSessionId = await _getOrCreateLocalMobileSessionId();
         final dbMobileSessionId = response?['active_mobile_session_id'] as String?;
 
-        if (isFreshSignIn || dbMobileSessionId == null) {
+        final prefs = await SharedPreferences.getInstance();
+        final claimActiveSession = prefs.getBool('claim_active_session') == true;
+
+        if (isFreshSignIn || claimActiveSession || dbMobileSessionId == null) {
+          if (claimActiveSession) {
+            await prefs.remove('claim_active_session');
+          }
           await _client
               .from('user_profiles')
               .update({'active_mobile_session_id': localSessionId})
@@ -398,6 +404,8 @@ class AuthService extends ChangeNotifier {
   Future<void> signInWithGoogle({bool forceConsent = false}) async {
     _loginError = null;
     notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('claim_active_session', true);
     // SUPABASE NATIVE OAUTH LOGIN WITH DEEP LINKS
     await _client.auth.signInWithOAuth(
       OAuthProvider.google,

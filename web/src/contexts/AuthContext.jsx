@@ -247,7 +247,7 @@ export function AuthProvider({ children }) {
         localStorage.setItem('active_web_session_id', localSessionId)
       }
 
-      const claimActiveSession = sessionStorage.getItem('claim_active_session') === 'true' || isFreshSignIn
+      const claimActiveSession = localStorage.getItem('claim_active_session') === 'true' || isFreshSignIn
       if (claimActiveSession || !profileData.active_web_session_id) {
         // Claim active session
         await supabase
@@ -255,7 +255,7 @@ export function AuthProvider({ children }) {
           .update({ active_web_session_id: localSessionId })
           .eq('id', authUser.id)
         
-        sessionStorage.removeItem('claim_active_session')
+        localStorage.removeItem('claim_active_session')
         profileData.active_web_session_id = localSessionId
         setIsSessionInvalidated(false)
       } else if (profileData.active_web_session_id !== localSessionId) {
@@ -321,7 +321,7 @@ export function AuthProvider({ children }) {
   }
 
   async function signInWithGoogle(forceConsent = false) {
-    sessionStorage.setItem('claim_active_session', 'true')
+    localStorage.setItem('claim_active_session', 'true')
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
