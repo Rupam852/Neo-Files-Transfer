@@ -90,7 +90,7 @@ serve(async (req) => {
               isValid = true
               folderName = folderData.name
             } else {
-              validationError = "Google Drive Permission Error: You do not have write/edit permissions to this folder."
+              validationError = "Google Drive Permission Error: This folder does not belong to your account or you do not have write/edit permissions. Please open Google Drive and grant 'Editor' permissions to this folder."
             }
           } else {
             validationError = "Google Drive Error: The specified ID is a file, not a folder."
