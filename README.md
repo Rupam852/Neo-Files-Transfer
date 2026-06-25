@@ -97,8 +97,8 @@ graph TD
     M -->|Query metadata| D
     
     %% Downloads Decision routing
-    B -->|Download via Render Proxy (preferred)| P
-    B -->|Fallback (if Proxy unset)| H
+    B -->|Download via Render Proxy preferred| P
+    B -->|Fallback if Proxy unset| H
     M -->|Dio chunked download| P
     
     H -->|Retrieve Owner Google Tokens| D
