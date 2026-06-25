@@ -1240,7 +1240,7 @@ export default function FilesPage({ onViewVersions }) {
                           <span className="text-gray-300">{formatDate(file.created_at)}</span>
                           {file.current_version_num > 1 && file.modified_at && (
                             <span className="text-[11px] text-indigo-400/80 font-medium">
-                              Mod: {formatDate(file.modified_at)}
+                              Modified: {formatDate(file.modified_at)}
                             </span>
                           )}
                         </div>

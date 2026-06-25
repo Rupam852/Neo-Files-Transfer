@@ -150,7 +150,7 @@ class FileListItem extends StatelessWidget {
               if (file.currentVersionNum > 1 && file.modifiedAt != null) ...[
                 const SizedBox(height: 3),
                 Text(
-                  'Mod: ${DateFormat('MMM dd, yyyy, hh:mm a').format(file.modifiedAt!.toLocal())}',
+                  'Modified: ${DateFormat('MMM dd, yyyy, hh:mm a').format(file.modifiedAt!.toLocal())}',
                   style: TextStyle(
                     color: Colors.indigo.shade300.withOpacity(0.8),
                     fontSize: 10.5,
