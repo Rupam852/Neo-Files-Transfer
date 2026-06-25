@@ -723,12 +723,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (file.isFolder) {
       return '${AppConfig.proxyUrl}/api/download/folder/$hash';
     }
-    final isLargeFile = file.fileSize > 100 * 1024 * 1024;
-    if (isLargeFile) {
-      return '${AppConfig.proxyUrl}/api/download/stream/$hash';
-    } else {
-      return '${AppConfig.proxyUrl}/api/download/file/$hash';
-    }
+    // Single files go through the Cloudflare Worker
+    return '${AppConfig.cfWorkerUrl}?hash=$hash';
   }
 
   void _showShareDialog(SharedFile file) {
