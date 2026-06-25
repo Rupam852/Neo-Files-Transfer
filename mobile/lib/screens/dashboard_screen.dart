@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -48,6 +49,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Download state
   double _downloadProgress = 0.0;
   String _downloadingFileName = '';
+
+  // Action loading state (Rename, Share/Public, Private, Delete)
+  bool _isActionLoading = false;
 
   @override
   void initState() {
@@ -115,9 +119,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _handleUploadFile() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     if (authService.profile?.isFolderVerified != true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please configure and verify your Google Drive folder in Settings first.')),
-      );
+      _showWarningSnackBar('Please configure and verify your Google Drive folder in Settings first.');
       return;
     }
 
@@ -143,28 +145,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         
         final ext = picked.name.split('.').last.toLowerCase();
         if (blockedExtensions.contains(ext)) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('File ${picked.name} has a blocked extension and was skipped.'),
-                backgroundColor: Colors.orangeAccent,
-              ),
-            );
-          }
+          _showWarningSnackBar('File ${picked.name} has a blocked extension and was skipped.');
           continue;
         }
 
         final uploadLimit = AppConfig.proxyUrl.isNotEmpty ? 250 * 1024 * 1024 : 100 * 1024 * 1024;
         final limitLabel = AppConfig.proxyUrl.isNotEmpty ? '250MB' : '100MB';
         if (picked.size > uploadLimit) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('File ${picked.name} exceeds $limitLabel and was skipped.'),
-                backgroundColor: Colors.orangeAccent,
-              ),
-            );
-          }
+          _showWarningSnackBar('File ${picked.name} exceeds $limitLabel and was skipped.');
           continue;
         }
 
@@ -198,23 +186,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       if (mounted && successCount > 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Successfully uploaded $successCount files!'),
-            backgroundColor: const Color(0xFF10B981),
-          ),
-        );
+        _showSuccessSnackBar('Successfully uploaded $successCount files!');
       }
       _refreshFiles();
     } catch (e) {
       final errorMsg = _formatError(e);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: errorMsg.contains('cancel') ? Colors.orangeAccent : Colors.redAccent,
-          ),
-        );
+        if (errorMsg.contains('cancel')) {
+          _showWarningSnackBar(errorMsg);
+        } else {
+          _showErrorSnackBar(errorMsg);
+        }
       }
     } finally {
       setState(() {
@@ -227,9 +209,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _handleUploadFolder() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     if (authService.profile?.isFolderVerified != true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please configure and verify your Google Drive folder in Settings first.')),
-      );
+      _showWarningSnackBar('Please configure and verify your Google Drive folder in Settings first.');
       return;
     }
 
@@ -238,9 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final rootDir = Directory(selectedDirectory);
     if (!rootDir.existsSync()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selected directory does not exist.')),
-      );
+      _showWarningSnackBar('Selected directory does not exist.');
       return;
     }
 
@@ -420,23 +398,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Successfully uploaded folder structure with $successCount files!'),
-            backgroundColor: const Color(0xFF10B981),
-          ),
-        );
+        _showSuccessSnackBar('Successfully uploaded folder structure with $successCount files!');
       }
       _refreshFiles();
     } catch (e) {
       final errorMsg = _formatError(e);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: errorMsg.contains('cancel') ? Colors.orangeAccent : Colors.redAccent,
-          ),
-        );
+        if (errorMsg.contains('cancel')) {
+          _showWarningSnackBar(errorMsg);
+        } else {
+          _showErrorSnackBar(errorMsg);
+        }
       }
     } finally {
       setState(() {
@@ -504,6 +476,68 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return msg;
   }
 
+  void _showCustomSnackBar({
+    required String message,
+    required Color backgroundColor,
+    required IconData icon,
+  }) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(milliseconds: 1800),
+        backgroundColor: backgroundColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4.0),
+                child: Icon(Icons.close, color: Colors.white70, size: 18),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    _showCustomSnackBar(
+      message: message,
+      backgroundColor: const Color(0xFF10B981),
+      icon: Icons.check_circle_outline,
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    _showCustomSnackBar(
+      message: message,
+      backgroundColor: Colors.redAccent,
+      icon: Icons.error_outline,
+    );
+  }
+
+  void _showWarningSnackBar(String message) {
+    _showCustomSnackBar(
+      message: message,
+      backgroundColor: Colors.orangeAccent,
+      icon: Icons.warning_amber_outlined,
+    );
+  }
+
   Future<void> _handleCreateFolder() async {
     _folderNameController.clear();
     showDialog(
@@ -538,15 +572,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 await fileService.createFolder(name, _currentFolder?.id);
                 _refreshFiles();
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Folder $name created successfully'), backgroundColor: const Color(0xFF10B981)),
-                  );
+                  _showSuccessSnackBar('Folder "$name" created successfully.');
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to create folder: ${_formatError(e)}'), backgroundColor: Colors.redAccent),
-                  );
+                  _showErrorSnackBar('Failed to create folder: ${_formatError(e)}');
                 }
               }
             },
@@ -565,7 +595,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _renameController.text = file.fileName;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFF0F172A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Rename Item', style: TextStyle(color: Colors.white)),
@@ -581,24 +611,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
           ),
           ElevatedButton(
             onPressed: () async {
               final newName = _renameController.text.trim();
               if (newName.isEmpty || newName == file.fileName) return;
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
+
+              setState(() {
+                _isActionLoading = true;
+              });
 
               try {
                 final fileService = Provider.of<FileService>(context, listen: false);
                 await fileService.renameFile(file, newName);
-                _refreshFiles();
+                await _refreshFiles();
+                if (mounted) {
+                  _showSuccessSnackBar('Renamed successfully to "$newName"');
+                }
               } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to rename: ${_formatError(e)}'), backgroundColor: Colors.redAccent),
-                  );
+                if (mounted) {
+                  _showErrorSnackBar('Failed to rename: ${_formatError(e)}');
+                }
+              } finally {
+                if (mounted) {
+                  setState(() {
+                    _isActionLoading = false;
+                  });
                 }
               }
             },
@@ -631,6 +672,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
+    setState(() {
+      _isActionLoading = true;
+    });
+
     try {
       if (!isPublic && (file.uniqueShareHash == null || file.uniqueShareHash!.isEmpty)) {
         // Generate a new share hash in Supabase
@@ -642,29 +687,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       await fileService.toggleSharing(file, nextStatus);
-      _refreshFiles();
+      await _refreshFiles();
 
-      if (!isPublic) {
-        final updatedData = await Supabase.instance.client
-            .from('shared_files')
-            .select()
-            .eq('id', file.id)
-            .single();
-        final updatedFile = SharedFile.fromJson(updatedData);
+      if (mounted) {
+        if (!isPublic) {
+          _showSuccessSnackBar('"${file.fileName}" is now public and ready for sharing.');
 
-        _showShareDialog(updatedFile);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Sharing disabled. File is now private.')),
-          );
+          final updatedData = await Supabase.instance.client
+              .from('shared_files')
+              .select()
+              .eq('id', file.id)
+              .single();
+          final updatedFile = SharedFile.fromJson(updatedData);
+
+          _showShareDialog(updatedFile);
+        } else {
+          _showSuccessSnackBar('"${file.fileName}" is now private.');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to toggle sharing: ${_formatError(e)}'), backgroundColor: Colors.redAccent),
-        );
+        _showErrorSnackBar('Failed to toggle sharing: ${_formatError(e)}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isActionLoading = false;
+        });
       }
     }
   }
@@ -732,9 +781,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: const Icon(LucideIcons.copy, size: 14, color: Colors.indigoAccent),
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: webUrl));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Web download link copied!')),
-                        );
+                        _showSuccessSnackBar('Web download link copied!');
                       },
                     ),
                   ],
@@ -774,9 +821,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: const Icon(LucideIcons.copy, size: 14, color: Colors.pinkAccent),
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: directUrl));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Direct download link copied!')),
-                        );
+                        _showSuccessSnackBar('Direct download link copied!');
                       },
                     ),
                   ],
@@ -855,9 +900,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: const Icon(LucideIcons.copy, size: 14, color: Colors.indigoAccent),
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: folderUrl));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Drive folder link copied to clipboard!')),
-                        );
+                        _showSuccessSnackBar('Drive folder link copied to clipboard!');
                       },
                       constraints: const BoxConstraints(),
                       padding: EdgeInsets.zero,
@@ -1066,9 +1109,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _downloadingFileName = '';
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download failed: $e'), backgroundColor: Colors.redAccent),
-        );
+        _showErrorSnackBar('Download failed: $e');
       }
     }
   }
@@ -1076,7 +1117,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _handleDelete(SharedFile file) async {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFF0F172A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Delete ${file.isFolder ? "Folder" : "File"}?', style: const TextStyle(color: Colors.white)),
@@ -1086,21 +1127,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
-              final fileService = Provider.of<FileService>(context, listen: false);
+              Navigator.pop(dialogContext);
+
+              setState(() {
+                _isActionLoading = true;
+              });
+
               try {
+                final fileService = Provider.of<FileService>(context, listen: false);
                 await fileService.deleteFile(file);
-                _refreshFiles();
+                await _refreshFiles();
+                if (mounted) {
+                  _showSuccessSnackBar('"${file.fileName}" deleted successfully.');
+                }
               } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to delete: ${_formatError(e)}'), backgroundColor: Colors.redAccent),
-                  );
+                if (mounted) {
+                  _showErrorSnackBar('Failed to delete: ${_formatError(e)}');
+                }
+              } finally {
+                if (mounted) {
+                  setState(() {
+                    _isActionLoading = false;
+                  });
                 }
               }
             },
@@ -1117,7 +1170,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context);
     final fileService = Provider.of<FileService>(context);
 
     // Apply search filter
@@ -1128,7 +1180,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       behavior: HitTestBehavior.opaque,
-      child: Scaffold(
+      child: Stack(
+        children: [
+          Scaffold(
         backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -1346,6 +1400,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
     ),
+    if (_isActionLoading)
+      Positioned.fill(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+          child: Container(
+            color: Colors.black.withOpacity(0.5),
+            child: Center(
+              child: Material(
+                type: MaterialType.transparency,
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A).withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      CircularProgressIndicator(color: Colors.indigoAccent),
+                      SizedBox(height: 16),
+                      Text(
+                        'Please wait...',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      ],
+    ),
   );
   }
 
@@ -1555,9 +1651,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: const Icon(LucideIcons.copy, size: 14, color: Colors.white60),
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: '${AppConfig.appUrl}/download/${file.uniqueShareHash}'));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Share URL copied to clipboard!')),
-                        );
+                        _showSuccessSnackBar('Share URL copied to clipboard!');
                       },
                       constraints: const BoxConstraints(),
                       padding: EdgeInsets.zero,
