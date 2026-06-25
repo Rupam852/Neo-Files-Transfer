@@ -16,6 +16,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _folderIdController = TextEditingController();
   final _client = Supabase.instance.client;
   bool _isSaving = false;
+  String? _validationError;
 
   @override
   void initState() {
@@ -31,11 +32,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _handleVerifyAndSave() async {
+    setState(() {
+      _validationError = null;
+    });
     final folderIdInput = _folderIdController.text.trim();
     if (folderIdInput.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a Google Drive Folder ID or Link')),
-      );
+      setState(() {
+        _validationError = 'Please enter a Google Drive Folder ID or Link';
+      });
       return;
     }
 
@@ -168,14 +172,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         throw Exception('Folder validation returned false. Verify permissions.');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to verify folder ID: ${e.toString()}'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+      String msg = e.toString();
+      if (msg.startsWith('Exception: ')) {
+        msg = msg.substring('Exception: '.length);
       }
+      setState(() {
+        _validationError = msg;
+      });
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -367,6 +370,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
+                  if (_validationError != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(LucideIcons.alertTriangle, color: Colors.redAccent, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _validationError!,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _isSaving ? null : _handleVerifyAndSave,

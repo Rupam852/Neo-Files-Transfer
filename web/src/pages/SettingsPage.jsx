@@ -46,13 +46,13 @@ export default function SettingsPage() {
   async function verifyAndSaveFolder() {
     setValidationError(null)
     if (!folderUrl.trim()) {
-      toast.error('Please enter a Google Drive folder link')
+      setValidationError('Please enter a Google Drive folder link')
       return
     }
 
     const folderId = extractFolderId(folderUrl)
     if (!folderId) {
-      toast.error('Invalid Google Drive folder URL')
+      setValidationError('Invalid Google Drive folder URL')
       return
     }
 
