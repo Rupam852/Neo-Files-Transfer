@@ -255,22 +255,51 @@ export default function LandingPage() {
           <div className="lg:col-span-6 space-y-8 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full text-xs font-semibold uppercase tracking-wider animate-fade-in-up">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
-              Live Proxy Storage
+              Developer File Distribution
             </div>
             
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1] font-['Space_Grotesk'] animate-fade-in-up animation-delay-100">
-              Secure Cloud <br />
+              Simplify How You <br />
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-                File Distribution
+                Distribute Files
               </span>
             </h1>
 
             <p className="text-base sm:text-lg text-gray-400 max-w-xl mx-auto lg:mx-0 leading-relaxed animate-fade-in-up animation-delay-200">
-              Upload files directly to private Google Drive backends and distribute secure proxy download links. 
-              Track logs, control access, and scale storage with zero limits.
+              Built specifically for developers to distribute software builds, code assets, and dynamic zip folders. Turn your private Google Drive into a high-performance backend CDN with absolute delivery control.
             </p>
 
-            <div className="p-4 bg-indigo-950/20 border border-indigo-900/50 rounded-2xl max-w-xl mx-auto lg:mx-0 text-left animate-fade-in-up animation-delay-250">
+            {/* Dual Link Sharing Concept Showcase */}
+            <div className="grid sm:grid-cols-2 gap-4 max-w-xl mx-auto lg:mx-0 text-left animate-fade-in-up animation-delay-250">
+              {/* Option 1 */}
+              <div className="p-4 bg-slate-900/30 border border-slate-800/80 rounded-2xl hover:border-indigo-500/20 transition-colors">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-7 h-7 bg-indigo-500/10 border border-indigo-500/20 rounded-lg flex items-center justify-center">
+                    <FileText size={14} className="text-indigo-400" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-white font-['Space_Grotesk']">Option 1: Share Link</h4>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Generates a URL that leads to a premium, dedicated web download page with real-time transfer progress bars.
+                </p>
+              </div>
+
+              {/* Option 2 */}
+              <div className="p-4 bg-slate-900/30 border border-slate-800/80 rounded-2xl hover:border-pink-500/20 transition-colors">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-7 h-7 bg-pink-500/10 border border-pink-500/20 rounded-lg flex items-center justify-center">
+                    <Link2 size={14} className="text-pink-400" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-white font-['Space_Grotesk']">Option 2: Direct Website Link</h4>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  A raw stream API link you can embed in any custom button on your own website, triggering instant downloads inline.
+                </p>
+              </div>
+            </div>
+
+            {/* Subscription Warning Block */}
+            <div className="p-4 bg-indigo-950/20 border border-indigo-900/50 rounded-2xl max-w-xl mx-auto lg:mx-0 text-left animate-fade-in-up animation-delay-300">
               <p className="text-xs text-indigo-400 font-bold uppercase tracking-wider flex items-center gap-1.5 font-['Space_Grotesk'] mb-2">
                 <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" /> Subscription Notice / सूचना
               </p>
@@ -285,7 +314,7 @@ export default function LandingPage() {
             </div>
 
             {/* Premium Micro Feature Pills */}
-            <div className="flex flex-wrap gap-3 justify-center lg:justify-start pt-4 animate-fade-in-up animation-delay-300">
+            <div className="flex flex-wrap gap-3 justify-center lg:justify-start pt-2 animate-fade-in-up animation-delay-300">
               <div className="flex items-center gap-2 px-3.5 py-1.5 bg-emerald-500/5 border border-emerald-500/10 rounded-full text-xs font-semibold text-emerald-400">
                 <Database size={13} />
                 <span>Unlimited Drive Storage</span>
@@ -540,7 +569,7 @@ export default function LandingPage() {
               </div>
               <h3 className="font-semibold text-lg text-white font-['Space_Grotesk']">Dual-Link Sharing</h3>
               <p className="text-gray-400 text-sm leading-relaxed">
-                Distribute links as either a premium Web Download Page (with real-time progress indicators) or a Direct API stream link for background downloading.
+                Share files via a premium Download Portal (Option 1) with transfer progress bars, or direct Stream API URLs (Option 2) to embed in custom download buttons.
               </p>
             </div>
 
