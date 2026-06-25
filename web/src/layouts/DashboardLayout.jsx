@@ -9,7 +9,6 @@ import {
   Menu,
   X,
   Upload,
-  Bell,
   ChevronDown,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
@@ -247,9 +246,6 @@ export default function DashboardLayout() {
                 <span className="hidden sm:inline">Upload</span>
               </button>
             )}
-            <button className="relative p-2 text-gray-400 hover:text-gray-200 rounded-lg hover:bg-dark-500">
-              <Bell size={20} />
-            </button>
             <div className="relative" ref={profileRef}>
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
