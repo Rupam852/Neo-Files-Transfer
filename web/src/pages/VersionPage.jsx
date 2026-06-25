@@ -123,7 +123,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
                       'X-Upload-Content-Type': selectedFile.type || 'application/octet-stream'
                     },
                     body: JSON.stringify({
-                      name: selectedFile.name,
+                      name: file.file_name,
                       parents: [profile.drive_folder_id]
                     })
                   }
@@ -250,6 +250,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
 
           const formData = new FormData()
           formData.append('file', selectedFile)
+          formData.append('file_name', file.file_name)
           formData.append('folder_id', profile.drive_folder_id)
           formData.append('provider_token', googleToken)
           if (file.google_drive_file_id) {
@@ -280,9 +281,9 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
         .update({ 
           current_version_num: newVersionNum,
           google_drive_file_id: result.file_id,
-          file_name: selectedFile.name,
           file_size: selectedFile.size,
-          mime_type: result.mime_type || selectedFile.type
+          mime_type: result.mime_type || selectedFile.type,
+          modified_at: new Date().toISOString()
         })
         .eq('id', fileId)
 
@@ -290,7 +291,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
       await supabase.from('activity_logs').insert({
         user_id: user.id,
         action: 'version_upload',
-        details: `Uploaded version ${newVersionNum} for: ${selectedFile.name}`,
+        details: `Uploaded version ${newVersionNum} for: ${file.file_name}`,
       })
 
       toast.success(`Version ${newVersionNum} uploaded successfully`)

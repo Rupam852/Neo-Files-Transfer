@@ -1236,7 +1236,14 @@ export default function FilesPage({ onViewVersions }) {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-400 hidden lg:table-cell">
-                        {formatDate(file.created_at)}
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-gray-300">{formatDate(file.created_at)}</span>
+                          {file.current_version_num > 1 && file.modified_at && (
+                            <span className="text-[11px] text-indigo-400/80 font-medium">
+                              Mod: {formatDate(file.modified_at)}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="relative">

@@ -38,6 +38,7 @@ serve(async (req) => {
     const folderId = formData.get("folder_id") as string
     const clientProviderToken = formData.get("provider_token") as string
     const oldFileId = formData.get("old_file_id") as string
+    const originalFileName = formData.get("file_name") as string || file.name
 
     if (!file) {
       throw new Error("No file provided")
@@ -79,7 +80,7 @@ serve(async (req) => {
 
     // Upload new version to Google Drive
     const metadata = {
-      name: file.name,
+      name: originalFileName,
       parents: [folderId],
     }
 

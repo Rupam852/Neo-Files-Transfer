@@ -9,6 +9,7 @@ class SharedFile {
   final String? uniqueShareHash;
   final String sharingStatus; // 'public' or 'private'
   final DateTime createdAt;
+  final DateTime? modifiedAt;
   final bool isFolder;
   final String? parentFolderId;
   final int downloadCount;
@@ -24,6 +25,7 @@ class SharedFile {
     this.uniqueShareHash,
     required this.sharingStatus,
     required this.createdAt,
+    this.modifiedAt,
     this.isFolder = false,
     this.parentFolderId,
     this.downloadCount = 0,
@@ -41,6 +43,7 @@ class SharedFile {
       uniqueShareHash: json['unique_share_hash'] as String?,
       sharingStatus: json['sharing_status'] as String? ?? 'private',
       createdAt: DateTime.parse(json['created_at'] as String),
+      modifiedAt: json['modified_at'] != null ? DateTime.parse(json['modified_at'] as String) : null,
       isFolder: json['is_folder'] as bool? ?? false,
       parentFolderId: json['parent_folder_id'] as String?,
       downloadCount: (json['download_count'] as num?)?.toInt() ?? 0,
@@ -59,6 +62,7 @@ class SharedFile {
       'unique_share_hash': uniqueShareHash,
       'sharing_status': sharingStatus,
       'created_at': createdAt.toIso8601String(),
+      'modified_at': modifiedAt?.toIso8601String(),
       'is_folder': isFolder,
       'parent_folder_id': parentFolderId,
       'download_count': downloadCount,

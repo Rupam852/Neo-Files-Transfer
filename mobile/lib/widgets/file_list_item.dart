@@ -98,50 +98,66 @@ class FileListItem extends StatelessWidget {
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4.0),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                sizeStr,
-                style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 11.5,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 3,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade600,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                formattedDate,
-                style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 11.5,
-                ),
-              ),
-              if (file.sharingStatus == 'public') ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: Colors.indigo.shade500.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'Shared',
+              Row(
+                children: [
+                  Text(
+                    sizeStr,
                     style: TextStyle(
-                      color: Colors.indigo.shade300,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade400,
+                      fontSize: 11.5,
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 3,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade600,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    formattedDate,
+                    style: TextStyle(
+                      color: Colors.grey.shade400,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                  if (file.sharingStatus == 'public') ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.shade500.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Shared',
+                        style: TextStyle(
+                          color: Colors.indigo.shade300,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ]
+                ],
+              ),
+              if (file.currentVersionNum > 1 && file.modifiedAt != null) ...[
+                const SizedBox(height: 3),
+                Text(
+                  'Mod: ${DateFormat('MMM dd, yyyy, hh:mm a').format(file.modifiedAt!.toLocal())}',
+                  style: TextStyle(
+                    color: Colors.indigo.shade300.withOpacity(0.8),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ]
+              ],
             ],
           ),
         ),
