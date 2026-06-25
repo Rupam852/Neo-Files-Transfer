@@ -55,11 +55,13 @@ serve(async (req) => {
     let isValid = false
     let folderName = "Google Drive Folder"
 
+    let validationError = ""
+
     if (accessToken) {
       try {
         const fetchFolder = async (token: string) => {
           return await fetch(
-            `https://www.googleapis.com/drive/v3/files/${folder_id}?fields=id,name,mimeType`,
+            `https://www.googleapis.com/drive/v3/files/${folder_id}?fields=id,name,mimeType,capabilities`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -84,35 +86,58 @@ serve(async (req) => {
         if (driveResponse.ok) {
           const folderData = await driveResponse.json()
           if (folderData.mimeType === "application/vnd.google-apps.folder") {
-            isValid = true
-            folderName = folderData.name
+            if (folderData.capabilities?.canAddChildren === true) {
+              isValid = true
+              folderName = folderData.name
+            } else {
+              validationError = "Google Drive Permission Error: You do not have write/edit permissions to this folder."
+            }
+          } else {
+            validationError = "Google Drive Error: The specified ID is a file, not a folder."
+          }
+        } else {
+          const errData = await driveResponse.json().catch(() => ({}))
+          const isInsufficient = errData.error?.errors?.some((e: any) => e.reason === 'insufficientPermissions')
+          if (isInsufficient || driveResponse.status === 403) {
+            validationError = "Google Drive Scope Error: Insufficient permissions. Please ensure you checked the Google Drive write permission checkbox during login."
+          } else if (driveResponse.status === 404) {
+            validationError = "Google Drive Error: Folder not found. Please verify the folder ID."
+          } else {
+            validationError = errData.error?.message || `Google Drive API returned status ${driveResponse.status}`
           }
         }
       } catch (e) {
         console.error("Google Drive API check failed:", e)
+        validationError = e.message
       }
     }
 
     if (!isValid) {
-      // Fallback to checking the public folder page
-      try {
-        const publicResponse = await fetch(
-          `https://drive.google.com/drive/folders/${folder_id}`,
-          { method: "HEAD" }
-        )
-        if (publicResponse.status === 200) {
-          isValid = true
-        } else {
-          // If HEAD fails or gets blocked, try a GET request
-          const publicResponseGet = await fetch(
-            `https://drive.google.com/drive/folders/${folder_id}`
+      if (validationError) {
+        throw new Error(validationError)
+      }
+
+      // Fallback to checking the public folder page only if no accessToken was checked
+      if (!accessToken) {
+        try {
+          const publicResponse = await fetch(
+            `https://drive.google.com/drive/folders/${folder_id}`,
+            { method: "HEAD" }
           )
-          if (publicResponseGet.status === 200) {
+          if (publicResponse.status === 200) {
             isValid = true
+          } else {
+            // If HEAD fails or gets blocked, try a GET request
+            const publicResponseGet = await fetch(
+              `https://drive.google.com/drive/folders/${folder_id}`
+            )
+            if (publicResponseGet.status === 200) {
+              isValid = true
+            }
           }
+        } catch (e) {
+          console.error("Public folder check failed:", e)
         }
-      } catch (e) {
-        console.error("Public folder check failed:", e)
       }
     }
 

@@ -253,7 +253,10 @@ export function AuthProvider({ children }) {
         localStorage.setItem('active_web_session_id', localSessionId)
       }
 
-      const claimActiveSession = localStorage.getItem('claim_active_session') === 'true' || isFreshSignIn
+      const claimActiveSession =
+        localStorage.getItem('claim_active_session') === 'true' ||
+        isFreshSignIn ||
+        window.location.pathname === '/auth/callback'
       if (claimActiveSession || !profileData.active_web_session_id) {
         // Claim active session
         await supabase
@@ -344,6 +347,29 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
+    try {
+      if (user) {
+        const localSessionId = localStorage.getItem('active_web_session_id')
+        if (localSessionId) {
+          // Only clear if the DB session matches our local session
+          const { data: profileData } = await supabase
+            .from('user_profiles')
+            .select('active_web_session_id')
+            .eq('id', user.id)
+            .maybeSingle()
+
+          if (profileData && profileData.active_web_session_id === localSessionId) {
+            await supabase
+              .from('user_profiles')
+              .update({ active_web_session_id: null })
+              .eq('id', user.id)
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to clear active session in DB:', e)
+    }
+
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)

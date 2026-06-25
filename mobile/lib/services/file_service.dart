@@ -243,6 +243,10 @@ class FileService extends ChangeNotifier {
       uploadUrl = startSessionResponse.headers.value('Location') ?? '';
       if (uploadUrl.isEmpty) throw Exception('Google did not return upload URI.');
     } catch (e) {
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('403') || errStr.contains('401') || errStr.contains('permission') || errStr.contains('unauthorized')) {
+        _authService.setGoogleConnectionError(true);
+      }
       throw Exception('Initiating Google upload session failed: $e');
     }
 

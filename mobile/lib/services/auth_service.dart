@@ -18,6 +18,7 @@ class AuthService extends ChangeNotifier {
   String? _loginError;
   String? _localMobileSessionId;
   bool _isProfileLoading = false;
+  bool _hasGoogleConnectionError = false;
 
   User? get currentUser => _user;
   UserProfile? get profile => _profile;
@@ -29,6 +30,14 @@ class AuthService extends ChangeNotifier {
   bool get isSharingEnabled => _isSharingEnabled;
   bool get isLoading => _isLoading;
   String? get loginError => _loginError;
+  bool get hasGoogleConnectionError => _hasGoogleConnectionError;
+
+  void setGoogleConnectionError(bool value) {
+    if (_hasGoogleConnectionError != value) {
+      _hasGoogleConnectionError = value;
+      notifyListeners();
+    }
+  }
 
   AuthService() {
     _init();
@@ -456,6 +465,7 @@ class AuthService extends ChangeNotifier {
     _isDownloadsEnabled = true;
     _isSharingEnabled = true;
     _isLoading = false;
+    _hasGoogleConnectionError = false;
     if (clearError) {
       _loginError = null;
     }

@@ -447,8 +447,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (errString.contains('401') || errString.contains('unauthorized') || errString.contains('google drive connection expired')) {
       return 'Google Drive session expired. Please reconnect in settings.';
     }
-    if (errString.contains('permission') || errString.contains('denied') || errString.contains('forbidden')) {
-      return 'Permission denied. Please verify your Google Drive settings.';
+    if (errString.contains('permission') || errString.contains('denied') || errString.contains('forbidden') || errString.contains('403')) {
+      return 'Google Drive Permission Error (403): Make sure you have edit/write access to the configured folder, your Google Drive storage is not full, and you granted Google Drive permissions during login.';
     }
 
     String msg = e.toString();

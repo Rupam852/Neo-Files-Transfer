@@ -428,12 +428,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: (authService.profile?.googleRefreshToken != null)
+                          color: (authService.profile?.googleRefreshToken != null && !authService.hasGoogleConnectionError)
                               ? Colors.green.withOpacity(0.1)
                               : Colors.red.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: (authService.profile?.googleRefreshToken != null)
+                            color: (authService.profile?.googleRefreshToken != null && !authService.hasGoogleConnectionError)
                                 ? Colors.green.withOpacity(0.2)
                                 : Colors.red.withOpacity(0.2),
                           ),
@@ -442,21 +442,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              (authService.profile?.googleRefreshToken != null)
+                              (authService.profile?.googleRefreshToken != null && !authService.hasGoogleConnectionError)
                                   ? LucideIcons.check
                                   : LucideIcons.alertTriangle,
-                              color: (authService.profile?.googleRefreshToken != null)
+                              color: (authService.profile?.googleRefreshToken != null && !authService.hasGoogleConnectionError)
                                   ? Colors.green
                                   : Colors.red,
                               size: 11,
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              (authService.profile?.googleRefreshToken != null)
+                              (authService.profile?.googleRefreshToken != null && !authService.hasGoogleConnectionError)
                                   ? 'Connected'
-                                  : 'Disconnected',
+                                  : (authService.hasGoogleConnectionError ? 'Action Required' : 'Disconnected'),
                               style: TextStyle(
-                                color: (authService.profile?.googleRefreshToken != null)
+                                color: (authService.profile?.googleRefreshToken != null && !authService.hasGoogleConnectionError)
                                     ? Colors.green
                                     : Colors.red,
                                 fontSize: 10,
@@ -469,28 +469,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    'The application requires permissions to query your Google Drive to execute proxy transfers. Link your account to start transferring files.',
+                  Text(
+                    authService.hasGoogleConnectionError
+                        ? 'A Google Drive permission or connection error was detected. You may need to re-authorize the app and ensure the target Google Drive has storage space and edit access.'
+                        : 'The application requires permissions to query your Google Drive to execute proxy transfers. Link your account to start transferring files.',
                     style: TextStyle(
-                      color: Colors.white60,
+                      color: authService.hasGoogleConnectionError ? Colors.redAccent.shade100 : Colors.white60,
                       fontSize: 12,
                       height: 1.5,
                     ),
                   ),
-                  if (authService.profile?.googleRefreshToken == null) ...[
+                  if (authService.profile?.googleRefreshToken == null || authService.hasGoogleConnectionError) ...[
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
-                      onPressed: () => authService.signInWithGoogle(forceConsent: true),
+                      onPressed: () async {
+                        try {
+                          await authService.signInWithGoogle(forceConsent: true);
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Re-authorization failed: $e'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                        }
+                      },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E293B),
+                        backgroundColor: authService.hasGoogleConnectionError
+                            ? Colors.red.shade900.withOpacity(0.4)
+                            : const Color(0xFF1E293B),
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 48),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: authService.hasGoogleConnectionError
+                                ? Colors.redAccent.withOpacity(0.3)
+                                : Colors.transparent,
+                          ),
                         ),
                       ),
                       icon: const Icon(LucideIcons.refreshCw, size: 14),
-                      label: const Text('Link / Re-authorize Google Drive', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      label: Text(
+                        authService.hasGoogleConnectionError
+                            ? 'Fix Connection / Re-authorize Google'
+                            : 'Link / Re-authorize Google Drive',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ],
