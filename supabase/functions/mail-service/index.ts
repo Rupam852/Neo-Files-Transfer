@@ -69,13 +69,17 @@ serve(async (req) => {
         .maybeSingle()
 
       if (existingPending) {
-        const msg = existingPending.status === 'approved'
-          ? "This email is already approved. You can log in!"
-          : "This email is already registered and pending admin approval."
-        return new Response(
-          JSON.stringify({ error: msg }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-        )
+        if (existingPending.status === 'approved') {
+          return new Response(
+            JSON.stringify({ error: "This email is already approved. You can log in!" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+          )
+        } else if (existingPending.status === 'pending') {
+          return new Response(
+            JSON.stringify({ error: "This email is already registered and pending admin approval." }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+          )
+        }
       }
 
       const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "127.0.0.1"
@@ -382,12 +386,21 @@ serve(async (req) => {
 
       const { data: existingPending } = await supabase
         .from("pending_registrations")
-        .select("id")
+        .select("id, status")
         .eq("email", normalizedEmail)
         .maybeSingle()
 
       if (existingPending) {
-        throw new Error("This email is already registered and pending admin approval.")
+        if (existingPending.status === 'approved') {
+          throw new Error("This email is already approved. You can log in!")
+        } else if (existingPending.status === 'pending') {
+          throw new Error("This email is already registered and pending admin approval.")
+        } else if (existingPending.status === 'rejected') {
+          await supabase
+            .from("pending_registrations")
+            .delete()
+            .eq("id", existingPending.id)
+        }
       }
 
       // Insert into pending_registrations
