@@ -34,6 +34,7 @@ export function generateShareUrl(hash) {
 }
 
 export function generateDirectDownloadUrl(hash, isFolder, fileSize) {
+  console.log("VITE_CF_WORKER_URL value in helper:", import.meta.env.VITE_CF_WORKER_URL)
   const cfWorkerUrl = import.meta.env.VITE_CF_WORKER_URL
   const proxyUrl = import.meta.env.VITE_PROXY_URL
 
