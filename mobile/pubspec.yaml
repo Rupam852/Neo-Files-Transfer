@@ -38,6 +38,7 @@ dependencies:
   # Backend & Supabase
   supabase_flutter: ^2.8.0
   google_sign_in: ^6.2.1
+  flutter_web_auth_2: ^5.0.0
   shared_preferences: ^2.2.2
 
   # File Picking & File System API

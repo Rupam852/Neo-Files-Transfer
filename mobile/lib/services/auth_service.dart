@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import '../models/user_profile.dart';
 
 class AuthService extends ChangeNotifier {
@@ -413,17 +414,31 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('claim_active_session', true);
-    // SUPABASE NATIVE OAUTH LOGIN WITH DEEP LINKS
-    await _client.auth.signInWithOAuth(
-      OAuthProvider.google,
-      redirectTo: 'com.neofiles.neofilestransfer://login-callback/',
-      scopes: 'email profile https://www.googleapis.com/auth/drive',
-      queryParams: {
-        'access_type': 'offline',
-        if (forceConsent) 'prompt': 'consent',
-      },
-      authScreenLaunchMode: LaunchMode.inAppWebView,
-    );
+
+    try {
+      final res = await _client.auth.getOAuthSignInUrl(
+        provider: OAuthProvider.google,
+        redirectTo: 'com.neofiles.neofilestransfer://login-callback/',
+        scopes: 'email profile https://www.googleapis.com/auth/drive',
+        queryParams: {
+          'access_type': 'offline',
+          if (forceConsent) 'prompt': 'consent',
+        },
+      );
+
+      final resultUrl = await FlutterWebAuth2.authenticate(
+        url: res.url,
+        callbackUrlScheme: 'com.neofiles.neofilestransfer',
+      );
+
+      final uri = Uri.parse(resultUrl);
+      await _client.auth.getSessionFromUrl(uri);
+    } catch (e) {
+      debugPrint('Google Sign-In Error: $e');
+      _loginError = e.toString();
+      notifyListeners();
+      rethrow;
+    }
   }
 
   Future<void> signOut({bool clearError = true}) async {
