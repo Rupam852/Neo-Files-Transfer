@@ -850,27 +850,44 @@ export default function LandingPage() {
       {/* ─── FOOTER ──────────────────────────────────────── */}
       <footer className="relative z-10 border-t border-white/[0.05] py-12 bg-gradient-to-b from-transparent to-black/40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="flex flex-col items-center sm:items-start gap-2">
-              <div className="flex items-center gap-2.5">
-                <img src="/favicon.png" alt="Neo Files Logo" className="w-7 h-7 object-contain opacity-80" />
-                <span className="text-sm font-semibold text-slate-400 font-['Space_Grotesk']">
-                  Neo<span className="text-indigo-400">Files</span>
-                </span>
-                <span className="text-slate-700">•</span>
-                <span className="text-xs text-slate-600">Built with Supabase & Google Drive</span>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-8 text-center sm:text-left">
+            
+            {/* Left/Center side: Branding and Info */}
+            <div className="flex flex-col items-center sm:items-start gap-3">
+              
+              {/* Logo + Sub-brand line */}
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-2.5">
+                  <img src="/favicon.png" alt="Neo Files Logo" className="w-7 h-7 object-contain opacity-80" />
+                  <span className="text-sm font-semibold text-slate-400 font-['Space_Grotesk']">
+                    Neo<span className="text-indigo-400">Files</span>
+                  </span>
+                </div>
+                <span className="hidden sm:inline text-slate-700">•</span>
+                <span className="text-xs text-slate-500 font-medium">Built with Supabase &amp; Google Drive</span>
               </div>
-              <span className="text-[11px] text-slate-600 sm:pl-0">
-                Made with ❤️ for developers &nbsp;·&nbsp; Support:{' '}
-                <a href="mailto:rupambairagya08@gmail.com" className="text-indigo-400 hover:text-indigo-300 hover:underline font-mono transition-colors">
-                  rupambairagya08@gmail.com
-                </a>
-              </span>
+              
+              {/* Tagline & Support Email */}
+              <div className="flex flex-col items-center sm:items-start gap-1">
+                <p className="text-[11px] text-slate-500">
+                  Made with ❤️ for developers
+                </p>
+                <p className="text-[11px] text-slate-600">
+                  Support:{' '}
+                  <a href="mailto:rupambairagya08@gmail.com" className="text-indigo-400/90 hover:text-indigo-300 hover:underline font-mono transition-colors">
+                    rupambairagya08@gmail.com
+                  </a>
+                </p>
+              </div>
+
             </div>
-            <div className="flex gap-6 text-xs text-slate-600">
+
+            {/* Right/Bottom side: Privacy & Terms */}
+            <div className="flex gap-6 text-xs text-slate-500 font-medium">
               <Link to="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-slate-300 transition-colors">Terms of Service</Link>
             </div>
+
           </div>
         </div>
       </footer>
