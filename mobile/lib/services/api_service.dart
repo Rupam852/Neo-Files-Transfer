@@ -17,6 +17,12 @@ class ApiService {
     if (errStr.contains('403') || errStr.contains('401') || errStr.contains('permission') || errStr.contains('unauthorized')) {
       _authService.setGoogleConnectionError(true);
     }
+    if (e is DioException && e.response?.data != null) {
+      final data = e.response!.data;
+      if (data is Map && data.containsKey('error')) {
+        throw Exception(data['error']);
+      }
+    }
   }
 
   // Refresh Google Access Token via Proxy
