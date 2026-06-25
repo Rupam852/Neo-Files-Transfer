@@ -175,3 +175,14 @@ html.is-scrolling {
 .animate-shimmer {
   animation: shimmer 1.5s linear infinite;
 }
+
+@keyframes btn-shine {
+  0% { transform: translateX(-150%) skewX(-20deg); opacity: 0; }
+  10% { opacity: 1; }
+  60% { opacity: 1; }
+  100% { transform: translateX(350%) skewX(-20deg); opacity: 0; }
+}
+
+.animate-btn-shine {
+  animation: btn-shine 2.8s ease-in-out infinite;
+}
