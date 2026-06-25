@@ -297,8 +297,6 @@ export default function LandingPage() {
             <div className="animate-fade-in-up animation-delay-300 max-w-lg mx-auto lg:mx-0">
               <a
                 href="https://neo-files-download.rupambairagya08.workers.dev?hash=137c0037e239"
-                target="_blank"
-                rel="noopener noreferrer"
                 className="relative flex items-center justify-between gap-4 w-full px-5 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl font-semibold overflow-hidden"
               >
                 {/* Pulse rings */}
