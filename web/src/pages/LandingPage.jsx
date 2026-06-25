@@ -301,16 +301,11 @@ export default function LandingPage() {
             {/* Subscription Warning Block */}
             <div className="p-4 bg-indigo-950/20 border border-indigo-900/50 rounded-2xl max-w-xl mx-auto lg:mx-0 text-left animate-fade-in-up animation-delay-300">
               <p className="text-xs text-indigo-400 font-bold uppercase tracking-wider flex items-center gap-1.5 font-['Space_Grotesk'] mb-2">
-                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" /> Subscription Notice / सूचना
+                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" /> Subscription Notice
               </p>
-              <div className="space-y-2 text-xs sm:text-sm text-slate-400 leading-relaxed font-normal">
-                <p className="border-b border-indigo-900/30 pb-2">
-                  <span className="text-slate-300 font-semibold">Hinglish:</span> Yeh app free nahi hai, access karne ke liye <strong className="text-white font-semibold">₹199/Month</strong> charges hain. Agar aapko app ka access chahiye toh niche di gayi request submit karein. Admin payment ke liye contact karega, aur payment hone ke baad access mil jayega.
-                </p>
-                <p>
-                  <span className="text-slate-300 font-semibold">English:</span> Access to this application is not free. It is a premium service charging <strong className="text-white font-semibold">₹199 / Month</strong>. Please submit an access request below. The administrator will contact you to collect payment and activate your access.
-                </p>
-              </div>
+              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-normal">
+                Access to this application is not free. It is a premium service charging <strong className="text-white font-semibold">₹199 / Month</strong>. Please submit an access request below. The administrator will contact you to collect payment and activate your access.
+              </p>
             </div>
 
             {/* Premium Micro Feature Pills */}
