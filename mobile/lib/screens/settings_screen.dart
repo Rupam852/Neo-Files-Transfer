@@ -31,13 +31,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _handleVerifyAndSave() async {
-    final folderId = _folderIdController.text.trim();
-    if (folderId.isEmpty) {
+    final folderIdInput = _folderIdController.text.trim();
+    if (folderIdInput.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a Google Drive Folder ID')),
+        const SnackBar(content: Text('Please enter a Google Drive Folder ID or Link')),
       );
       return;
     }
+
+    String folderId = folderIdInput;
+    // Extract folder ID if a URL is pasted
+    final regExp1 = RegExp(r'/folders/([a-zA-Z0-9_-]+)');
+    final regExp2 = RegExp(r'id=([a-zA-Z0-9_-]+)');
+
+    final match1 = regExp1.firstMatch(folderIdInput);
+    if (match1 != null) {
+      folderId = match1.group(1)!;
+    } else {
+      final match2 = regExp2.firstMatch(folderIdInput);
+      if (match2 != null) {
+        folderId = match2.group(1)!;
+      }
+    }
+
+    // Update text field to show the extracted raw ID
+    _folderIdController.text = folderId;
 
     final authService = Provider.of<AuthService>(context, listen: false);
     final currentFolderId = authService.profile?.driveFolderId;

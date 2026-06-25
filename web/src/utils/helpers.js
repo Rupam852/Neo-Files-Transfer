@@ -48,6 +48,9 @@ export function generateDirectDownloadUrl(hash, isFolder, fileSize) {
 }
 
 export function extractFolderId(url) {
+  if (url && !url.includes('/') && !url.includes('.') && url.length > 10) {
+    return url
+  }
   const patterns = [
     /\/folders\/([a-zA-Z0-9_-]+)/,
     /id=([a-zA-Z0-9_-]+)/,
