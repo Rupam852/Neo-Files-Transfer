@@ -34,11 +34,12 @@ export function generateShareUrl(hash) {
 }
 
 export function generateDirectDownloadUrl(hash, isFolder, fileSize) {
-  // All downloads are routed through the Render Proxy (if VITE_PROXY_URL is set) 
-  // to prevent Supabase Edge Function execution timeout limits.
+  // Folders and large files (>50MB) go through the Render Proxy if VITE_PROXY_URL is set
+  // to avoid Supabase Edge Function execution timeout limits. Small files use Supabase Edge Functions.
   const proxyUrl = import.meta.env.VITE_PROXY_URL
+  const useProxy = isFolder || (proxyUrl && fileSize && fileSize > 50 * 1024 * 1024)
 
-  if (proxyUrl) {
+  if (useProxy && proxyUrl) {
     const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
     return `${cleanProxy}/download-file?hash=${hash}`
   }

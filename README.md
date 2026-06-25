@@ -97,8 +97,8 @@ graph TD
     M -->|Query metadata| D
     
     %% Downloads Decision routing
-    B -->|Download via Render Proxy preferred| P
-    B -->|Fallback if Proxy unset| H
+    B -->|Download file under 50MB| H
+    B -->|Download folder or file over 50MB| P
     M -->|Dio chunked download| P
     
     H -->|Retrieve Owner Google Tokens| D
@@ -119,7 +119,7 @@ graph TD
 1. **Google Auth & Token Storage**: Users sign in via Google OAuth. The retrieved access and refresh tokens are safely stored in the `user_profiles` database table.
 2. **Directory & Tree Uploads**: When users upload nested directories or folders, directories are created parent-first, and files are linked to their corresponding database parents (`parent_folder_id` referencing `shared_files(id) ON DELETE CASCADE`).
 3. **High-Speed Direct Client Uploads**: Uploading files bypasses backend servers. The React frontend negotiates a resumable session directly with Google Drive using the owner's `accessToken` and uploads raw bytes directly from the client's browser, giving 100% full upload speed.
-4. **Unified Download Routing via Render Proxy**: All file and folder downloads (regardless of size) are routed through the Node.js **Render Proxy** if configured. This prevents execution timeouts (such as the Deno 150-second runtime limit on slow downloads) and ensures memory-efficient chunk-by-chunk stream forwarding using HTTP piping. It falls back to Supabase Edge Functions only if `VITE_PROXY_URL` is not set.
+4. **Hybrid Download Streaming Routing**: Single files under 50MB are routed through the regional **Supabase Edge Function** (`download-file`) for instant, cold-start-free downloads. Folders and larger files (>50MB) are routed through the **Render Proxy** to prevent execution timeouts (bypassing the 150-second Deno execution limit). Both backend servers fetch the authenticated `alt=media` stream from the Google Drive API using the owner's credentials, bypassing Google's 1 MB/s speed throttling on public links and removing login requirements for guests.
 5. **Mobile Downloads with Progress Bar**: The Flutter client fetches direct streaming URLs from the proxy and handles storage downloading natively using `Dio` chunk stream listeners, rendering a smooth progress bar overlay for files.
 6. **On-the-fly ZIP Compilation**: When a shared folder is downloaded, the Render Proxy queries all child elements recursively, downloads their binary contents in parallel, packages them into a standard `.zip` archive on the fly using `archiver`, and streams the ZIP file directly to the guest browser.
 7. **Token Auto-Refresh Middleware**: Both Deno Edge Functions and the Render Proxy automatically intercept Google API `401 Unauthorized` responses, exchange the owner's refresh token for a fresh access token, save it to the DB, and resume the operation seamlessly.
