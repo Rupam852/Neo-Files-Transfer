@@ -82,7 +82,8 @@ graph TD
     end
 
     %% Flows
-    A & M -->|OAuth login| E
+    A -->|OAuth login| E
+    M -->|OAuth login| E
     E -->|Tokens| D
     
     A -->|1. Create Folder| G
@@ -92,7 +93,8 @@ graph TD
     A -->|2. Upload File / Folder Tree - Direct| I
     A -->|3. Register metadata| D
     
-    B & M -->|Query metadata| D
+    B -->|Query metadata| D
+    M -->|Query metadata| D
     
     %% Downloads Decision routing
     B -->|Download via Render Proxy (preferred)| P
@@ -106,7 +108,8 @@ graph TD
     P -->|Retrieve Owner Google Tokens| D
     P -->|Fetch alt=media stream| I
     P -->|Stream file / compile dynamic ZIP| P
-    P -->|Direct stream to Client| B & M
+    P -->|Direct stream to Client| B
+    P -->|Direct stream to Client| M
 
     H & F & G & P -->|If 401 Unauthorized| J
     J -->|New Access Token| D
