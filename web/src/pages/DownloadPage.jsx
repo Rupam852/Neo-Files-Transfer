@@ -89,21 +89,16 @@ export default function DownloadPage() {
     if (!fileInfo) return
 
     try {
-      const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)
-
       console.log('Using native browser download manager for maximum speed.')
       setStatus('downloading')
       setProgress(100)
       setDownloadStage('Transfer active — downloading via browser manager...')
-      
-      // Start browser download instantly
-      window.location.href = directUrl
 
       // Transition to completed screen
       setTimeout(() => {
         setStatus('completed')
         setDownloadStage('')
-      }, 1000)
+      }, 1500)
 
     } catch (err) {
       console.error('Download error:', err)
@@ -162,12 +157,13 @@ export default function DownloadPage() {
               </div>
             </div>
 
-            <button
+            <a
+              href={generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)}
               onClick={handleStartDownload}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] active:scale-[0.98]"
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] active:scale-[0.98] text-center"
             >
               <Download size={18} /> Download Now
-            </button>
+            </a>
             
             <p className="text-center text-xs text-slate-500">
               Files are transferred securely with TLS encryption.
@@ -249,15 +245,12 @@ export default function DownloadPage() {
             <div className="bg-slate-900/40 rounded-xl p-4 text-sm text-slate-300 leading-relaxed border border-slate-900">
               The file download has started. If it did not save automatically, click the button below to retry.
             </div>
-            <button
-              onClick={() => {
-                const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)
-                window.location.href = directUrl
-              }}
-              className="w-full btn-primary py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
+            <a
+              href={generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)}
+              className="w-full btn-primary py-3 rounded-xl font-semibold flex items-center justify-center gap-2 text-center"
             >
               <Download size={16} /> Save File Again
-            </button>
+            </a>
             <p className="text-xs text-slate-500">
               Powered by Neo Files Transfer
             </p>
@@ -341,15 +334,12 @@ export default function DownloadPage() {
               >
                 <Download size={16} /> Retry Streaming
               </button>
-              <button
-                onClick={() => {
-                  const directUrl = generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)
-                  window.location.href = directUrl
-                }}
-                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-200"
+              <a
+                href={generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)}
+                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-200 text-center"
               >
                 <Download size={16} /> Download Directly (No Stream)
-              </button>
+              </a>
             </div>
 
             <p className="text-xs text-slate-500">
