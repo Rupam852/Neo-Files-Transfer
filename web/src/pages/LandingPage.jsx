@@ -270,6 +270,16 @@ export default function LandingPage() {
               Track logs, control access, and scale storage with zero limits.
             </p>
 
+            <div className="bg-indigo-950/30 border border-indigo-500/20 rounded-2xl p-5 max-w-xl mx-auto lg:mx-0 text-left space-y-2 animate-fade-in-up animation-delay-250">
+              <div className="flex items-center gap-2 text-indigo-400 font-semibold text-sm">
+                <span className="text-base">💰</span> Premium Access Plan
+              </div>
+              <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
+                NeoFiles is a premium service charged at <strong>₹199 / month</strong>. 
+                Please submit your access request. An administrator will contact you shortly to complete payment setup and activate your account.
+              </p>
+            </div>
+
             {/* Premium Micro Feature Pills */}
             <div className="flex flex-wrap gap-3 justify-center lg:justify-start pt-4 animate-fade-in-up animation-delay-300">
               <div className="flex items-center gap-2 px-3.5 py-1.5 bg-emerald-500/5 border border-emerald-500/10 rounded-full text-xs font-semibold text-emerald-400">
