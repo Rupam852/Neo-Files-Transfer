@@ -244,6 +244,49 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 12),
+        // Subscription Notice
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.indigo.shade500.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.indigo.shade500.withOpacity(0.2)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(LucideIcons.creditCard, color: Colors.indigo.shade300, size: 16),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'SUBSCRIPTION NOTICE / सूचना (₹199/MONTH)',
+                      style: TextStyle(color: Colors.indigoAccent, fontSize: 9.5, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Hinglish: Yeh app free nahi hai, access karne ke liye ₹199/Month charges hain. Agar aapko access chahiye toh request submit karein. Admin payment ke liye contact karega aur payment hone ke baad access mil jayega.',
+                      style: TextStyle(color: Colors.white70, fontSize: 11, height: 1.45),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 1,
+                      color: Colors.indigo.shade500.withOpacity(0.15),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'English: Access to this application is not free. It costs ₹199 / Month. Please submit your request, and the administrator will contact you for payment and access setup.',
+                      style: TextStyle(color: Colors.white60, fontSize: 10.5, height: 1.45),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 20),
 
         // Name input
