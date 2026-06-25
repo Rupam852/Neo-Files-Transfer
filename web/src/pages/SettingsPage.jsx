@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [showFolderChangeConfirm, setShowFolderChangeConfirm] = useState(false)
   const [pendingFolderId, setPendingFolderId] = useState('')
+  const [validationError, setValidationError] = useState(null)
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
@@ -43,6 +44,7 @@ export default function SettingsPage() {
   }
 
   async function verifyAndSaveFolder() {
+    setValidationError(null)
     if (!folderUrl.trim()) {
       toast.error('Please enter a Google Drive folder link')
       return
@@ -114,7 +116,9 @@ export default function SettingsPage() {
       refreshProfile()
     } catch (err) {
       console.error(err)
-      toast.error(formatErrorMessage(err))
+      const errMsg = formatErrorMessage(err)
+      setValidationError(errMsg)
+      toast.error(errMsg)
     } finally {
       setVerifying(false)
     }
@@ -264,6 +268,16 @@ export default function SettingsPage() {
               Make sure the folder sharing setting is "Anyone with the link can view" before connecting.
             </p>
           </div>
+
+          {validationError && (
+            <div className="bg-red-900/30 border border-red-600/30 rounded-lg p-3 flex items-start gap-2 text-red-200 text-xs">
+              <AlertTriangle size={16} className="text-red-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold">Connection/Permission Error:</p>
+                <p className="text-red-300 mt-0.5 leading-relaxed">{validationError}</p>
+              </div>
+            </div>
+          )}
 
           <button
             onClick={verifyAndSaveFolder}
