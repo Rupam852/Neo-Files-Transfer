@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../services/supabase'
 
 const AuthContext = createContext(null)
@@ -14,6 +14,7 @@ export function AuthProvider({ children }) {
   const [downloadsEnabled, setDownloadsEnabled] = useState(true)
   const [sharingEnabled, setSharingEnabled] = useState(true)
   const [loading, setLoading] = useState(true)
+  const loadingProfileRef = useRef(false)
 
   const generateSessionId = () => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -186,6 +187,11 @@ export function AuthProvider({ children }) {
 
 
   async function loadProfile(authUser, sessionTokens = {}, isFreshSignIn = false) {
+    if (loadingProfileRef.current) {
+      console.log('Ignore concurrent loadProfile call')
+      return
+    }
+    loadingProfileRef.current = true
     try {
       // Load user profile
       let { data: profileData, error: profileError } = await supabase
@@ -316,6 +322,7 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.error('Error loading profile:', err)
     } finally {
+      loadingProfileRef.current = false
       setLoading(false)
     }
   }

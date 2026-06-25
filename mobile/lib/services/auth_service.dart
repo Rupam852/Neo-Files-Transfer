@@ -16,6 +16,7 @@ class AuthService extends ChangeNotifier {
   bool _isLoading = true;
   String? _loginError;
   String? _localMobileSessionId;
+  bool _isProfileLoading = false;
 
   User? get currentUser => _user;
   UserProfile? get profile => _profile;
@@ -210,6 +211,11 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> loadProfile(User authUser, [Map<String, String?>? sessionTokens, bool isFreshSignIn = false]) async {
+    if (_isProfileLoading) {
+      debugPrint('Ignore concurrent loadProfile call');
+      return;
+    }
+    _isProfileLoading = true;
     try {
       _isLoading = true;
       notifyListeners();
@@ -396,6 +402,7 @@ class AuthService extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error loading profile: $e');
     } finally {
+      _isProfileLoading = false;
       _isLoading = false;
       notifyListeners();
     }
