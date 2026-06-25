@@ -34,15 +34,22 @@ export function generateShareUrl(hash) {
 }
 
 export function generateDirectDownloadUrl(hash, isFolder, fileSize) {
-  // Folders and large files (>50MB) go through the Render Proxy if VITE_PROXY_URL is set
-  // to avoid Supabase Edge Function execution timeout limits. Small files use Supabase Edge Functions.
+  const cfWorkerUrl = import.meta.env.VITE_CF_WORKER_URL
   const proxyUrl = import.meta.env.VITE_PROXY_URL
-  const useProxy = isFolder || (proxyUrl && fileSize && fileSize > 50 * 1024 * 1024)
 
-  if (useProxy && proxyUrl) {
+  // If it's a folder, zip it via Render Proxy
+  if (isFolder && proxyUrl) {
     const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
     return `${cleanProxy}/download-file?hash=${hash}`
   }
+
+  // If it's a single file, route through high-speed Cloudflare Worker
+  if (cfWorkerUrl) {
+    const cleanWorker = cfWorkerUrl.endsWith('/') ? cfWorkerUrl.slice(0, -1) : cfWorkerUrl
+    return `${cleanWorker}?hash=${hash}`
+  }
+
+  // Fallback to Supabase regional Deno Edge Function
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   return `${supabaseUrl}/functions/v1/download-file?hash=${hash}`
 }

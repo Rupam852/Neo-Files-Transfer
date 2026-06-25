@@ -93,30 +93,17 @@ export default function DownloadPage() {
 
       console.log('Using native browser download manager for maximum speed.')
       setStatus('downloading')
-      setProgress(15)
-      setDownloadStage('Connecting to secure node...')
+      setProgress(100)
+      setDownloadStage('Transfer active — downloading via browser manager...')
       
-      setTimeout(() => {
-        setProgress(50)
-        setDownloadStage('Requesting file stream...')
-      }, 300)
-      
-      setTimeout(() => {
-        setProgress(85)
-        setDownloadStage('Initializing direct high-speed transfer...')
-      }, 600)
-      
-      setTimeout(() => {
-        setProgress(100)
-        setStatus('saving')
-        setDownloadStage('Transfer active — downloading via browser manager...')
-        window.location.href = directUrl
-      }, 900)
+      // Start browser download instantly
+      window.location.href = directUrl
 
+      // Transition to completed screen
       setTimeout(() => {
         setStatus('completed')
         setDownloadStage('')
-      }, 2500)
+      }, 1000)
 
     } catch (err) {
       console.error('Download error:', err)

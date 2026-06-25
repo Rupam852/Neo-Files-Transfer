@@ -5,6 +5,13 @@ import archiver from 'archiver'
 import { Readable } from 'stream'
 import https from 'https'
 
+const keepAliveAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 100,
+  maxFreeSockets: 10,
+  timeout: 60000 // 60s inactivity timeout
+})
+
 const destroyStream = (stream) => {
   if (stream) {
     if (typeof stream.destroy === 'function') {
@@ -23,6 +30,7 @@ const fetchMediaFromDriveNode = (driveId, token) => {
         headers: {
           'Authorization': `Bearer ${token}`
         },
+        agent: keepAliveAgent,
         timeout: 60000 // 60s inactivity timeout
       },
       (res) => {
@@ -283,10 +291,61 @@ app.get('/download-file', async (req, res) => {
       const archive = archiver('zip', { zlib: { level: 5 } })
       let aborted = false
 
+      const streamPromises = []
+      const concurrency = 4
+      const activePromises = []
+
+      for (let i = 0; i < filesToZip.length; i++) {
+        const item = filesToZip[i]
+        if (item.is_folder) {
+          streamPromises.push(Promise.resolve({ is_folder: true, stream: null, item }))
+          continue
+        }
+
+        const task = async () => {
+          try {
+            let res = await fetchMediaFromDriveNode(item.google_drive_file_id, accessToken)
+            if (res.statusCode === 401 && refreshToken) {
+              destroyStream(res)
+              accessToken = await refreshGoogleToken(file.user_id, refreshToken, supabaseAdmin)
+              res = await fetchMediaFromDriveNode(item.google_drive_file_id, accessToken)
+            }
+            return { is_folder: false, stream: res, item }
+          } catch (err) {
+            console.error(`Error pre-fetching stream for ${item.file_name}:`, err)
+            return { is_folder: false, stream: null, item, error: err }
+          }
+        }
+
+        const promiseWrapper = (async () => {
+          while (activePromises.length >= concurrency) {
+            await Promise.race(activePromises)
+          }
+          const p = task()
+          activePromises.push(p)
+          const clean = () => {
+            const index = activePromises.indexOf(p)
+            if (index > -1) activePromises.splice(index, 1)
+          }
+          p.then(clean, clean)
+          return p
+        })()
+
+        streamPromises.push(promiseWrapper)
+      }
+
       res.on('close', () => {
         console.log('Client aborted connection. Destroying ZIP archive stream.')
         aborted = true
         archive.destroy()
+        // Clean up all pre-fetched streams
+        for (const p of streamPromises) {
+          p.then((resolved) => {
+            if (resolved && resolved.stream) {
+              destroyStream(resolved.stream)
+            }
+          }).catch(() => {})
+        }
       })
 
       archive.on('error', (err) => {
@@ -302,7 +361,8 @@ app.get('/download-file', async (req, res) => {
       archive.pipe(res)
 
       // Process and append files one by one (fully streamed)
-      for (const item of filesToZip) {
+      for (let i = 0; i < filesToZip.length; i++) {
+        const item = filesToZip[i]
         if (aborted) {
           console.log('ZIP creation aborted before processing:', item.relativePath)
           break
@@ -322,29 +382,18 @@ app.get('/download-file', async (req, res) => {
 
         let fileResponse = null
         try {
-          fileResponse = await fetchMediaFromDriveNode(item.google_drive_file_id, accessToken)
+          const resolved = await streamPromises[i]
+          fileResponse = resolved?.stream
 
           if (aborted) {
             destroyStream(fileResponse)
             break
           }
 
-          if (fileResponse.statusCode === 401 && refreshToken) {
-            destroyStream(fileResponse)
-            accessToken = await refreshGoogleToken(file.user_id, refreshToken, supabaseAdmin)
-            if (aborted) break
-            fileResponse = await fetchMediaFromDriveNode(item.google_drive_file_id, accessToken)
-          }
-
-          if (aborted) {
-            destroyStream(fileResponse)
-            break
-          }
-
-          if (fileResponse.statusCode === 200) {
+          if (fileResponse && fileResponse.statusCode === 200) {
             await appendStreamToArchive(archive, fileResponse, item.relativePath)
           } else {
-            console.error(`Failed to fetch file ${item.file_name} from Drive during folder compilation. Status: ${fileResponse.statusCode}`)
+            console.error(`Failed to fetch file ${item.file_name} from Drive during folder compilation. Status: ${fileResponse?.statusCode}`)
             destroyStream(fileResponse)
           }
         } catch (itemErr) {

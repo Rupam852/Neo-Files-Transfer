@@ -983,7 +983,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         throw Exception('No active session. Please sign in again.');
       }
 
-      final downloadUrl = '${AppConfig.proxyUrl}/download/direct/${file.googleDriveFileId}';
+      final downloadUrl = '${AppConfig.cfWorkerUrl}/download/direct/${file.googleDriveFileId}';
 
       DateTime? lastUpdate;
       await dio.download(
