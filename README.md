@@ -1,6 +1,6 @@
 # 🚀 Neo Files Transfer
 
-A premium, secure, and responsive web-based file management and transfer platform. Built with **React**, **Tailwind CSS**, and **Supabase**, this project provides a seamless user experience (inspired by premium Dribbble Moneta designs) coupled with enterprise-grade security features.
+A premium, secure, and responsive file management, sharing, and transfer ecosystem. Built with **React** (Vite) for the web client, **Flutter** for the cross-platform mobile client, **Supabase** for secure auth & metadata storage, and a dedicated **Render Proxy** for high-volume streaming. The frontend design is inspired by premium Dribbble Moneta aesthetics, coupled with robust security control.
 
 ---
 
@@ -32,9 +32,10 @@ A premium, secure, and responsive web-based file management and transfer platfor
 
 | Layer | Technologies |
 | :--- | :--- |
-| **Frontend** | React (Vite), Tailwind CSS, Lucide Icons, HTML5 History API |
+| **Web Frontend** | React (Vite), Tailwind CSS, Lucide Icons, HTML5 History API |
+| **Mobile Client** | Flutter (Dart SDK), Supabase Flutter SDK, Dio Client, Lucide Icons |
 | **Database & Auth** | Supabase (Authentication, PostgreSQL Database, Realtime Channels) |
-| **Edge Functions** | Deno (SMTP verification email delivery, small-medium file downloads, user moderation) |
+| **Edge Functions** | Deno (SMTP verification email delivery, fallback downloads, user moderation) |
 | **Proxy & Zip Compiler** | Render (Express, Node.js, Archiver dynamic streams) |
 
 ---
@@ -54,9 +55,10 @@ graph TD
     classDef db fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff;
     classDef ext fill:#7c2d12,stroke:#f97316,stroke-width:2px,color:#fff;
 
-    subgraph Client ["Client Side (React SPA)"]
-        A[User Dashboard]:::client
-        B[Download Page]:::client
+    subgraph Client ["Client Apps"]
+        A[Web Dashboard / Landing]:::client
+        B[Web Download Page]:::client
+        M[Flutter Mobile App]:::client
     end
 
     subgraph Backend ["Supabase Backend Layer"]
@@ -80,7 +82,7 @@ graph TD
     end
 
     %% Flows
-    A -->|OAuth login| E
+    A & M -->|OAuth login| E
     E -->|Tokens| D
     
     A -->|1. Create Folder| G
@@ -90,11 +92,12 @@ graph TD
     A -->|2. Upload File / Folder Tree - Direct| I
     A -->|3. Register metadata| D
     
-    B -->|Query metadata| D
+    B & M -->|Query metadata| D
     
     %% Downloads Decision routing
-    B -->|Download file under 50MB| H
-    B -->|Download folder or file over 50MB| P
+    B -->|Download via Render Proxy (preferred)| P
+    B -->|Fallback (if Proxy unset)| H
+    M -->|Dio chunked download| P
     
     H -->|Retrieve Owner Google Tokens| D
     H -->|Fetch alt=media stream| I
@@ -103,7 +106,7 @@ graph TD
     P -->|Retrieve Owner Google Tokens| D
     P -->|Fetch alt=media stream| I
     P -->|Stream file / compile dynamic ZIP| P
-    P -->|Direct ZIP / file stream| B
+    P -->|Direct stream to Client| B & M
 
     H & F & G & P -->|If 401 Unauthorized| J
     J -->|New Access Token| D
@@ -113,9 +116,10 @@ graph TD
 1. **Google Auth & Token Storage**: Users sign in via Google OAuth. The retrieved access and refresh tokens are safely stored in the `user_profiles` database table.
 2. **Directory & Tree Uploads**: When users upload nested directories or folders, directories are created parent-first, and files are linked to their corresponding database parents (`parent_folder_id` referencing `shared_files(id) ON DELETE CASCADE`).
 3. **High-Speed Direct Client Uploads**: Uploading files bypasses backend servers. The React frontend negotiates a resumable session directly with Google Drive using the owner's `accessToken` and uploads raw bytes directly from the client's browser, giving 100% full upload speed.
-4. **Hybrid Download Streaming Routing**: Single files under 50MB are routed through the regional **Supabase Edge Function** (`download-file`) for instant, cold-start-free downloads. Folders and larger files (>50MB) are routed through the **Render Proxy** to prevent execution timeouts (bypassing the 150-second Deno execution limit). Both backend servers fetch the authenticated `alt=media` stream from the Google Drive API using the owner's credentials, bypassing Google's 1 MB/s speed throttling on public links and removing login requirements for guests.
-5. **On-the-fly ZIP Compilation**: When a shared folder is downloaded, the Render Proxy queries all child elements recursively, downloads their binary contents in parallel, packages them into a standard `.zip` archive on the fly using `archiver`, and streams the ZIP file directly to the guest browser.
-6. **Token Auto-Refresh Middleware**: Both Deno Edge Functions and the Render Proxy automatically intercept Google API `401 Unauthorized` responses, exchange the owner's refresh token for a fresh access token, save it to the DB, and resume the operation seamlessly.
+4. **Unified Download Routing via Render Proxy**: All file and folder downloads (regardless of size) are routed through the Node.js **Render Proxy** if configured. This prevents execution timeouts (such as the Deno 150-second runtime limit on slow downloads) and ensures memory-efficient chunk-by-chunk stream forwarding using HTTP piping. It falls back to Supabase Edge Functions only if `VITE_PROXY_URL` is not set.
+5. **Mobile Downloads with Progress Bar**: The Flutter client fetches direct streaming URLs from the proxy and handles storage downloading natively using `Dio` chunk stream listeners, rendering a smooth progress bar overlay for files.
+6. **On-the-fly ZIP Compilation**: When a shared folder is downloaded, the Render Proxy queries all child elements recursively, downloads their binary contents in parallel, packages them into a standard `.zip` archive on the fly using `archiver`, and streams the ZIP file directly to the guest browser.
+7. **Token Auto-Refresh Middleware**: Both Deno Edge Functions and the Render Proxy automatically intercept Google API `401 Unauthorized` responses, exchange the owner's refresh token for a fresh access token, save it to the DB, and resume the operation seamlessly.
 
 ---
 
@@ -124,6 +128,7 @@ graph TD
 
 ### Prerequisites
 - Node.js (v18+)
+- Flutter SDK (v3.12+) & Dart SDK (for mobile app)
 - Supabase CLI
 - Google OAuth Console Credentials (optional, for Google Auth)
 - Gmail SMTP credentials (for email OTP service)
@@ -152,6 +157,7 @@ supabase secrets set GOOGLE_CLIENT_ID="your-google-client-id" GOOGLE_CLIENT_SECR
 Deploy Deno Edge Functions to handle backend-restricted operations like email delivery and admin tasks:
 ```bash
 supabase functions deploy mail-service
+supabase functions deploy download-file
 ```
 
 ### 2. Frontend Setup (React App)
@@ -162,6 +168,7 @@ Create a `.env` file inside the `web` directory:
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 VITE_APP_URL=http://localhost:5173
+VITE_PROXY_URL=http://localhost:3000   # Render Proxy URL (optional, for large file downloads)
 ```
 
 Install dependencies and start the development server:
@@ -172,6 +179,19 @@ npm run dev
 ```
 
 The web client will be active at `http://localhost:5173`.
+
+### 3. Mobile Setup (Flutter App)
+Navigate to the `mobile` folder and install dependencies:
+```bash
+cd mobile
+flutter pub get
+```
+
+Set up configurations inside `mobile/lib/config.dart` (or follow the project config guidelines to specify Supabase URLs, client keys, and Proxy API endpoints).
+Run the app:
+```bash
+flutter run
+```
 
 ---
 
@@ -191,6 +211,11 @@ The web client will be active at `http://localhost:5173`.
 │   │   └── services/              # Supabase Client initializations
 │   ├── tailwind.config.js         # Tailwind styling tokens & system configuration
 │   └── vite.config.js             # Vite configurations
+├── mobile/                        # Flutter Mobile App Client
+│   ├── android/                   # Native Android resources
+│   ├── ios/                       # Native iOS resources
+│   └── lib/                       # Dart codebase (screens, widgets, config)
+├── proxy/                         # Node.js Express Proxy Server (Render)
 └── README.md                      # Documentation
 ```
 
