@@ -153,6 +153,10 @@ class AuthService extends ChangeNotifier {
             table: 'user_profiles',
             callback: (payload) async {
               if (_user == null) return;
+              if (payload.eventType == PostgresChangeEvent.delete) {
+                await signOut();
+                return;
+              }
               final Map<String, dynamic>? newRecord = payload.newRecord;
               if (newRecord != null) {
                 final newMobileSession = newRecord['active_mobile_session_id'] as String?;

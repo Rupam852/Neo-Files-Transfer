@@ -139,6 +139,10 @@ export function AuthProvider({ children }) {
         },
         async (payload) => {
           console.log('Realtime profile status change:', payload)
+          if (payload.eventType === 'DELETE') {
+            await signOut()
+            return
+          }
           if (payload.new) {
             const newWebSession = payload.new.active_web_session_id
             const localSession = localStorage.getItem('active_web_session_id')
