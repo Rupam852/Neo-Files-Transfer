@@ -37,14 +37,15 @@ A premium, secure, and responsive file management, sharing, and transfer ecosyst
 | **Database & Auth** | Supabase (Authentication, PostgreSQL Database, Realtime Channels) |
 | **Edge Functions** | Deno (SMTP verification email delivery, fallback downloads, user moderation) |
 | **Proxy & Zip Compiler** | Render (Express, Node.js, Archiver dynamic streams) |
+| **High-Speed CDN Edge Worker** | Cloudflare Workers (Fast single-file downloads & stream pipe) |
 
 ---
 
 ## 🏗️ Architecture & Workflow
 
-The platform leverages **React** for client-side rendering, **Supabase** for user access control/metadata tracking, and a hybrid backend split between **Supabase Edge Functions** (for fast regional, cold-start-free execution) and a **Render Proxy Server** (for long-running, timeout-free file streaming and ZIP compression on-the-fly).
+The platform leverages **React** for client-side rendering, **Supabase** for user access control/metadata tracking, and a multi-layered backend split between **Cloudflare Workers** (for high-speed, zero-cold-start single file downloads), **Supabase Edge Functions** (for regional utility APIs), and a **Render Proxy Server** (for folder ZIP compilation on-the-fly).
 
-Below is the flowchart representing the platform's multi-layered tree storage hierarchy, direct uploads, and zipped on-the-fly streaming download architecture:
+Below is the flowchart representing the platform's multi-layered tree storage hierarchy, direct uploads, and zipped/streamed download architecture:
 
 ```mermaid
 graph TD
@@ -54,6 +55,7 @@ graph TD
     classDef proxy fill:#4c1d95,stroke:#a78bfa,stroke-width:2px,color:#fff;
     classDef db fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff;
     classDef ext fill:#7c2d12,stroke:#f97316,stroke-width:2px,color:#fff;
+    classDef cf fill:#d97706,stroke:#f59e0b,stroke-width:2px,color:#fff;
 
     subgraph Client ["Client Apps"]
         A[Web Dashboard / Landing]:::client
@@ -70,6 +72,10 @@ graph TD
             G[create-folder]:::edge
             H[download-file]:::edge
         end
+    end
+
+    subgraph CloudflareEdge ["Cloudflare Edge Network"]
+        W[Cloudflare Worker Proxy]:::cf
     end
 
     subgraph RenderProxy ["Proxy Server (Render Node.js)"]
@@ -93,25 +99,24 @@ graph TD
     A -->|2. Upload File / Folder Tree - Direct| I
     A -->|3. Register metadata| D
     
-    B -->|Query metadata| D
-    M -->|Query metadata| D
+    B & M -->|Query metadata| D
     
     %% Downloads Decision routing
-    B -->|Download file under 50MB| H
-    B -->|Download folder or file over 50MB| P
-    M -->|Dio chunked download| P
+    B -->|Download single file| W
+    B -->|Download folder| P
+    M -->|Direct single file download| W
     
-    H -->|Retrieve Owner Google Tokens| D
-    H -->|Fetch alt=media stream| I
-    H -->|Direct stream response| B
+    W -->|Retrieve Owner Google Tokens| D
+    W -->|Fetch alt=media stream| I
+    W -->|Direct stream response| B
+    W -->|Direct stream response| M
     
     P -->|Retrieve Owner Google Tokens| D
     P -->|Fetch alt=media stream| I
     P -->|Stream file / compile dynamic ZIP| P
     P -->|Direct stream to Client| B
-    P -->|Direct stream to Client| M
 
-    H & F & G & P -->|If 401 Unauthorized| J
+    H & F & G & P & W -->|If 401 Unauthorized| J
     J -->|New Access Token| D
 ```
 
@@ -119,10 +124,10 @@ graph TD
 1. **Google Auth & Token Storage**: Users sign in via Google OAuth. The retrieved access and refresh tokens are safely stored in the `user_profiles` database table.
 2. **Directory & Tree Uploads**: When users upload nested directories or folders, directories are created parent-first, and files are linked to their corresponding database parents (`parent_folder_id` referencing `shared_files(id) ON DELETE CASCADE`).
 3. **High-Speed Direct Client Uploads**: Uploading files bypasses backend servers. The React frontend negotiates a resumable session directly with Google Drive using the owner's `accessToken` and uploads raw bytes directly from the client's browser, giving 100% full upload speed.
-4. **Hybrid Download Streaming Routing**: Single files under 50MB are routed through the regional **Supabase Edge Function** (`download-file`) for instant, cold-start-free downloads. Folders and larger files (>50MB) are routed through the **Render Proxy** to prevent execution timeouts (bypassing the 150-second Deno execution limit). Both backend servers fetch the authenticated `alt=media` stream from the Google Drive API using the owner's credentials, bypassing Google's 1 MB/s speed throttling on public links and removing login requirements for guests.
-5. **Mobile Downloads with Progress Bar**: The Flutter client fetches direct streaming URLs from the proxy and handles storage downloading natively using `Dio` chunk stream listeners, rendering a smooth progress bar overlay for files.
+4. **Hybrid Download Streaming Routing**: Single files are routed through the serverless **Cloudflare Worker** on the edge network for instant, cold-start-free downloads at gigabit speeds. Folders are routed through the **Render Proxy** to prevent execution timeouts and compile ZIP archives on the fly using `archiver`. If the Cloudflare Worker is not configured, the app falls back to regional **Supabase Edge Functions** (`download-file`). All backend servers fetch the authenticated `alt=media` stream from the Google Drive API using the owner's credentials, bypassing Google's public download throttling.
+5. **Mobile Downloads with Progress Bar**: The Flutter client fetches direct streaming URLs from the Cloudflare Worker and handles storage downloading natively using `Dio` chunk stream listeners, rendering a smooth progress bar overlay for files.
 6. **On-the-fly ZIP Compilation**: When a shared folder is downloaded, the Render Proxy queries all child elements recursively, downloads their binary contents in parallel, packages them into a standard `.zip` archive on the fly using `archiver`, and streams the ZIP file directly to the guest browser.
-7. **Token Auto-Refresh Middleware**: Both Deno Edge Functions and the Render Proxy automatically intercept Google API `401 Unauthorized` responses, exchange the owner's refresh token for a fresh access token, save it to the DB, and resume the operation seamlessly.
+7. **Token Auto-Refresh Middleware**: Deno Edge Functions, Cloudflare Workers, and the Render Proxy automatically intercept Google API `401 Unauthorized` responses, exchange the owner's refresh token for a fresh access token, save it to the DB, and resume the operation seamlessly.
 
 ---
 
