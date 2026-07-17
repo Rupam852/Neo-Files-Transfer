@@ -178,6 +178,19 @@ export default function DownloadPage() {
               </div>
             </div>
 
+            {/* APK Security Warning Banner */}
+            {fileInfo?.file_name?.toLowerCase().endsWith('.apk') && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex gap-3 text-left">
+                <AlertTriangle className="text-amber-500 flex-shrink-0 mt-0.5" size={18} />
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-amber-400">Android APK Warning</p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Some browsers may show a safety warning during download. This is a standard prompt for all Android apps. You can safely click <strong>"Keep"</strong> or <strong>"Download anyway"</strong>.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <a
               href={generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)}
               onClick={handleStartDownload}
