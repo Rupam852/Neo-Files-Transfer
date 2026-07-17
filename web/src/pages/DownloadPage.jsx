@@ -91,14 +91,35 @@ export default function DownloadPage() {
     try {
       console.log('Using native browser download manager for maximum speed.')
       setStatus('downloading')
-      setProgress(100)
+      setProgress(0)
+      setDownloadedBytes(0)
       setDownloadStage('Transfer active — downloading via browser manager...')
 
-      // Transition to completed screen
-      setTimeout(() => {
-        setStatus('completed')
-        setDownloadStage('')
-      }, 1500)
+      const duration = 1500 // 1.5 seconds visual transition
+      const startTime = performance.now()
+
+      const animate = (now) => {
+        const elapsed = now - startTime
+        const rawProgress = Math.min(elapsed / duration, 1)
+        
+        // Easing function for smoother progress (easeOutQuad)
+        const easedProgress = rawProgress * (2 - rawProgress)
+        
+        const currentProgress = Math.round(easedProgress * 100)
+        const currentBytes = Math.round(easedProgress * totalBytes)
+
+        setProgress(currentProgress)
+        setDownloadedBytes(currentBytes)
+
+        if (elapsed < duration) {
+          requestAnimationFrame(animate)
+        } else {
+          setStatus('completed')
+          setDownloadStage('')
+        }
+      }
+
+      requestAnimationFrame(animate)
 
     } catch (err) {
       console.error('Download error:', err)
