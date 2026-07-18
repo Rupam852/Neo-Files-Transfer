@@ -91,35 +91,11 @@ export default function DownloadPage() {
     try {
       console.log('Using native browser download manager for maximum speed.')
       setStatus('downloading')
-      setProgress(0)
-      setDownloadedBytes(0)
-      setDownloadStage('Transfer active — downloading via browser manager...')
 
-      const duration = 1500 // 1.5 seconds visual transition
-      const startTime = performance.now()
-
-      const animate = (now) => {
-        const elapsed = now - startTime
-        const rawProgress = Math.min(elapsed / duration, 1)
-        
-        // Easing function for smoother progress (easeOutQuad)
-        const easedProgress = rawProgress * (2 - rawProgress)
-        
-        const currentProgress = Math.round(easedProgress * 100)
-        const currentBytes = Math.round(easedProgress * totalBytes)
-
-        setProgress(currentProgress)
-        setDownloadedBytes(currentBytes)
-
-        if (elapsed < duration) {
-          requestAnimationFrame(animate)
-        } else {
-          setStatus('completed')
-          setDownloadStage('')
-        }
-      }
-
-      requestAnimationFrame(animate)
+      // Short delay with loading spinner before transitioning to completed screen
+      setTimeout(() => {
+        setStatus('completed')
+      }, 1200)
 
     } catch (err) {
       console.error('Download error:', err)
@@ -207,61 +183,11 @@ export default function DownloadPage() {
 
         {/* State: downloading or saving */}
         {(status === 'downloading' || status === 'saving') && (
-          <div className="space-y-6">
-            <div className="text-center space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full text-xs font-semibold uppercase tracking-wider mb-2">
-                <Download size={12} className="animate-bounce" />
-                {status === 'saving' ? 'Saving File...' : 'Secure Stream Active'}
-              </div>
-              <h2 className="text-2xl font-bold text-white font-['Space_Grotesk']">
-                {status === 'saving' ? 'Finalizing Download' : 'Downloading File'}
-              </h2>
-              <p className="text-sm text-slate-400">
-                {downloadStage || (status === 'saving'
-                  ? 'Writing cached blocks to your browser — download will trigger automatically...'
-                  : fileInfo?.is_folder && progress === 0
-                    ? 'Server is compressing folder contents into a ZIP. Please wait...'
-                    : fileInfo?.is_folder
-                      ? 'Streaming ZIP archive from Shield node...'
-                      : 'Streaming secure blocks directly from Shield node.')}
-              </p>
-            </div>
-
-            {/* File Info Block */}
-            <div className="bg-slate-900/50 border border-slate-900 rounded-2xl p-4 flex items-center gap-4">
-              <div className="w-12 h-12 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center justify-center text-indigo-400 flex-shrink-0">
-                <FileIcon size={24} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-white truncate leading-tight mb-1">{fileInfo?.file_name}</p>
-                <p className="text-xs text-slate-400 font-medium">{fileInfo?.is_folder ? 'Folder Archive' : formatFileSize(totalBytes)}</p>
-              </div>
-            </div>
-
-            {/* Realtime Progress Track */}
+          <div className="space-y-6 text-center py-6">
+            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span className="text-slate-400">
-                  {status === 'saving' ? 'Progress: 100%' : fileInfo?.is_folder && progress === 0 ? 'Building archive...' : `Progress: ${progress}%`}
-                </span>
-                <span className="text-indigo-400 font-semibold">
-                  {status === 'saving' ? 'Saving...' : (fileInfo?.is_folder ? `${formatFileSize(downloadedBytes)} downloaded` : `${formatFileSize(downloadedBytes)} / ${formatFileSize(totalBytes)}`)}
-                </span>
-              </div>
-              <div className="h-2.5 bg-slate-900 border border-slate-800/80 rounded-full overflow-hidden relative">
-                {fileInfo?.is_folder && progress === 0 && status === 'downloading' ? (
-                  <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-indigo-500/0 via-purple-500 to-indigo-500/0 animate-shimmer shadow-[0_0_12px_rgba(99,102,241,0.5)]" />
-                ) : (
-                  <div
-                    className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(99,102,241,0.5)]"
-                    style={{ width: `${progress}%` }}
-                  />
-                )}
-              </div>
-            </div>
-
-            <div className="text-center text-xs text-slate-500">
-              {status === 'saving' ? 'Writing cached blocks. Do not close this window.' : 'Please do not close this window. Your download is preparing in local browser memory.'}
+              <h2 className="text-2xl font-bold text-white font-['Space_Grotesk']">Preparing Download</h2>
+              <p className="text-sm text-slate-400">Initiating secure stream from Shield node. Please wait...</p>
             </div>
           </div>
         )}
