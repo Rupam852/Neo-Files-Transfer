@@ -170,6 +170,7 @@ export default function DownloadPage() {
             <a
               href={generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)}
               onClick={handleStartDownload}
+              rel="noopener noreferrer"
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] active:scale-[0.98] text-center"
             >
               <Download size={18} /> Download Now
@@ -207,6 +208,7 @@ export default function DownloadPage() {
             </div>
             <a
               href={generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)}
+              rel="noopener noreferrer"
               className="w-full btn-primary py-3 rounded-xl font-semibold flex items-center justify-center gap-2 text-center"
             >
               <Download size={16} /> Save File Again
@@ -296,6 +298,7 @@ export default function DownloadPage() {
               </button>
               <a
                 href={generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size)}
+                rel="noopener noreferrer"
                 className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-200 text-center"
               >
                 <Download size={16} /> Download Directly (No Stream)
