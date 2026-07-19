@@ -152,6 +152,7 @@ app.get('/refresh-token', async (req, res) => {
 app.get('/download-file', async (req, res) => {
   const hash = req.query.hash
   const isStream = req.query.stream === 'true'
+  const skipIncrement = req.query.skip_increment === 'true'
 
   if (!hash) {
     return res.status(400).json({ error: 'File Hash Required' })
@@ -405,7 +406,7 @@ app.get('/download-file', async (req, res) => {
         }
       }
 
-      if (!aborted) {
+      if (!aborted && !skipIncrement) {
         // Increment download count in database asynchronously
         (async () => {
           try {
@@ -414,7 +415,9 @@ app.get('/download-file', async (req, res) => {
             console.error('Failed to increment download count:', err)
           }
         })()
-
+      }
+      
+      if (!aborted) {
         // Finalize the archive stream
         archive.finalize()
       }
@@ -460,16 +463,18 @@ app.get('/download-file', async (req, res) => {
       res.setHeader('Content-Length', file.file_size)
     }
 
-    // Increment download count in database asynchronously
-    (async () => {
-      try {
-        await supabaseAdmin.rpc('increment_download_count', { file_id: file.id })
-      } catch (err) {
-        // Ignore if user cancels download early (aborted stream)
-        if (err.message && err.message.includes('aborted')) return
-        console.error('Failed to increment download count:', err)
-      }
-    })()
+    // Increment download count in database asynchronously if not skipped
+    if (!skipIncrement) {
+      (async () => {
+        try {
+          await supabaseAdmin.rpc('increment_download_count', { file_id: file.id })
+        } catch (err) {
+          // Ignore if user cancels download early (aborted stream)
+          if (err.message && err.message.includes('aborted')) return
+          console.error('Failed to increment download count:', err)
+        }
+      })()
+    }
 
     // Listen for client abort to clean up stream and prevent socket leak
     res.on('close', () => {

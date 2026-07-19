@@ -33,26 +33,28 @@ export function generateShareUrl(hash) {
   return `${baseUrl}/download/${hash}`
 }
 
-export function generateDirectDownloadUrl(hash, isFolder, fileSize) {
+export function generateDirectDownloadUrl(hash, isFolder, fileSize, skipIncrement = false) {
   console.log("VITE_CF_WORKER_URL value in helper:", import.meta.env.VITE_CF_WORKER_URL)
   const cfWorkerUrl = import.meta.env.VITE_CF_WORKER_URL
   const proxyUrl = import.meta.env.VITE_PROXY_URL
+  
+  const incrementParam = skipIncrement ? '&skip_increment=true' : ''
 
   // If it's a folder, zip it via Render Proxy
   if (isFolder && proxyUrl) {
     const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
-    return `${cleanProxy}/download-file?hash=${hash}`
+    return `${cleanProxy}/download-file?hash=${hash}${incrementParam}`
   }
 
   // If it's a single file, route through high-speed Cloudflare Worker
   if (cfWorkerUrl) {
     const cleanWorker = cfWorkerUrl.endsWith('/') ? cfWorkerUrl.slice(0, -1) : cfWorkerUrl
-    return `${cleanWorker}?hash=${hash}`
+    return `${cleanWorker}?hash=${hash}${incrementParam}`
   }
 
   // Fallback to Supabase regional Deno Edge Function
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-  return `${supabaseUrl}/functions/v1/download-file?hash=${hash}`
+  return `${supabaseUrl}/functions/v1/download-file?hash=${hash}${incrementParam}`
 }
 
 export function extractFolderId(url) {

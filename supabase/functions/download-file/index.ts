@@ -21,6 +21,7 @@ serve(async (req) => {
     const url = new URL(req.url)
     const hash = url.searchParams.get("hash")
     isStream = url.searchParams.get("stream") === "true"
+    const skipIncrement = url.searchParams.get("skip_increment") === "true"
 
     if (!hash) {
       if (isStream) {
@@ -247,10 +248,12 @@ serve(async (req) => {
         responseHeaders.set(key, value)
       }
 
-      // Increment download count in database asynchronously
-      supabaseAdmin.rpc("increment_download_count", { file_id: file.id }).then(({ error }) => {
-        if (error) console.error("Failed to increment download count:", error)
-      })
+      // Increment download count in database asynchronously if not skipped
+      if (!skipIncrement) {
+        supabaseAdmin.rpc("increment_download_count", { file_id: file.id }).then(({ error }) => {
+          if (error) console.error("Failed to increment download count:", error)
+        })
+      }
 
       return new Response(zippedBytes, {
         headers: responseHeaders,
@@ -308,10 +311,12 @@ serve(async (req) => {
       responseHeaders.set(key, value)
     }
 
-    // Increment download count in database asynchronously
-    supabaseAdmin.rpc("increment_download_count", { file_id: file.id }).then(({ error }) => {
-      if (error) console.error("Failed to increment download count:", error)
-    })
+    // Increment download count in database asynchronously if not skipped
+    if (!skipIncrement) {
+      supabaseAdmin.rpc("increment_download_count", { file_id: file.id }).then(({ error }) => {
+        if (error) console.error("Failed to increment download count:", error)
+      })
+    }
 
     // Stream the body directly to the client
     return new Response(driveResponse.body, {
