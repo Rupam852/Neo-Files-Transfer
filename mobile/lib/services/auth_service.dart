@@ -435,7 +435,7 @@ class AuthService extends ChangeNotifier {
         scopes: 'email profile https://www.googleapis.com/auth/drive',
         queryParams: {
           'access_type': 'offline',
-          if (forceConsent) 'prompt': 'consent',
+          'prompt': 'consent select_account',
         },
       );
 

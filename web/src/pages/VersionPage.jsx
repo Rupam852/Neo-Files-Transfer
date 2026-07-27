@@ -95,10 +95,15 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
           
           const refreshGoogleAccessToken = async () => {
             const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
+            const { data: { session: currentSession } } = await supabase.auth.getSession()
+            const freshToken = currentSession?.access_token || token
             const refreshRes = await fetch(`${cleanProxy}/refresh-token`, {
-              headers: { 'Authorization': `Bearer ${token}` }
+              headers: { 'Authorization': `Bearer ${freshToken}` }
             })
-            if (!refreshRes.ok) throw new Error('Google Drive connection expired. Please reconnect in settings.')
+            if (!refreshRes.ok) {
+              const errData = await refreshRes.json().catch(() => ({}))
+              throw new Error(errData.error || 'Google Drive connection expired. Please reconnect in settings.')
+            }
             const data = await refreshRes.json()
             localStorage.setItem('google_provider_token', data.google_access_token)
             return data.google_access_token

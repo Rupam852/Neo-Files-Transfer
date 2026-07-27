@@ -215,6 +215,8 @@ export default function App() {
       {/* Public Routes */}
       <Route path="/" element={<MainLayout />}>
         <Route index element={<HomeRoute />} />
+        <Route path="dashboard" element={<HomeRoute />} />
+        <Route path="dashboard/*" element={<HomeRoute />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="auth/callback" element={<AuthCallback />} />
         <Route path="privacy" element={<PrivacyPolicyPage />} />

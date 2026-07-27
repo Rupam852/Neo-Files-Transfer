@@ -35,8 +35,22 @@ export default function DashboardLayout() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const profileRef = useRef(null)
 
+  const getTabFromPath = () => {
+    try {
+      const path = window.location.pathname.toLowerCase()
+      if (path.includes('/settings')) return 'settings'
+      if (path.includes('/shared')) return 'shared'
+      if (path.includes('/versions')) return 'versions'
+      if (path.includes('/files')) return 'files'
+      if (path.includes('/dashboard')) return 'dashboard'
+    } catch (e) {}
+    return null
+  }
+
   const [currentTab, setCurrentTab] = useState(() => {
     try {
+      const pathTab = getTabFromPath()
+      if (pathTab) return pathTab
       return localStorage.getItem('activeTab') || 'dashboard'
     } catch (e) {
       return 'dashboard'
@@ -53,6 +67,7 @@ export default function DashboardLayout() {
   const navigateTab = (tab, fileId = null, push = true) => {
     setCurrentTab(tab)
     setSelectedFileId(fileId)
+    const targetUrl = tab === 'dashboard' ? '/dashboard' : `/dashboard/${tab}`
     try {
       localStorage.setItem('activeTab', tab)
       if (fileId) {
@@ -61,7 +76,7 @@ export default function DashboardLayout() {
         localStorage.removeItem('activeFileId')
       }
       if (push && window.history?.pushState) {
-        window.history.pushState({ tab, fileId }, '')
+        window.history.pushState({ tab, fileId }, '', targetUrl)
       }
     } catch (e) {
       console.error('History API error:', e)
@@ -72,27 +87,27 @@ export default function DashboardLayout() {
     // Restore and setup initial history state on mount
     try {
       const currentState = window.history.state
-      if (currentState && currentState.tab) {
-        setCurrentTab(currentState.tab)
-        setSelectedFileId(currentState.fileId || null)
-        localStorage.setItem('activeTab', currentState.tab)
-        if (currentState.fileId) {
-          localStorage.setItem('activeFileId', currentState.fileId)
-        } else {
-          localStorage.removeItem('activeFileId')
-        }
-      } else {
-        const storedTab = localStorage.getItem('activeTab') || 'dashboard'
-        const storedFileId = localStorage.getItem('activeFileId') || null
-        if (window.history?.replaceState) {
-          window.history.replaceState({ tab: storedTab, fileId: storedFileId }, '')
-        }
+      const pathTab = getTabFromPath()
+      const initialTab = (currentState && currentState.tab) || pathTab || localStorage.getItem('activeTab') || 'dashboard'
+      const initialFileId = (currentState && currentState.fileId) || localStorage.getItem('activeFileId') || null
+      const targetUrl = initialTab === 'dashboard' ? '/dashboard' : `/dashboard/${initialTab}`
+
+      setCurrentTab(initialTab)
+      setSelectedFileId(initialFileId)
+      localStorage.setItem('activeTab', initialTab)
+      if (initialFileId) {
+        localStorage.setItem('activeFileId', initialFileId)
+      }
+
+      if (window.history?.replaceState) {
+        window.history.replaceState({ tab: initialTab, fileId: initialFileId }, '', targetUrl)
       }
     } catch (e) {
       console.error('History API error on mount:', e)
     }
 
     const handlePopState = (event) => {
+      const pathTab = getTabFromPath()
       if (event.state && event.state.tab) {
         setCurrentTab(event.state.tab)
         setSelectedFileId(event.state.fileId || null)
@@ -104,6 +119,9 @@ export default function DashboardLayout() {
             localStorage.removeItem('activeFileId')
           }
         } catch (e) {}
+      } else if (pathTab) {
+        setCurrentTab(pathTab)
+        setSelectedFileId(null)
       } else {
         setCurrentTab('dashboard')
         setSelectedFileId(null)
@@ -160,7 +178,10 @@ export default function DashboardLayout() {
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Logo */}
-        <div className="h-16 flex items-center gap-3 px-6 border-b border-dark-400">
+        <div 
+          onClick={() => navigateTab('dashboard')}
+          className="h-16 flex items-center gap-3 px-6 border-b border-dark-400 cursor-pointer hover:bg-dark-600/50 transition-colors"
+        >
           <img 
             src="/favicon.png" 
             alt="Neo Files Logo" 
@@ -169,7 +190,10 @@ export default function DashboardLayout() {
           <span className="font-semibold text-gray-100">Neo Files</span>
           <button
             className="ml-auto lg:hidden text-gray-400 hover:text-gray-200"
-            onClick={() => setSidebarOpen(false)}
+            onClick={(e) => {
+              e.stopPropagation()
+              setSidebarOpen(false)
+            }}
           >
             <X size={20} />
           </button>
@@ -291,7 +315,7 @@ export default function DashboardLayout() {
           {currentTab === 'files' && <FilesPage onViewVersions={(fileId) => navigateTab('versions', fileId)} />}
           {currentTab === 'shared' && <SharedFilesPage />}
           {currentTab === 'settings' && <SettingsPage />}
-          {currentTab === 'versions' && <VersionPage fileId={selectedFileId} onBack={() => window.history.back()} />}
+          {currentTab === 'versions' && <VersionPage fileId={selectedFileId} onBack={() => navigateTab('files')} />}
         </main>
       </div>
 
