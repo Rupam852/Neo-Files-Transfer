@@ -336,15 +336,16 @@ export function AuthProvider({ children }) {
 
   async function signInWithGoogle(forceConsent = false) {
     localStorage.setItem('claim_active_session', 'true')
+    const queryParams = { access_type: 'offline' }
+    if (forceConsent) {
+      queryParams.prompt = 'consent select_account'
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
         scopes: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive',
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent select_account'
-        }
+        queryParams
       }
     })
     if (error) throw error
