@@ -44,7 +44,7 @@ class FileService extends ChangeNotifier {
         query = query.filter('parent_folder_id', 'is', null);
       }
 
-      final response = await query.order('created_at', ascending: false);
+      final response = await query.order('file_name', ascending: true);
 
       _files = (response as List).map((json) => SharedFile.fromJson(json)).toList();
     } catch (e) {
@@ -68,7 +68,7 @@ class FileService extends ChangeNotifier {
           .select('*, file_versions(*)')
           .eq('user_id', userId)
           .not('unique_share_hash', 'is', null)
-          .order('created_at', ascending: false);
+          .order('file_name', ascending: true);
 
       _sharedFiles = (response as List).map((json) => SharedFile.fromJson(json)).toList();
     } catch (e) {
