@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
-import { Files, Share2, Globe, Download, FolderOpen, X, Copy, Check, ExternalLink } from 'lucide-react'
+import { Files, Share2, Globe, Download, FolderOpen, X, Copy, Check, ExternalLink, AlertTriangle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 
@@ -214,6 +214,16 @@ export default function DashboardPage({ onNavigate }) {
               >
                 <X size={18} />
               </button>
+            </div>
+
+            {/* Direct Link Notice Banner */}
+            <div className="px-6 pt-4 pb-1">
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start gap-2.5">
+                <AlertTriangle size={15} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-amber-200/90 leading-relaxed">
+                  <strong>Note:</strong> Direct link downloads are not counted here. Only downloads from shared link pages are tracked.
+                </p>
+              </div>
             </div>
 
             {/* Content List */}
