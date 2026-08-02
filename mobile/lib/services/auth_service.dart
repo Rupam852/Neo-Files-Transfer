@@ -428,6 +428,7 @@ class AuthService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('claim_active_session', true);
 
+    try {
       final queryParams = <String, String>{'access_type': 'offline'};
       if (forceConsent) {
         queryParams['prompt'] = 'consent select_account';
