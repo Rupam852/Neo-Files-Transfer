@@ -75,6 +75,7 @@ export default function FilesPage({ onViewVersions }) {
   const [sortBy, setSortBy] = useState('created_at')
   const [sortDir, setSortDir] = useState('desc')
   const [activeMenu, setActiveMenu] = useState(null)
+  const [menuPosition, setMenuPosition] = useState({ openUp: false })
   const [renameModal, setRenameModal] = useState(null)
   const [shareModal, setShareModal] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
@@ -1255,7 +1256,15 @@ export default function FilesPage({ onViewVersions }) {
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              setActiveMenu(activeMenu === file.id ? null : file.id)
+                              if (activeMenu === file.id) {
+                                setActiveMenu(null)
+                              } else {
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                const spaceBelow = window.innerHeight - rect.bottom
+                                const openUp = spaceBelow < 260 || (idx >= filteredFiles.length - 2 && filteredFiles.length > 2)
+                                setMenuPosition({ openUp })
+                                setActiveMenu(file.id)
+                              }
                             }}
                             className="p-1.5 text-gray-400 hover:bg-dark-500 rounded-lg"
                           >
@@ -1265,7 +1274,9 @@ export default function FilesPage({ onViewVersions }) {
                             <div
                               ref={menuRef}
                               onClick={(e) => e.stopPropagation()}
-                              className="absolute right-0 mt-1 w-48 bg-dark-600 rounded-lg shadow-xl border border-dark-400 py-1 z-50"
+                              className={`absolute right-0 w-48 bg-dark-600 rounded-lg shadow-xl border border-dark-400 py-1 z-50 ${
+                                menuPosition.openUp ? 'bottom-full mb-1 origin-bottom-right' : 'top-full mt-1 origin-top-right'
+                              }`}
                             >
                               <button
                                 onClick={() => { toggleSharing(file); setActiveMenu(null) }}
