@@ -8,8 +8,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
-const SMTP_USER = Deno.env.get("SMTP_USER") || "neofilestransfar@gmail.com"
-const SMTP_PASS = Deno.env.get("SMTP_PASS")
+const SMTP_USER = Deno.env.get("SMTP_USER") || "support@neofilestransfer.site"
+const SMTP_PASS = Deno.env.get("SMTP_PASS") || "REDACTED_APP_PASSWORD"
 
 // Create Gmail Transporter
 const transporter = nodemailer.createTransport({
