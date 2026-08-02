@@ -31,3 +31,4 @@ coverage/
 
 # Supabase
 .supabase/
+supabase/.temp/
