@@ -4,6 +4,30 @@ import { createClient } from '@supabase/supabase-js'
 import archiver from 'archiver'
 import { Readable } from 'stream'
 import https from 'https'
+import WebSocket from 'ws'
+
+// Ensure WebSocket is polyfilled globally for Node.js < 22 / Supabase Realtime
+if (!globalThis.WebSocket) {
+  globalThis.WebSocket = WebSocket
+}
+
+const getSupabaseAdmin = () => {
+  const supabaseUrl = process.env.SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Supabase environment variables are missing on the proxy server.')
+  }
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    },
+    realtime: {
+      transport: WebSocket
+    }
+  })
+}
 
 const keepAliveAgent = new https.Agent({
   keepAlive: true,
@@ -113,12 +137,7 @@ app.get('/health', (req, res) => {
 // Endpoint to refresh and return the Google access token to the frontend
 app.get('/refresh-token', async (req, res) => {
   try {
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase environment variables are missing on the proxy server.')
-    }
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    const supabaseAdmin = getSupabaseAdmin()
 
     // Authenticate user via Supabase JWT
     const user = await getAuthenticatedUser(req, supabaseAdmin)
@@ -159,14 +178,7 @@ app.get('/download-file', async (req, res) => {
   }
 
   try {
-    // Verify environment variables
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase environment variables are missing on the proxy server.')
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    const supabaseAdmin = getSupabaseAdmin()
 
     // 1. Resolve file metadata by share hash
     const { data: file, error: fileError } = await supabaseAdmin
@@ -503,12 +515,7 @@ app.get('/download/direct/:driveFileId', async (req, res) => {
   }
 
   try {
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase environment variables are missing on the proxy server.')
-    }
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    const supabaseAdmin = getSupabaseAdmin()
 
     // Authenticate user via Supabase JWT
     const user = await getAuthenticatedUser(req, supabaseAdmin)
@@ -655,12 +662,7 @@ async function getAuthenticatedUser(req, supabaseAdmin) {
 // Streaming upload endpoint using Google Drive Resumable Upload API
 app.post('/upload-file', async (req, res) => {
   try {
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase environment variables are missing on the proxy server.')
-    }
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    const supabaseAdmin = getSupabaseAdmin()
 
     // Authenticate user via Supabase JWT
     const user = await getAuthenticatedUser(req, supabaseAdmin)
