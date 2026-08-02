@@ -35,6 +35,26 @@ export default function LandingPage() {
   const [verifying, setVerifying] = useState(false)
   const [resending, setResending] = useState(false)
   const [blockMessage, setBlockMessage] = useState('')
+  const [cooldownTimer, setCooldownTimer] = useState(0)
+  const [resendCount, setResendCount] = useState(0)
+
+  useEffect(() => {
+    let interval = null
+    if (cooldownTimer > 0) {
+      interval = setInterval(() => {
+        setCooldownTimer((prev) => {
+          if (prev <= 1) {
+            setResendCount(0)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    }
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [cooldownTimer])
 
   // Compute final full phone number
   const finalPhone = selectedCountry.code === 'other'
@@ -168,6 +188,7 @@ export default function LandingPage() {
   }
 
   async function handleResendOtp() {
+    if (cooldownTimer > 0) return
     setResending(true)
     setBlockMessage('')
     try {
@@ -186,6 +207,8 @@ export default function LandingPage() {
       const result = await response.json()
       if (!response.ok) {
         if (response.status === 429) {
+          const remainingSec = result.remaining_seconds || 35
+          setCooldownTimer(remainingSec)
           setBlockMessage(result.error)
         }
         throw new Error(result.error || 'Failed to resend verification code')
@@ -193,6 +216,12 @@ export default function LandingPage() {
 
       toast.success('New verification code sent!')
       setOtp('')
+      const nextCount = resendCount + 1
+      setResendCount(nextCount)
+
+      if (nextCount >= 2) {
+        setCooldownTimer(35)
+      }
     } catch (err) {
       console.error(err)
       toast.error(err.message || 'Failed to resend OTP')
@@ -548,10 +577,14 @@ export default function LandingPage() {
                         <button
                           type="button"
                           onClick={handleResendOtp}
-                          disabled={resending || !!blockMessage}
+                          disabled={resending || cooldownTimer > 0}
                           className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium disabled:opacity-40"
                         >
-                          {resending ? 'Resending...' : 'Resend Code'}
+                          {resending
+                            ? 'Resending...'
+                            : cooldownTimer > 0
+                            ? `Resend Code (${cooldownTimer}s)`
+                            : 'Resend Code'}
                         </button>
                       </div>
                     </div>

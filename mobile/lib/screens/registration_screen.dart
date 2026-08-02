@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -23,6 +24,33 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   String _step = 'form'; // 'form' or 'otp'
   bool _isLoading = false;
   String _blockMessage = '';
+  int _resendCount = 0;
+  int _cooldownSeconds = 0;
+  Timer? _timer;
+
+  void _startCooldown(int seconds) {
+    _timer?.cancel();
+    setState(() {
+      _cooldownSeconds = seconds;
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_cooldownSeconds <= 1) {
+        timer.cancel();
+        setState(() {
+          _cooldownSeconds = 0;
+          _resendCount = 0;
+        });
+      } else {
+        setState(() {
+          _cooldownSeconds--;
+        });
+      }
+    });
+  }
 
   final List<Map<String, dynamic>> _countries = [
     {'code': '+91', 'name': 'India', 'flag': '🇮🇳', 'length': 10},
@@ -38,6 +66,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   @override
   void dispose() {
+    _timer?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -46,6 +75,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   Future<void> _handleSendOtp() async {
+    if (_cooldownSeconds > 0) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -72,7 +102,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (response.statusCode == 200) {
         setState(() {
           _step = 'otp';
+          _resendCount++;
         });
+        if (_resendCount >= 3) {
+          _startCooldown(35);
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Verification code sent to your email!'),
@@ -85,7 +119,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     } on DioException catch (e) {
       String errMsg = 'Failed to request code.';
       if (e.response?.statusCode == 429) {
-        _blockMessage = e.response?.data['error'] ?? 'Too many requests. Please try again later.';
+        final remSec = e.response?.data['remaining_seconds'] ?? 35;
+        _startCooldown(remSec is int ? remSec : int.tryParse(remSec.toString()) ?? 35);
+        errMsg = e.response?.data['error'] ?? 'Please wait before requesting a new OTP.';
       } else {
         errMsg = e.response?.data['error'] ?? 'Connection error. Please try again.';
       }
@@ -465,8 +501,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               child: const Text('Change Details', style: TextStyle(color: Colors.white60, fontSize: 12)),
             ),
             TextButton(
-              onPressed: _isLoading ? null : _handleSendOtp,
-              child: const Text('Resend Code', style: TextStyle(color: Colors.indigoAccent, fontSize: 12)),
+              onPressed: (_isLoading || _cooldownSeconds > 0) ? null : _handleSendOtp,
+              child: Text(
+                _cooldownSeconds > 0
+                    ? 'Resend Code (${_cooldownSeconds}s)'
+                    : 'Resend Code',
+                style: TextStyle(
+                  color: (_isLoading || _cooldownSeconds > 0) ? Colors.white38 : Colors.indigoAccent,
+                  fontSize: 12,
+                ),
+              ),
             ),
           ],
         )

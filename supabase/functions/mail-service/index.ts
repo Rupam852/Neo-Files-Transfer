@@ -82,189 +82,40 @@ serve(async (req) => {
         }
       }
 
-      const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "127.0.0.1"
       const now = new Date()
 
-      // Fetch IP limit record
-      const { data: ipLimit, error: ipFetchError } = await supabase
-        .from("ip_rate_limits")
-        .select("*")
-        .eq("ip_address", clientIP)
-        .maybeSingle()
-
-      if (ipLimit) {
-        // A. Check if IP is currently blocked
-        if (ipLimit.blocked_until) {
-          const blockedUntil = new Date(ipLimit.blocked_until)
-          if (blockedUntil > now) {
-            const diffMs = blockedUntil.getTime() - now.getTime()
-            const diffMins = Math.ceil(diffMs / 60000)
-            return new Response(
-              JSON.stringify({ 
-                error: `Too many requests from this network. You are temporarily blocked from submitting requests for ${diffMins} minutes.` 
-              }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
-            )
-          } else {
-            // Block expired, reset counters
-            await supabase
-              .from("ip_rate_limits")
-              .update({
-                blocked_until: null,
-                minute_request_count: 0,
-                hour_request_count: 0,
-              })
-              .eq("ip_address", clientIP)
-            
-            ipLimit.blocked_until = null
-            ipLimit.minute_request_count = 0
-            ipLimit.hour_request_count = 0
-          }
-        }
-
-        // B. Check 60-second cooldown
-        const lastRequest = new Date(ipLimit.last_request_at)
-        const diffSeconds = (now.getTime() - lastRequest.getTime()) / 1000
-        if (diffSeconds < 60) {
-          const waitSeconds = Math.ceil(60 - diffSeconds)
-          return new Response(
-            JSON.stringify({ 
-              error: `Please wait ${waitSeconds} seconds before requesting a new OTP.` 
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
-          )
-        }
-
-        // C. Check 1-minute window (Max 2 requests)
-        const minuteStart = new Date(ipLimit.minute_window_start)
-        let minuteCount = ipLimit.minute_request_count
-        let nextMinuteStart = ipLimit.minute_window_start
-
-        if (now.getTime() - minuteStart.getTime() > 60 * 1000) {
-          nextMinuteStart = now.toISOString()
-          minuteCount = 1
-        } else {
-          minuteCount += 1
-        }
-
-        // D. Check 1-hour window (Max 10 requests)
-        const hourStart = new Date(ipLimit.hour_window_start)
-        let hourCount = ipLimit.hour_request_count
-        let nextHourStart = ipLimit.hour_window_start
-
-        if (now.getTime() - hourStart.getTime() > 60 * 60 * 1000) {
-          nextHourStart = now.toISOString()
-          hourCount = 1
-        } else {
-          hourCount += 1
-        }
-
-        // If limits exceeded, block the IP for 1 hour
-        if (minuteCount > 2 || hourCount > 10) {
-          const blockTime = new Date(now.getTime() + 60 * 60 * 1000)
-          await supabase
-            .from("ip_rate_limits")
-            .update({
-              last_request_at: now.toISOString(),
-              minute_request_count: minuteCount,
-              hour_request_count: hourCount,
-              blocked_until: blockTime.toISOString(),
-            })
-            .eq("ip_address", clientIP)
-
-          return new Response(
-            JSON.stringify({ 
-              error: "Too many requests from this network. You are blocked from submitting requests for 1 hour." 
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
-          )
-        }
-
-        // Update IP tracking record
-        await supabase
-          .from("ip_rate_limits")
-          .update({
-            last_request_at: now.toISOString(),
-            minute_window_start: nextMinuteStart,
-            minute_request_count: minuteCount,
-            hour_window_start: nextHourStart,
-            hour_request_count: hourCount,
-          })
-          .eq("ip_address", clientIP)
-
-      } else {
-        // Insert new IP tracking record
-        await supabase
-          .from("ip_rate_limits")
-          .insert({
-            ip_address: clientIP,
-            last_request_at: now.toISOString(),
-            minute_window_start: now.toISOString(),
-            minute_request_count: 1,
-            hour_window_start: now.toISOString(),
-            hour_request_count: 1,
-          })
-      }
-
       // Fetch existing verification record
-      const { data: existing, error: fetchError } = await supabase
+      const { data: existing } = await supabase
         .from("email_verifications")
         .select("*")
         .eq("email", normalizedEmail)
         .maybeSingle()
 
-      // Check if user is currently blocked
-      if (existing && existing.blocked_until) {
-        const blockedUntil = new Date(existing.blocked_until)
-        if (blockedUntil > now) {
-          const diffMs = blockedUntil.getTime() - now.getTime()
-          const diffMins = Math.ceil(diffMs / 60000)
-          return new Response(
-            JSON.stringify({ 
-              error: `You have requested too many OTPs. You are blocked from resending for ${diffMins} minutes. Please check your spam folder.` 
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
-          )
+      let newResendCount = 0
+
+      if (existing) {
+        // If user has already used 2 resends (total 3 sends: initial + 2 resends)
+        if (existing.resend_count >= 2) {
+          const lastSentTime = new Date(existing.created_at || now).getTime()
+          const diffMs = now.getTime() - lastSentTime
+          const diffSeconds = diffMs / 1000
+
+          if (diffSeconds < 35) {
+            const waitSeconds = Math.ceil(35 - diffSeconds)
+            return new Response(
+              JSON.stringify({ 
+                error: `Please wait ${waitSeconds} seconds before requesting a new OTP.`,
+                remaining_seconds: waitSeconds
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
+            )
+          } else {
+            // 35 seconds cooldown complete, reset counter
+            newResendCount = 0
+          }
         } else {
-          // Block expired, reset count
-          await supabase
-            .from("email_verifications")
-            .update({ resend_count: 0, blocked_until: null })
-            .eq("email", normalizedEmail)
+          newResendCount = existing.resend_count + 1
         }
-      }
-
-      // Calculate resend count
-      let currentResends = existing ? existing.resend_count : 0
-      currentResends += 1
-
-      if (currentResends > 5) {
-        // Block user for 1 hour
-        const blockTime = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour later
-        if (existing) {
-          await supabase
-            .from("email_verifications")
-            .update({ resend_count: currentResends, blocked_until: blockTime.toISOString() })
-            .eq("email", normalizedEmail)
-        } else {
-          // Generate a fake OTP just to create the row
-          await supabase
-            .from("email_verifications")
-            .insert({
-              email: normalizedEmail,
-              otp_code: "BLOCKED",
-              expires_at: now.toISOString(),
-              resend_count: currentResends,
-              blocked_until: blockTime.toISOString()
-            })
-        }
-
-        return new Response(
-          JSON.stringify({ 
-            error: "You have requested too many OTPs. You are blocked from resending for 1 hour. Please check your spam folder." 
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
-        )
       }
 
       // Generate 6-digit numeric OTP
@@ -278,8 +129,10 @@ serve(async (req) => {
           .update({
             otp_code: otp,
             expires_at: expiry.toISOString(),
-            resend_count: currentResends,
-            attempts: 0 // Reset validation attempts
+            resend_count: newResendCount,
+            created_at: now.toISOString(),
+            attempts: 0,
+            blocked_until: null
           })
           .eq("email", normalizedEmail)
       } else {
@@ -289,8 +142,10 @@ serve(async (req) => {
             email: normalizedEmail,
             otp_code: otp,
             expires_at: expiry.toISOString(),
-            resend_count: currentResends,
-            attempts: 0
+            resend_count: newResendCount,
+            created_at: now.toISOString(),
+            attempts: 0,
+            blocked_until: null
           })
       }
 
