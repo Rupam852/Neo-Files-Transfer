@@ -1274,8 +1274,10 @@ export default function FilesPage({ onViewVersions }) {
                             <div
                               ref={menuRef}
                               onClick={(e) => e.stopPropagation()}
-                              className={`absolute right-0 w-48 bg-dark-600 rounded-lg shadow-xl border border-dark-400 py-1 z-50 ${
-                                menuPosition.openUp ? 'bottom-full mb-1 origin-bottom-right' : 'top-full mt-1 origin-top-right'
+                              className={`absolute w-48 bg-dark-600 rounded-lg shadow-2xl border border-dark-400 py-1 z-50 ${
+                                menuPosition.openUp
+                                  ? 'right-0 bottom-full mb-1 sm:right-full sm:bottom-0 sm:mr-2 sm:mb-0 origin-bottom-right'
+                                  : 'right-0 top-full mt-1 sm:right-full sm:top-0 sm:mr-2 sm:mt-0 origin-top-right'
                               }`}
                             >
                               <button
