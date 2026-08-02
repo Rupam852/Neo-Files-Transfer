@@ -126,6 +126,11 @@ export default function AdminDashboardPage() {
   async function fetchData(showSpinner = false) {
     if (showSpinner) setLoading(true)
     try {
+      // Background auto-cleanup of activity logs older than 7 days
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      supabase.from('activity_logs').delete().lt('created_at', sevenDaysAgo).then(() => {}).catch(() => {})
+      supabase.from('admin_activity_logs').delete().lt('created_at', sevenDaysAgo).then(() => {}).catch(() => {})
+
       const [pendingRes, approvedRes, settingsRes, adminsRes, profilesRes] = await Promise.all([
         supabase.from('pending_registrations').select('*').order('submitted_at', { ascending: false }),
         supabase.from('approved_users').select('*').order('approved_at', { ascending: false }),
