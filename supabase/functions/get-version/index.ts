@@ -38,9 +38,17 @@ serve(async (req) => {
         JSON.stringify({ status: 'error', error: 'APK Version API key not found or file removed.' }),
         { status: 404, headers: corsHeaders }
       )
+    let shareHash = file.unique_share_hash
+    if (!shareHash) {
+      shareHash = Date.now().toString(36) + Math.random().toString(36).substring(2, 8) + file.id.substring(0, 6)
+      await supabaseAdmin
+        .from('shared_files')
+        .update({ unique_share_hash: shareHash, sharing_status: 'public' })
+        .eq('id', file.id)
     }
 
-    const downloadUrl = `${supabaseUrl}/functions/v1/download-file?hash=${file.unique_share_hash}`
+    const downloadUrl = `${supabaseUrl}/functions/v1/download-file?hash=${shareHash}`
+
 
     return new Response(
       JSON.stringify({

@@ -320,17 +320,26 @@ class FileService extends ChangeNotifier {
 
   // Get or generate Version API Key for APK file
   Future<SharedFile> getOrGenerateVersionApiKey(SharedFile file) async {
-    if (file.versionApiKey != null && file.versionApiKey!.isNotEmpty) {
-      return file;
-    }
-    final newKey = _generateApiKey();
+    String? newKey = file.versionApiKey;
+    String? shareHash = file.uniqueShareHash;
     final defaultVersion = file.apkVersion ?? 'v1.0.1';
 
-    await _client.from('shared_files').update({
-      'version_api_key': newKey,
-      'apk_version': defaultVersion,
-      'modified_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', file.id);
+    Map<String, dynamic> updates = {};
+    if (newKey == null || newKey.isEmpty) {
+      newKey = _generateApiKey();
+      updates['version_api_key'] = newKey;
+      updates['apk_version'] = defaultVersion;
+    }
+    if (shareHash == null || shareHash.isEmpty) {
+      shareHash = DateTime.now().millisecondsSinceEpoch.toRadixString(36) + file.id.substring(0, 6);
+      updates['unique_share_hash'] = shareHash;
+      updates['sharing_status'] = 'public';
+    }
+
+    if (updates.isNotEmpty) {
+      updates['modified_at'] = DateTime.now().toUtc().toIso8601String();
+      await _client.from('shared_files').update(updates).eq('id', file.id);
+    }
 
     return SharedFile(
       id: file.id,
@@ -340,17 +349,18 @@ class FileService extends ChangeNotifier {
       fileSize: file.fileSize,
       mimeType: file.mimeType,
       currentVersionNum: file.currentVersionNum,
-      uniqueShareHash: file.uniqueShareHash,
-      sharingStatus: file.sharingStatus,
+      uniqueShareHash: shareHash ?? file.uniqueShareHash,
+      sharingStatus: updates.containsKey('sharing_status') ? 'public' : file.sharingStatus,
       createdAt: file.createdAt,
       modifiedAt: DateTime.now(),
       isFolder: file.isFolder,
       parentFolderId: file.parentFolderId,
       downloadCount: file.downloadCount,
       apkVersion: defaultVersion,
-      versionApiKey: newKey,
+      versionApiKey: newKey ?? file.versionApiKey,
     );
   }
+
 
   // Update APK Version in DB
   Future<SharedFile> updateApkVersion(SharedFile file, String newVersion) async {
