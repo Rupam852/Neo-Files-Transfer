@@ -305,14 +305,16 @@ class AuthService extends ChangeNotifier {
         final prefs = await SharedPreferences.getInstance();
         final claimActiveSession = prefs.getBool('claim_active_session') == true;
 
-        if (isFreshSignIn || claimActiveSession || dbMobileSessionId == null) {
+        if (isFreshSignIn || claimActiveSession || dbMobileSessionId == null || dbMobileSessionId == localSessionId) {
           if (claimActiveSession) {
             await prefs.remove('claim_active_session');
           }
-          await _client
-              .from('user_profiles')
-              .update({'active_mobile_session_id': localSessionId})
-              .eq('id', authUser.id);
+          if (dbMobileSessionId != localSessionId) {
+            await _client
+                .from('user_profiles')
+                .update({'active_mobile_session_id': localSessionId})
+                .eq('id', authUser.id);
+          }
           _isSessionInvalidated = false;
           profileData = UserProfile(
             id: profileData.id,
@@ -328,11 +330,13 @@ class AuthService extends ChangeNotifier {
             updatedAt: profileData.updatedAt,
           );
         } else if (dbMobileSessionId != localSessionId) {
+          // If session was invalidated by another device logging in
           _isSessionInvalidated = true;
           _isLoading = false;
           notifyListeners();
           return;
         }
+
       }
 
       // Check if user is Admin

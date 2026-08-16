@@ -218,16 +218,16 @@ class FileListItem extends StatelessWidget {
               ),
             ],
             if (!file.isFolder && (file.fileName.toLowerCase().endsWith('.apk') || file.mimeType.contains('android.package-archive'))) ...[
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'version_api',
                 child: Row(
                   children: [
-                    Icon(LucideIcons.code, color: Colors.emerald.shade400, size: 16),
-                    const SizedBox(width: 10),
+                    Icon(LucideIcons.code, color: Color(0xFF34D399), size: 16),
+                    SizedBox(width: 10),
                     Text(
                       'Get Version API',
                       style: TextStyle(
-                        color: Colors.emerald.shade300,
+                        color: Color(0xFF6EE7B7),
                         fontSize: 13.5,
                         fontWeight: FontWeight.bold,
                       ),
@@ -236,6 +236,7 @@ class FileListItem extends StatelessWidget {
                 ),
               ),
             ],
+
 
             const PopupMenuDivider(),
             const PopupMenuItem(

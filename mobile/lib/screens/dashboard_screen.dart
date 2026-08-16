@@ -1165,7 +1165,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
     );
+  }
+
   Future<void> _handleGetVersionApi(SharedFile file) async {
+
     setState(() => _isActionLoading = true);
     try {
       final fileService = Provider.of<FileService>(context, listen: false);
