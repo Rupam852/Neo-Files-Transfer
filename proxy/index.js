@@ -666,11 +666,21 @@ app.get(['/api/version/:key', '/api/version'], async (req, res) => {
       return res.status(404).json({ status: 'error', error: 'APK Version API key not found or file removed.' })
     }
 
+    let shareHash = file.unique_share_hash
+    if (!shareHash) {
+      shareHash = Date.now().toString(36) + Math.random().toString(36).substring(2, 8) + file.id.substring(0, 6)
+      await supabaseAdmin
+        .from('shared_files')
+        .update({ unique_share_hash: shareHash, sharing_status: 'public' })
+        .eq('id', file.id)
+    }
+
     const host = req.get('host')
     const protocol = req.protocol
     const proxyBase = process.env.PROXY_URL || `${protocol}://${host}`
-    const downloadUrl = `${proxyBase}/download-file?hash=${file.unique_share_hash}`
-    const webUrl = `${process.env.VITE_APP_URL || `${protocol}://${host}`}/download/${file.unique_share_hash}`
+    const downloadUrl = `${proxyBase}/download-file?hash=${shareHash}`
+    const webUrl = `${process.env.VITE_APP_URL || `${protocol}://${host}`}/download/${shareHash}`
+
 
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Content-Type', 'application/json; charset=utf-8')

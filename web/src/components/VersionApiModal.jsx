@@ -90,12 +90,13 @@ export default function VersionApiModal({ file, onClose, onFileUpdated }) {
       version: version || "v1.0.1",
       file_name: file.file_name,
       file_size: file.file_size || 0,
-      download_url: apiUrl ? `${apiUrl.split('/api')[0]}/download-file?hash=${file.unique_share_hash || 'HASH'}` : "...",
+      download_url: apiUrl ? `${apiUrl.split('/api')[0]}/download-file?hash=${file.unique_share_hash || 'apk_share_link'}` : "...",
       updated_at: new Date().toISOString()
     },
     null,
     2
   )
+
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>

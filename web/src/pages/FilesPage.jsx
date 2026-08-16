@@ -1338,20 +1338,25 @@ export default function FilesPage({ onViewVersions }) {
                                 <button
                                   onClick={async () => {
                                     let targetFile = file
-                                    if (!file.version_api_key) {
-                                      const newKey = `apk_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`
-                                      const defaultVersion = file.apk_version || 'v1.0.1'
+                                    const updates = {}
+                                    if (!targetFile.version_api_key) {
+                                      updates.version_api_key = `apk_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`
+                                      updates.apk_version = targetFile.apk_version || 'v1.0.1'
+                                    }
+                                    if (!targetFile.unique_share_hash) {
+                                      updates.unique_share_hash = Date.now().toString(36) + Math.random().toString(36).substring(2, 8) + file.id.substring(0, 6)
+                                      updates.sharing_status = 'public'
+                                    }
+
+                                    if (Object.keys(updates).length > 0) {
+                                      updates.modified_at = new Date().toISOString()
                                       const { error } = await supabase
                                         .from('shared_files')
-                                        .update({
-                                          version_api_key: newKey,
-                                          apk_version: defaultVersion,
-                                          modified_at: new Date().toISOString()
-                                        })
+                                        .update(updates)
                                         .eq('id', file.id)
 
                                       if (!error) {
-                                        targetFile = { ...file, version_api_key: newKey, apk_version: defaultVersion }
+                                        targetFile = { ...file, ...updates }
                                         setFiles(prev => prev.map(f => f.id === file.id ? targetFile : f))
                                       }
                                     }
