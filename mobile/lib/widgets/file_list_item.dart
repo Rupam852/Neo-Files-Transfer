@@ -206,7 +206,37 @@ class FileListItem extends StatelessWidget {
                   ],
                 ),
               ),
+              const PopupMenuItem(
+                value: 'manage_versions',
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.history, color: Colors.white70, size: 16),
+                    SizedBox(width: 10),
+                    Text('Manage Versions', style: TextStyle(color: Colors.white70, fontSize: 13.5)),
+                  ],
+                ),
+              ),
             ],
+            if (!file.isFolder && (file.fileName.toLowerCase().endsWith('.apk') || file.mimeType.contains('android.package-archive'))) ...[
+              PopupMenuItem(
+                value: 'version_api',
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.code, color: Colors.emerald.shade400, size: 16),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Get Version API',
+                      style: TextStyle(
+                        color: Colors.emerald.shade300,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             const PopupMenuDivider(),
             const PopupMenuItem(
               value: 'delete',

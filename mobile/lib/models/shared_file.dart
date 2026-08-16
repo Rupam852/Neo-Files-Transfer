@@ -13,6 +13,8 @@ class SharedFile {
   final bool isFolder;
   final String? parentFolderId;
   final int downloadCount;
+  final String? apkVersion;
+  final String? versionApiKey;
 
   SharedFile({
     required this.id,
@@ -29,6 +31,8 @@ class SharedFile {
     this.isFolder = false,
     this.parentFolderId,
     this.downloadCount = 0,
+    this.apkVersion,
+    this.versionApiKey,
   });
 
   factory SharedFile.fromJson(Map<String, dynamic> json) {
@@ -47,6 +51,8 @@ class SharedFile {
       isFolder: json['is_folder'] as bool? ?? false,
       parentFolderId: json['parent_folder_id'] as String?,
       downloadCount: (json['download_count'] as num?)?.toInt() ?? 0,
+      apkVersion: json['apk_version'] as String?,
+      versionApiKey: json['version_api_key'] as String?,
     );
   }
 
@@ -66,6 +72,9 @@ class SharedFile {
       'is_folder': isFolder,
       'parent_folder_id': parentFolderId,
       'download_count': downloadCount,
+      'apk_version': apkVersion,
+      'version_api_key': versionApiKey,
     };
   }
 }
+

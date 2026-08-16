@@ -22,6 +22,9 @@ import 'settings_screen.dart';
 import 'admin_screen.dart';
 import '../widgets/file_list_item.dart';
 import '../widgets/upload_progress.dart';
+import '../widgets/version_api_dialog.dart';
+import '../widgets/manage_versions_dialog.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -1162,10 +1165,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
     );
+  Future<void> _handleGetVersionApi(SharedFile file) async {
+    setState(() => _isActionLoading = true);
+    try {
+      final fileService = Provider.of<FileService>(context, listen: false);
+      final updatedFile = await fileService.getOrGenerateVersionApiKey(file);
+      await _refreshFiles();
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => VersionApiDialog(file: updatedFile),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('Failed to load Version API: ${_formatError(e)}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isActionLoading = false);
+      }
+    }
+  }
+
+  void _handleManageVersions(SharedFile file) {
+    showDialog(
+      context: context,
+      builder: (context) => ManageVersionsDialog(file: file),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+
     final fileService = Provider.of<FileService>(context);
 
     // Apply search filter
@@ -1384,6 +1416,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         if (action == 'rename') _handleRename(file);
                                         if (action == 'share') _handleToggleSharing(file);
                                         if (action == 'download') _handleDownload(file);
+                                        if (action == 'manage_versions') _handleManageVersions(file);
+                                        if (action == 'version_api') _handleGetVersionApi(file);
                                         if (action == 'delete') _handleDelete(file);
                                       },
                                     );
