@@ -145,15 +145,15 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.emerald.shade500.withOpacity(0.15),
+                      color: const Color(0xFF10B981).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: Colors.emerald.shade500.withOpacity(0.3),
+                        color: const Color(0xFF10B981).withOpacity(0.3),
                       ),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       LucideIcons.smartphone,
-                      color: Colors.emerald.shade400,
+                      color: Color(0xFF34D399),
                       size: 20,
                     ),
                   ),
@@ -177,16 +177,16 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.emerald.shade500.withOpacity(0.2),
+                                color: const Color(0xFF10B981).withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(4),
                                 border: Border.all(
-                                  color: Colors.emerald.shade500.withOpacity(0.3),
+                                  color: const Color(0xFF10B981).withOpacity(0.3),
                                 ),
                               ),
-                              child: Text(
+                              child: const Text(
                                 'APK',
                                 style: TextStyle(
-                                  color: Colors.emerald.shade300,
+                                  color: Color(0xFF6EE7B7),
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -231,8 +231,8 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   Expanded(
                     child: TextField(
                       controller: _versionController,
-                      style: TextStyle(
-                        color: Colors.emerald.shade300,
+                      style: const TextStyle(
+                        color: Color(0xFF6EE7B7),
                         fontWeight: FontWeight.bold,
                         fontFamily: 'monospace',
                         fontSize: 14,
@@ -254,7 +254,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: Colors.emerald.shade400),
+                          borderSide: const BorderSide(color: Color(0xFF34D399)),
                         ),
                       ),
                     ),
@@ -312,7 +312,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                     ],
                   ),
                   TextButton.icon(
-                    onPressed: _isRegenerateKey ? null : _handleRegenerateKey,
+                    onPressed: _isRegenerating ? null : _handleRegenerateKey,
                     icon: _isRegenerating
                         ? const SizedBox(
                             width: 12,
@@ -363,7 +363,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   label: Text(_copied ? 'Copied to Clipboard' : 'Copy Version API Link',
                       style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.emerald.shade600,
+                    backgroundColor: const Color(0xFF059669),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -402,7 +402,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   '  "download_url": "${apiUrl.isNotEmpty ? apiUrl.replaceAll('/api/version/', '/download-file?hash=') : '...'}"\n'
                   '}',
                   style: TextStyle(
-                    color: Colors.emerald.shade400.withOpacity(0.9),
+                    color: const Color(0xFF34D399).withOpacity(0.9),
                     fontSize: 10.5,
                     fontFamily: 'monospace',
                     height: 1.4,

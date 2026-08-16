@@ -329,13 +329,13 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                                                 padding: const EdgeInsets.symmetric(
                                                     horizontal: 5, vertical: 1),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.emerald.shade500.withOpacity(0.2),
+                                                  color: const Color(0xFF10B981).withOpacity(0.2),
                                                   borderRadius: BorderRadius.circular(4),
                                                 ),
-                                                child: Text(
+                                                child: const Text(
                                                   'LATEST',
                                                   style: TextStyle(
-                                                    color: Colors.emerald.shade300,
+                                                    color: Color(0xFF6EE7B7),
                                                     fontSize: 8.5,
                                                     fontWeight: FontWeight.bold,
                                                   ),
