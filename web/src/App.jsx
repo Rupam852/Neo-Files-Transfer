@@ -16,7 +16,9 @@ import AuthCallback from './pages/AuthCallback'
 import AccessDeniedPage from './pages/AccessDeniedPage'
 import FileNotFoundPage from './pages/FileNotFoundPage'
 import DownloadPage from './pages/DownloadPage'
+import VersionApiPage from './pages/VersionApiPage'
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
+
 import TermsOfServicePage from './pages/TermsOfServicePage'
 
 // Admin Pages
@@ -231,9 +233,14 @@ export default function App() {
       {/* Download Routes */}
       <Route path="/download/:hash" element={<DownloadPage />} />
 
+      {/* Version API Routes */}
+      <Route path="/api/version/:key" element={<VersionApiPage />} />
+      <Route path="/api/version" element={<VersionApiPage />} />
+
       {/* Error Pages */}
       <Route path="/access-denied" element={<AccessDeniedPage />} />
       <Route path="*" element={<FileNotFoundPage />} />
     </Routes>
   )
+
 }
