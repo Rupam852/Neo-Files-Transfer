@@ -12,6 +12,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/rendering.dart';
+
 
 import 'package:intl/intl.dart';
 import '../models/shared_file.dart';
@@ -41,6 +43,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final TextEditingController _folderNameController = TextEditingController();
   String _searchQuery = '';
   int _currentTab = 0;
+  bool _isFabVisible = true;
+
 
   // Upload state
   bool _isUploading = false;
@@ -1272,50 +1276,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       floatingActionButton: _currentTab == 0
-          ? FloatingActionButton(
-              onPressed: () {
-                // Bottom options dialog
-                showModalBottomSheet(
-                  backgroundColor: const Color(0xFF0F172A),
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                  ),
-                  context: context,
-                  builder: (context) => SafeArea(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ListTile(
-                          leading: const Icon(LucideIcons.filePlus, color: Colors.indigoAccent),
-                          title: const Text('Upload Files', style: TextStyle(color: Colors.white)),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _handleUploadFile();
-                          },
+          ? AnimatedSlide(
+              duration: const Duration(milliseconds: 250),
+              offset: _isFabVisible ? Offset.zero : const Offset(0, 2),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 250),
+                opacity: _isFabVisible ? 1.0 : 0.0,
+                child: FloatingActionButton(
+                  onPressed: () {
+                    // Bottom options dialog
+                    showModalBottomSheet(
+                      backgroundColor: const Color(0xFF0F172A),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                      ),
+                      context: context,
+                      builder: (context) => SafeArea(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ListTile(
+                              leading: const Icon(LucideIcons.filePlus, color: Colors.indigoAccent),
+                              title: const Text('Upload Files', style: TextStyle(color: Colors.white)),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _handleUploadFile();
+                              },
+                            ),
+                            ListTile(
+                              leading: const Icon(LucideIcons.folder, color: Colors.teal),
+                              title: const Text('Upload Folder', style: TextStyle(color: Colors.white)),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _handleUploadFolder();
+                              },
+                            ),
+                            ListTile(
+                              leading: const Icon(LucideIcons.folderPlus, color: Colors.amber),
+                              title: const Text('Create Folder', style: TextStyle(color: Colors.white)),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _handleCreateFolder();
+                              },
+                            ),
+                          ],
                         ),
-                        ListTile(
-                          leading: const Icon(LucideIcons.folder, color: Colors.teal),
-                          title: const Text('Upload Folder', style: TextStyle(color: Colors.white)),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _handleUploadFolder();
-                          },
-                        ),
-                        ListTile(
-                          leading: const Icon(LucideIcons.folderPlus, color: Colors.amber),
-                          title: const Text('Create Folder', style: TextStyle(color: Colors.white)),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _handleCreateFolder();
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-              backgroundColor: Colors.indigo.shade600,
-              child: const Icon(LucideIcons.plus, color: Colors.white),
+                      ),
+                    );
+                  },
+                  backgroundColor: Colors.indigo.shade600,
+                  child: const Icon(LucideIcons.plus, color: Colors.white),
+                ),
+              ),
             )
           : null,
       body: PopScope(
@@ -1325,6 +1337,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (_currentTab != 0) {
             setState(() {
               _currentTab = 0;
+              _isFabVisible = true;
             });
             _refreshFiles();
           } else if (_folderPath.isNotEmpty) {
@@ -1333,105 +1346,120 @@ class _DashboardScreenState extends State<DashboardScreen> {
             SystemNavigator.pop();
           }
         },
-        child: RefreshIndicator(
-          onRefresh: _refreshFiles,
-          color: Colors.indigoAccent,
-          backgroundColor: const Color(0xFF0F172A),
-          child: _currentTab == 0
-              ? Column(
-                  children: [
-                    // Search Bar & Info card
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-                      child: TextFormField(
-                        controller: _searchController,
-                        style: const TextStyle(color: Colors.white, fontSize: 13.5),
-                        onChanged: (val) => setState(() => _searchQuery = val),
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(LucideIcons.search, color: Colors.white38, size: 16),
-                          hintText: 'Search files and folders...',
-                          hintStyle: const TextStyle(color: Colors.white30, fontSize: 12.5),
-                          filled: true,
-                          fillColor: const Color(0xFF0F172A).withOpacity(0.5),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
+        child: NotificationListener<UserScrollNotification>(
+          onNotification: (notification) {
+            if (notification.direction == ScrollDirection.reverse) {
+              if (_isFabVisible) {
+                setState(() => _isFabVisible = false);
+              }
+            } else if (notification.direction == ScrollDirection.forward) {
+              if (!_isFabVisible) {
+                setState(() => _isFabVisible = true);
+              }
+            }
+            return true;
+          },
+          child: RefreshIndicator(
+            onRefresh: _refreshFiles,
+            color: Colors.indigoAccent,
+            backgroundColor: const Color(0xFF0F172A),
+            child: _currentTab == 0
+                ? Column(
+                    children: [
+                      // Search Bar & Info card
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                        child: TextFormField(
+                          controller: _searchController,
+                          style: const TextStyle(color: Colors.white, fontSize: 13.5),
+                          onChanged: (val) => setState(() => _searchQuery = val),
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(LucideIcons.search, color: Colors.white38, size: 16),
+                            hintText: 'Search files and folders...',
+                            hintStyle: const TextStyle(color: Colors.white30, fontSize: 12.5),
+                            filled: true,
+                            fillColor: const Color(0xFF0F172A).withOpacity(0.5),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
+                            ),
                           ),
                         ),
                       ),
-                    ),
 
-                    // Download Progress overlay banner
-                    if (_downloadingFileName.isNotEmpty) ...[
-                      Container(
-                        width: double.infinity,
-                        color: Colors.indigo.shade900.withOpacity(0.8),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        child: Row(
-                          children: [
-                            const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'Downloading $_downloadingFileName (${(_downloadProgress * 100).round()}%)...',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white, fontSize: 12),
+                      // Download Progress overlay banner
+                      if (_downloadingFileName.isNotEmpty) ...[
+                        Container(
+                          width: double.infinity,
+                          color: Colors.indigo.shade900.withOpacity(0.8),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          child: Row(
+                            children: [
+                              const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Downloading $_downloadingFileName (${(_downloadProgress * 100).round()}%)...',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                      ],
+
+                      // Breadcrumb path navigation bar
+                      _buildBreadcrumbs(),
+
+                      // Files view list
+                      Expanded(
+                        child: fileService.isLoading
+                            ? const Center(child: CircularProgressIndicator(color: Colors.indigoAccent))
+                            : filteredFiles.isEmpty
+                                ? _buildEmptyState()
+                                : ListView.builder(
+                                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                                    itemCount: filteredFiles.length,
+                                    itemBuilder: (context, index) {
+                                      final file = filteredFiles[index];
+                                      return FileListItem(
+                                        file: file,
+                                        onTap: () {
+                                          if (file.isFolder) {
+                                            _navigateToFolder(file);
+                                          } else {
+                                            _showViewInDriveDialog(file);
+                                          }
+                                        },
+                                        onActionSelected: (action) {
+                                          if (action == 'rename') _handleRename(file);
+                                          if (action == 'share') _handleToggleSharing(file);
+                                          if (action == 'download') _handleDownload(file);
+                                          if (action == 'manage_versions') _handleManageVersions(file);
+                                          if (action == 'version_api') _handleGetVersionApi(file);
+                                          if (action == 'delete') _handleDelete(file);
+                                        },
+                                      );
+                                    },
+                                  ),
                       ),
                     ],
-
-                    // Breadcrumb path navigation bar
-                    _buildBreadcrumbs(),
-
-                    // Files view list
-                    Expanded(
-                      child: fileService.isLoading
-                          ? const Center(child: CircularProgressIndicator(color: Colors.indigoAccent))
-                          : filteredFiles.isEmpty
-                              ? _buildEmptyState()
-                              : ListView.builder(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                                  itemCount: filteredFiles.length,
-                                  itemBuilder: (context, index) {
-                                    final file = filteredFiles[index];
-                                    return FileListItem(
-                                      file: file,
-                                      onTap: () {
-                                        if (file.isFolder) {
-                                          _navigateToFolder(file);
-                                        } else {
-                                          _showViewInDriveDialog(file);
-                                        }
-                                      },
-                                      onActionSelected: (action) {
-                                        if (action == 'rename') _handleRename(file);
-                                        if (action == 'share') _handleToggleSharing(file);
-                                        if (action == 'download') _handleDownload(file);
-                                        if (action == 'manage_versions') _handleManageVersions(file);
-                                        if (action == 'version_api') _handleGetVersionApi(file);
-                                        if (action == 'delete') _handleDelete(file);
-                                      },
-                                    );
-                                  },
-                                ),
-                    ),
-                  ],
-                )
-              : _buildSharedFilesTab(),
+                  )
+                : _buildSharedFilesTab(),
+          ),
         ),
       ),
+
     ),
     if (_isActionLoading)
       Positioned.fill(
