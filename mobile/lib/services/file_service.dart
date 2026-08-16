@@ -275,8 +275,9 @@ class FileService extends ChangeNotifier {
     final driveData = response.data;
     final driveFileId = driveData['id'] as String;
 
-    // Step 3: Insert shared_files and file_versions
-    final insertResponse = await _client.from('shared_files').insert({
+    final isApk = finalFileName.toLowerCase().endsWith('.apk') || (driveData['mimeType'] as String? ?? '').contains('android.package-archive');
+
+    final insertPayload = <String, dynamic>{
       'user_id': userId,
       'google_drive_file_id': driveFileId,
       'file_name': finalFileName,
@@ -285,7 +286,15 @@ class FileService extends ChangeNotifier {
       'current_version_num': 1,
       'sharing_status': 'private',
       'parent_folder_id': parentDbFolderId,
-    }).select('id').single();
+    };
+
+    if (isApk) {
+      insertPayload['apk_version'] = 'v1.0.1';
+      insertPayload['version_api_key'] = _generateApiKey();
+    }
+
+    // Step 3: Insert shared_files and file_versions
+    final insertResponse = await _client.from('shared_files').insert(insertPayload).select('id').single();
 
     final dbFileId = insertResponse['id'] as String;
 
@@ -301,6 +310,208 @@ class FileService extends ChangeNotifier {
       'details': 'Uploaded file: $finalFileName',
     });
   }
+
+  String _generateApiKey() {
+    final now = DateTime.now();
+    final random = now.microsecondsSinceEpoch.toRadixString(36);
+    final rand2 = (100000 + (now.millisecond * 7919)).toRadixString(36);
+    return 'apk_${random}$rand2';
+  }
+
+  // Get or generate Version API Key for APK file
+  Future<SharedFile> getOrGenerateVersionApiKey(SharedFile file) async {
+    if (file.versionApiKey != null && file.versionApiKey!.isNotEmpty) {
+      return file;
+    }
+    final newKey = _generateApiKey();
+    final defaultVersion = file.apkVersion ?? 'v1.0.1';
+
+    await _client.from('shared_files').update({
+      'version_api_key': newKey,
+      'apk_version': defaultVersion,
+      'modified_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', file.id);
+
+    return SharedFile(
+      id: file.id,
+      userId: file.userId,
+      googleDriveFileId: file.googleDriveFileId,
+      fileName: file.fileName,
+      fileSize: file.fileSize,
+      mimeType: file.mimeType,
+      currentVersionNum: file.currentVersionNum,
+      uniqueShareHash: file.uniqueShareHash,
+      sharingStatus: file.sharingStatus,
+      createdAt: file.createdAt,
+      modifiedAt: DateTime.now(),
+      isFolder: file.isFolder,
+      parentFolderId: file.parentFolderId,
+      downloadCount: file.downloadCount,
+      apkVersion: defaultVersion,
+      versionApiKey: newKey,
+    );
+  }
+
+  // Update APK Version in DB
+  Future<SharedFile> updateApkVersion(SharedFile file, String newVersion) async {
+    final formatted = newVersion.trim().startsWith('v') ? newVersion.trim() : 'v${newVersion.trim()}';
+    await _client.from('shared_files').update({
+      'apk_version': formatted,
+      'modified_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', file.id);
+
+    return SharedFile(
+      id: file.id,
+      userId: file.userId,
+      googleDriveFileId: file.googleDriveFileId,
+      fileName: file.fileName,
+      fileSize: file.fileSize,
+      mimeType: file.mimeType,
+      currentVersionNum: file.currentVersionNum,
+      uniqueShareHash: file.uniqueShareHash,
+      sharingStatus: file.sharingStatus,
+      createdAt: file.createdAt,
+      modifiedAt: DateTime.now(),
+      isFolder: file.isFolder,
+      parentFolderId: file.parentFolderId,
+      downloadCount: file.downloadCount,
+      apkVersion: formatted,
+      versionApiKey: file.versionApiKey,
+    );
+  }
+
+  // Regenerate Version API Key
+  Future<SharedFile> regenerateVersionApiKey(SharedFile file) async {
+    final newKey = _generateApiKey();
+    final defaultVersion = file.apkVersion ?? 'v1.0.1';
+
+    await _client.from('shared_files').update({
+      'version_api_key': newKey,
+      'apk_version': defaultVersion,
+      'modified_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', file.id);
+
+    return SharedFile(
+      id: file.id,
+      userId: file.userId,
+      googleDriveFileId: file.googleDriveFileId,
+      fileName: file.fileName,
+      fileSize: file.fileSize,
+      mimeType: file.mimeType,
+      currentVersionNum: file.currentVersionNum,
+      uniqueShareHash: file.uniqueShareHash,
+      sharingStatus: file.sharingStatus,
+      createdAt: file.createdAt,
+      modifiedAt: DateTime.now(),
+      isFolder: file.isFolder,
+      parentFolderId: file.parentFolderId,
+      downloadCount: file.downloadCount,
+      apkVersion: defaultVersion,
+      versionApiKey: newKey,
+    );
+  }
+
+  // Fetch Version History List for File
+  Future<List<Map<String, dynamic>>> getFileVersions(String fileId) async {
+    final response = await _client
+        .from('file_versions')
+        .select('*')
+        .eq('file_id', fileId)
+        .order('version_number', ascending: false);
+
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  // Upload New Version of Existing File
+  Future<void> uploadFileVersion({
+    required SharedFile fileRecord,
+    required File newFile,
+    required String fileName,
+    required Function(double) onProgress,
+    required CancelToken cancelToken,
+  }) async {
+    final userId = _authService.currentUser?.id;
+    if (userId == null) throw Exception('User not logged in.');
+
+    String? targetDriveFolderId;
+    if (fileRecord.parentFolderId != null) {
+      final parentFolder = await _client
+          .from('shared_files')
+          .select('google_drive_file_id')
+          .eq('id', fileRecord.parentFolderId!)
+          .single();
+      targetDriveFolderId = parentFolder['google_drive_file_id'] as String;
+    } else {
+      targetDriveFolderId = _authService.profile?.driveFolderId;
+    }
+
+    if (targetDriveFolderId == null) throw Exception('Drive folder not configured.');
+
+    // Step 1: Start resumable session
+    String googleToken = await _authService.getGoogleAccessToken() ?? '';
+    if (googleToken.isEmpty) {
+      googleToken = await _apiService.refreshGoogleAccessToken();
+    }
+
+    final dio = Dio();
+    final startSessionResponse = await dio.post(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+      data: {
+        'name': fileName,
+        'parents': [targetDriveFolderId]
+      },
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $googleToken',
+          'Content-Type': 'application/json; charset=UTF-8',
+          'X-Upload-Content-Type': 'application/octet-stream',
+        },
+      ),
+    );
+
+    final uploadUrl = startSessionResponse.headers.value('Location') ?? '';
+    if (uploadUrl.isEmpty) throw Exception('Google did not return upload URI.');
+
+    // Step 2: Upload file stream
+    final len = await newFile.length();
+    final response = await dio.put(
+      uploadUrl,
+      data: newFile.openRead(),
+      cancelToken: cancelToken,
+      options: Options(headers: {'Content-Length': len}),
+      onSendProgress: (sent, total) {
+        if (total > 0) onProgress(sent / total);
+      },
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Upload failed with status ${response.statusCode}');
+    }
+
+    final newDriveId = response.data['id'] as String;
+    final nextVersionNum = fileRecord.currentVersionNum + 1;
+
+    // Step 3: Insert into file_versions and update shared_files
+    await _client.from('file_versions').insert({
+      'file_id': fileRecord.id,
+      'google_drive_file_id': newDriveId,
+      'version_number': nextVersionNum,
+    });
+
+    await _client.from('shared_files').update({
+      'current_version_num': nextVersionNum,
+      'google_drive_file_id': newDriveId,
+      'file_size': len,
+      'modified_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', fileRecord.id);
+
+    await _client.from('activity_logs').insert({
+      'user_id': userId,
+      'action': 'version_upload',
+      'details': 'Uploaded version $nextVersionNum for: ${fileRecord.fileName}',
+    });
+  }
+
 
   // Delete Single File / Folder
   Future<void> deleteFile(SharedFile file) async {
