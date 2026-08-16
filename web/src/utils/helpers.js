@@ -57,6 +57,21 @@ export function generateDirectDownloadUrl(hash, isFolder, fileSize, skipIncremen
   return `${supabaseUrl}/functions/v1/download-file?hash=${hash}${incrementParam}`
 }
 
+export function generateVersionApiUrl(apiKey) {
+  if (!apiKey) return ''
+  const proxyUrl = import.meta.env.VITE_PROXY_URL
+  if (proxyUrl) {
+    const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
+    return `${cleanProxy}/api/version/${apiKey}`
+  }
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  if (supabaseUrl) {
+    return `${supabaseUrl}/functions/v1/get-version?key=${apiKey}`
+  }
+  return `${window.location.origin}/api/version/${apiKey}`
+}
+
+
 export function extractFolderId(url) {
   if (url && !url.includes('/') && !url.includes('.') && url.length > 10) {
     return url

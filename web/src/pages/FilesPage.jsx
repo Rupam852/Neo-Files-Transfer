@@ -6,10 +6,11 @@ import {
   Search, Upload, MoreVertical, Download, Pencil, Trash2,
   Share2, History, FileText, Image, Video, Archive, Table,
   Presentation, File, SortAsc, Plus, Folder, ChevronRight,
-  CheckSquare, Square, FolderInput, X,
+  CheckSquare, Square, FolderInput, X, Code2,
 } from 'lucide-react'
 import { formatFileSize, formatDate, getExtension, generateShareUrl, generateDirectDownloadUrl, formatErrorMessage } from '../utils/helpers'
 import { useNavigate } from 'react-router-dom'
+import VersionApiModal from '../components/VersionApiModal'
 
 const ALLOWED_TYPES = [
   'application/pdf',
@@ -80,6 +81,7 @@ export default function FilesPage({ onViewVersions }) {
   const [shareModal, setShareModal] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [newName, setNewName] = useState('')
+  const [versionApiModalFile, setVersionApiModalFile] = useState(null)
   const menuRef = useRef(null)
 
   // Folders and batching states
@@ -450,7 +452,8 @@ export default function FilesPage({ onViewVersions }) {
           })
         }
 
-        const { error: insertError } = await supabase.from('shared_files').insert({
+        const isApk = file.name.toLowerCase().endsWith('.apk') || file.type === 'application/vnd.android.package-archive'
+        const insertPayload = {
           user_id: user.id,
           google_drive_file_id: result.file_id,
           file_name: uniqueName,
@@ -459,7 +462,14 @@ export default function FilesPage({ onViewVersions }) {
           current_version_num: 1,
           sharing_status: 'private',
           parent_folder_id: dbParentId,
-        })
+        }
+
+        if (isApk) {
+          insertPayload.apk_version = 'v1.0.1'
+          insertPayload.version_api_key = `apk_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`
+        }
+
+        const { error: insertError } = await supabase.from('shared_files').insert(insertPayload)
 
         if (insertError) throw insertError
 
@@ -1324,6 +1334,36 @@ export default function FilesPage({ onViewVersions }) {
                                   Manage Versions
                                 </button>
                               )}
+                              {!file.is_folder && (file.file_name?.toLowerCase().endsWith('.apk') || file.mime_type === 'application/vnd.android.package-archive') && (
+                                <button
+                                  onClick={async () => {
+                                    let targetFile = file
+                                    if (!file.version_api_key) {
+                                      const newKey = `apk_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`
+                                      const defaultVersion = file.apk_version || 'v1.0.1'
+                                      const { error } = await supabase
+                                        .from('shared_files')
+                                        .update({
+                                          version_api_key: newKey,
+                                          apk_version: defaultVersion,
+                                          modified_at: new Date().toISOString()
+                                        })
+                                        .eq('id', file.id)
+
+                                      if (!error) {
+                                        targetFile = { ...file, version_api_key: newKey, apk_version: defaultVersion }
+                                        setFiles(prev => prev.map(f => f.id === file.id ? targetFile : f))
+                                      }
+                                    }
+                                    setVersionApiModalFile(targetFile)
+                                    setActiveMenu(null)
+                                  }}
+                                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-emerald-400 font-medium hover:bg-dark-500"
+                                >
+                                  <Code2 size={16} />
+                                  Get Version API
+                                </button>
+                              )}
                               <hr className="my-1 border-dark-400" />
                               <button
                                 onClick={() => {
@@ -1693,6 +1733,18 @@ export default function FilesPage({ onViewVersions }) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Version API Modal for APK files */}
+      {versionApiModalFile && (
+        <VersionApiModal
+          file={versionApiModalFile}
+          onClose={() => setVersionApiModalFile(null)}
+          onFileUpdated={(updated) => {
+            setFiles(prev => prev.map(f => f.id === updated.id ? updated : f))
+            setVersionApiModalFile(updated)
+          }}
+        />
       )}
 
       {/* Global Processing Loader Spinner */}

@@ -644,6 +644,55 @@ app.get('/download/direct/:driveFileId', async (req, res) => {
   }
 })
 
+// Public Version API Endpoint for APK files (In-App Updater System)
+app.get(['/api/version/:key', '/api/version'], async (req, res) => {
+  const versionApiKey = req.params.key || req.query.key || req.query.version_api_key
+
+  if (!versionApiKey) {
+    return res.status(400).json({ status: 'error', error: 'Version API Key Required' })
+  }
+
+  try {
+    const supabaseAdmin = getSupabaseAdmin()
+
+    // Query file by version_api_key
+    const { data: file, error: fileError } = await supabaseAdmin
+      .from('shared_files')
+      .select('id, file_name, mime_type, apk_version, version_api_key, unique_share_hash, sharing_status, file_size, created_at, modified_at')
+      .eq('version_api_key', versionApiKey)
+      .maybeSingle()
+
+    if (fileError || !file) {
+      return res.status(404).json({ status: 'error', error: 'APK Version API key not found or file removed.' })
+    }
+
+    const host = req.get('host')
+    const protocol = req.protocol
+    const proxyBase = process.env.PROXY_URL || `${protocol}://${host}`
+    const downloadUrl = `${proxyBase}/download-file?hash=${file.unique_share_hash}`
+    const webUrl = `${process.env.VITE_APP_URL || `${protocol}://${host}`}/download/${file.unique_share_hash}`
+
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+
+    return res.status(200).json({
+      status: 'success',
+      version: file.apk_version || 'v1.0.1',
+      file_name: file.file_name,
+      file_size: file.file_size || 0,
+      download_url: downloadUrl,
+      web_url: webUrl,
+      sharing_status: file.sharing_status,
+      created_at: file.created_at,
+      updated_at: file.modified_at || file.created_at
+    })
+  } catch (error) {
+    console.error('Version API Proxy Error:', error)
+    return res.status(500).json({ status: 'error', error: error.message || 'Internal Proxy Error' })
+  }
+})
+
+
 
 // Helper to authenticate user using Supabase JWT token
 async function getAuthenticatedUser(req, supabaseAdmin) {
