@@ -121,6 +121,7 @@ const appendStreamToArchive = (archiveInstance, source, name) => {
 }
 
 const app = express()
+app.set('json spaces', 2)
 const PORT = process.env.PORT || 3001
 
 // Setup CORS
@@ -675,14 +676,16 @@ app.get(['/api/version/:key', '/api/version'], async (req, res) => {
         .eq('id', file.id)
     }
 
-    const host = req.get('host')
-    const protocol = req.protocol
-    const proxyBase = process.env.PROXY_URL || `${protocol}://${host}`
-    const downloadUrl = `${proxyBase}/download-file?hash=${shareHash}`
-    const webUrl = `${process.env.VITE_APP_URL || `${protocol}://${host}`}/download/${shareHash}`
-
+    // Use high-speed Cloudflare Edge Worker for direct APK download
+    const cfWorkerUrl = process.env.CF_WORKER_URL || process.env.VITE_CF_WORKER_URL || 'https://neo-files-download.rupambairagya08.workers.dev'
+    const cleanWorker = cfWorkerUrl.endsWith('/') ? cfWorkerUrl.slice(0, -1) : cfWorkerUrl
+    const downloadUrl = `${cleanWorker}?hash=${shareHash}`
+    const appUrl = (process.env.VITE_APP_URL || process.env.APP_URL || 'https://neo-files-transfer.pages.dev').replace(/\/$/, '')
+    const webUrl = `${appUrl}/download/${shareHash}`
 
     res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
     return res.status(200).json({

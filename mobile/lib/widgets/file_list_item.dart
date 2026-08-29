@@ -173,6 +173,23 @@ class FileListItem extends StatelessWidget {
           ),
           itemBuilder: (context) => [
             const PopupMenuItem(
+              value: 'share_file',
+              child: Row(
+                children: [
+                  Icon(LucideIcons.share2, color: Color(0xFF818CF8), size: 16),
+                  SizedBox(width: 10),
+                  Text(
+                    'Share File',
+                    style: TextStyle(
+                      color: Color(0xFFC7D2FE),
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
               value: 'rename',
               child: Row(
                 children: [
@@ -186,10 +203,14 @@ class FileListItem extends StatelessWidget {
               value: 'share',
               child: Row(
                 children: [
-                  const Icon(LucideIcons.share2, color: Colors.white70, size: 16),
+                  Icon(
+                    file.sharingStatus == 'public' ? LucideIcons.lock : LucideIcons.globe,
+                    color: Colors.white70,
+                    size: 16,
+                  ),
                   const SizedBox(width: 10),
                   Text(
-                    file.sharingStatus == 'public' ? 'Make Private' : 'Make Public & Share',
+                    file.sharingStatus == 'public' ? 'Make Private' : 'Make Public',
                     style: const TextStyle(color: Colors.white70, fontSize: 13.5),
                   ),
                 ],

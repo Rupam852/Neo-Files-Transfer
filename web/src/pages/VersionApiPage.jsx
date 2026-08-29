@@ -32,12 +32,9 @@ export default function VersionApiPage() {
           return
         }
 
-        const proxyUrl = import.meta.env.VITE_PROXY_URL
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-        const downloadUrl = proxyUrl
-          ? `${proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl}/download-file?hash=${file.unique_share_hash}`
-          : `${supabaseUrl}/functions/v1/download-file?hash=${file.unique_share_hash}`
-
+        const cfWorkerUrl = import.meta.env.VITE_CF_WORKER_URL || 'https://neo-files-download.rupambairagya08.workers.dev'
+        const cleanWorker = cfWorkerUrl.endsWith('/') ? cfWorkerUrl.slice(0, -1) : cfWorkerUrl
+        const downloadUrl = `${cleanWorker}?hash=${file.unique_share_hash}`
         const webUrl = `${window.location.origin}/download/${file.unique_share_hash}`
 
         setData({
@@ -63,23 +60,68 @@ export default function VersionApiPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: '20px', fontFamily: 'monospace', color: '#888' }}>
-        Loading version API...
+      <div style={{ padding: '24px', fontFamily: 'monospace', color: '#94a3b8', background: '#090d16', minHeight: '100vh' }}>
+        {JSON.stringify({ status: 'loading', message: 'Fetching version API data...' }, null, 2)}
       </div>
     )
   }
 
   if (error) {
     return (
-      <pre style={{ padding: '20px', fontFamily: 'monospace', color: '#ff5555', background: '#0d1117' }}>
+      <pre style={{ padding: '24px', fontFamily: 'monospace', color: '#f87171', background: '#090d16', margin: 0, minHeight: '100vh', whiteSpace: 'pre-wrap' }}>
         {JSON.stringify({ status: 'error', error }, null, 2)}
       </pre>
     )
   }
 
   return (
-    <pre style={{ padding: '20px', fontFamily: 'monospace', color: '#50fa7b', background: '#0d1117', margin: 0, minHeight: '100vh', wordBreak: 'break-all' }}>
-      {JSON.stringify(data, null, 2)}
-    </pre>
+    <div style={{ background: '#090d16', minHeight: '100vh', color: '#34d399', fontFamily: 'monospace', padding: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #1e293b', paddingBottom: '10px' }}>
+        <div style={{ fontSize: '13px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></span>
+          <span>Version API Response &bull; 200 OK</span>
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(JSON.stringify(data, null, 2))
+              alert('JSON copied to clipboard!')
+            }}
+            style={{
+              padding: '4px 12px',
+              fontSize: '12px',
+              background: '#1e293b',
+              color: '#f8fafc',
+              border: '1px solid #334155',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            Copy JSON
+          </button>
+          {data?.download_url && (
+            <a
+              href={data.download_url}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                padding: '4px 12px',
+                fontSize: '12px',
+                background: '#059669',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                textDecoration: 'none'
+              }}
+            >
+              Direct Download APK
+            </a>
+          )}
+        </div>
+      </div>
+      <pre style={{ margin: 0, fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#34d399' }}>
+        {JSON.stringify(data, null, 2)}
+      </pre>
+    </div>
   )
 }

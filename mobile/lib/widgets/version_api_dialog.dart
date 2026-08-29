@@ -374,15 +374,57 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
               ),
               const SizedBox(height: 20),
 
-              // JSON Preview
-              Text(
-                'API RESPONSE PREVIEW (JSON)',
-                style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
+              // JSON Preview Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'API RESPONSE PREVIEW (JSON)',
+                    style: TextStyle(
+                      color: Colors.grey.shade400,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () {
+                      final jsonText = '{\n'
+                          '  "status": "success",\n'
+                          '  "version": "${_currentFile.apkVersion ?? 'v1.0.1'}",\n'
+                          '  "file_name": "${_currentFile.fileName}",\n'
+                          '  "file_size": ${_currentFile.fileSize},\n'
+                          '  "download_url": "${AppConfig.cfWorkerUrl}?hash=${_currentFile.uniqueShareHash ?? 'apk_share_link'}",\n'
+                          '  "web_url": "${AppConfig.appUrl}/download/${_currentFile.uniqueShareHash ?? ''}",\n'
+                          '  "sharing_status": "${_currentFile.sharingStatus}",\n'
+                          '  "created_at": "${_currentFile.createdAt.toIso8601String()}",\n'
+                          '  "updated_at": "${(_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String()}"\n'
+                          '}';
+                      Clipboard.setData(ClipboardData(text: jsonText));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Sample JSON response copied!')),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Row(
+                        children: [
+                          Icon(Icons.copy, size: 12, color: Colors.grey.shade400),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Copy JSON',
+                            style: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 6),
               Container(
@@ -393,19 +435,26 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.white.withOpacity(0.06)),
                 ),
-                child: Text(
-                  '{\n'
-                  '  "status": "success",\n'
-                  '  "version": "${_currentFile.apkVersion ?? 'v1.0.1'}",\n'
-                  '  "file_name": "${_currentFile.fileName}",\n'
-                  '  "file_size": ${_currentFile.fileSize},\n'
-                  '  "download_url": "${apiUrl.isNotEmpty ? apiUrl.replaceAll('/api/version/', '/download-file?hash=') : '...'}"\n'
-                  '}',
-                  style: TextStyle(
-                    color: const Color(0xFF34D399).withOpacity(0.9),
-                    fontSize: 10.5,
-                    fontFamily: 'monospace',
-                    height: 1.4,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SelectableText(
+                    '{\n'
+                    '  "status": "success",\n'
+                    '  "version": "${_currentFile.apkVersion ?? 'v1.0.1'}",\n'
+                    '  "file_name": "${_currentFile.fileName}",\n'
+                    '  "file_size": ${_currentFile.fileSize},\n'
+                    '  "download_url": "${AppConfig.cfWorkerUrl}?hash=${_currentFile.uniqueShareHash ?? 'apk_share_link'}",\n'
+                    '  "web_url": "${AppConfig.appUrl}/download/${_currentFile.uniqueShareHash ?? ''}",\n'
+                    '  "sharing_status": "${_currentFile.sharingStatus}",\n'
+                    '  "created_at": "${_currentFile.createdAt.toIso8601String()}",\n'
+                    '  "updated_at": "${(_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String()}"\n'
+                    '}',
+                    style: TextStyle(
+                      color: const Color(0xFF34D399).withOpacity(0.9),
+                      fontSize: 10.5,
+                      fontFamily: 'monospace',
+                      height: 1.4,
+                    ),
                   ),
                 ),
               ),

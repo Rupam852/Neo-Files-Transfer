@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
-import { Copy, Check, RefreshCw, Save, Smartphone, Code2, X } from 'lucide-react'
-import { generateVersionApiUrl } from '../utils/helpers'
+import { Copy, Check, RefreshCw, Save, Smartphone, Code2, X, ExternalLink } from 'lucide-react'
+import { generateVersionApiUrl, generateDirectDownloadUrl } from '../utils/helpers'
 
 export default function VersionApiModal({ file, onClose, onFileUpdated }) {
   const [version, setVersion] = useState(file.apk_version || 'v1.0.1')
   const [apiKey, setApiKey] = useState(file.version_api_key || '')
   const [copied, setCopied] = useState(false)
+  const [jsonCopied, setJsonCopied] = useState(false)
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
 
@@ -84,18 +85,34 @@ export default function VersionApiModal({ file, onClose, onFileUpdated }) {
     }
   }
 
-  const sampleJsonResponse = JSON.stringify(
-    {
-      status: "success",
-      version: version || "v1.0.1",
-      file_name: file.file_name,
-      file_size: file.file_size || 0,
-      download_url: apiUrl ? `${apiUrl.split('/api')[0]}/download-file?hash=${file.unique_share_hash || 'apk_share_link'}` : "...",
-      updated_at: new Date().toISOString()
-    },
-    null,
-    2
-  )
+  const directDownloadUrl = file.unique_share_hash
+    ? generateDirectDownloadUrl(file.unique_share_hash, false, file.file_size)
+    : `${(import.meta.env.VITE_CF_WORKER_URL || 'https://neo-files-download.rupambairagya08.workers.dev').replace(/\/$/, '')}?hash=apk_share_link`
+
+  const webDownloadUrl = file.unique_share_hash
+    ? `${window.location.origin}/download/${file.unique_share_hash}`
+    : `${window.location.origin}/download/apk_share_link`
+
+  const sampleJsonObject = {
+    status: "success",
+    version: version || "v1.0.1",
+    file_name: file.file_name,
+    file_size: file.file_size || 0,
+    download_url: directDownloadUrl,
+    web_url: webDownloadUrl,
+    sharing_status: file.sharing_status || 'public',
+    created_at: file.created_at || new Date().toISOString(),
+    updated_at: file.modified_at || file.created_at || new Date().toISOString()
+  }
+
+  const sampleJsonResponse = JSON.stringify(sampleJsonObject, null, 2)
+
+  const handleCopyJson = () => {
+    navigator.clipboard.writeText(sampleJsonResponse)
+    setJsonCopied(true)
+    toast.success('JSON response copied!')
+    setTimeout(() => setJsonCopied(false), 2000)
+  }
 
 
   return (
@@ -189,11 +206,24 @@ export default function VersionApiModal({ file, onClose, onFileUpdated }) {
               <button
                 onClick={handleCopyLink}
                 disabled={!apiUrl}
-                className="btn-secondary px-4 py-2 text-xs font-semibold shrink-0 flex items-center gap-1.5"
+                className="btn-secondary px-3 py-2 text-xs font-semibold shrink-0 flex items-center gap-1.5"
+                title="Copy API Link"
               >
                 {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
                 {copied ? 'Copied' : 'Copy API'}
               </button>
+              {apiUrl && (
+                <a
+                  href={apiUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-secondary px-3 py-2 text-xs font-semibold shrink-0 flex items-center gap-1.5 hover:text-emerald-400 transition-colors"
+                  title="Test API Endpoint in new tab"
+                >
+                  <ExternalLink size={14} />
+                  Test
+                </a>
+              )}
             </div>
             <p className="text-[11px] text-gray-400 leading-relaxed">
               Integrate this API link into any app's updater system. When called via GET HTTP request, it returns JSON with the latest version.
@@ -202,11 +232,22 @@ export default function VersionApiModal({ file, onClose, onFileUpdated }) {
 
           {/* JSON Response Preview */}
           <div className="space-y-1.5">
-            <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-              API Response Preview (JSON)
-            </label>
-            <div className="bg-dark-800 border border-dark-400 rounded-xl p-3 font-mono text-[11px] text-emerald-400/90 overflow-x-auto leading-relaxed">
-              <pre>{sampleJsonResponse}</pre>
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                API Response Preview (JSON)
+              </label>
+              <button
+                onClick={handleCopyJson}
+                type="button"
+                className="text-[11px] font-semibold text-gray-400 hover:text-emerald-400 flex items-center gap-1 transition-colors"
+                title="Copy formatted JSON response"
+              >
+                {jsonCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                {jsonCopied ? 'Copied JSON' : 'Copy JSON'}
+              </button>
+            </div>
+            <div className="bg-dark-800 border border-dark-400 rounded-xl p-3 font-mono text-[11px] text-emerald-400/90 overflow-x-auto leading-relaxed max-h-56">
+              <pre className="whitespace-pre overflow-x-auto select-all">{sampleJsonResponse}</pre>
             </div>
           </div>
         </div>

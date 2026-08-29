@@ -734,6 +734,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '${AppConfig.cfWorkerUrl}?hash=$hash';
   }
 
+  Future<void> _handleShareFile(SharedFile file) async {
+    try {
+      if (file.sharingStatus != 'public' || file.uniqueShareHash == null || file.uniqueShareHash!.isEmpty) {
+        setState(() => _isActionLoading = true);
+        final fileService = Provider.of<FileService>(context, listen: false);
+        await fileService.toggleSharing(file, 'public');
+        await _refreshFiles();
+
+        final updatedData = await Supabase.instance.client
+            .from('shared_files')
+            .select()
+            .eq('id', file.id)
+            .single();
+        final updatedFile = SharedFile.fromJson(updatedData);
+        setState(() => _isActionLoading = false);
+        if (mounted) {
+          _showShareDialog(updatedFile);
+        }
+      } else {
+        _showShareDialog(file);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isActionLoading = false);
+        _showErrorSnackBar('Failed to open share options: ${_formatError(e)}');
+      }
+    }
+  }
+
   void _showShareDialog(SharedFile file) {
     final hash = file.uniqueShareHash ?? '';
     final webUrl = '${AppConfig.appUrl}/download/$hash';
@@ -744,7 +773,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF0F172A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Share File Options', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Row(
+          children: const [
+            Icon(LucideIcons.share2, color: Color(0xFF818CF8), size: 20),
+            SizedBox(width: 10),
+            Text('Share File Links', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -758,33 +793,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 18),
               
-              // Option A: Web Link
-              const Text(
-                'OPTION A: WEB DOWNLOAD PAGE LINK',
-                style: TextStyle(color: Colors.indigoAccent, fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              // Option 1: Web Link
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.indigoAccent.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.indigoAccent.withOpacity(0.4)),
+                    ),
+                    child: const Text('OPTION 1', style: TextStyle(color: Colors.indigoAccent, fontSize: 9.5, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'WEB DOWNLOAD PAGE LINK',
+                    style: TextStyle(color: Colors.indigoAccent, fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  ),
+                ],
               ),
               const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white.withOpacity(0.06)),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
                         webUrl,
-                        style: const TextStyle(color: Colors.white60, fontSize: 11.5),
+                        style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontFamily: 'monospace'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(LucideIcons.copy, size: 14, color: Colors.indigoAccent),
+                      icon: const Icon(LucideIcons.copy, size: 15, color: Colors.indigoAccent),
+                      tooltip: 'Copy Option 1 URL',
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: webUrl));
-                        _showSuccessSnackBar('Web download link copied!');
+                        _showSuccessSnackBar('Option 1 (Web Download Link) copied!');
                       },
                     ),
                   ],
@@ -792,39 +843,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Opens the beautiful download page with real-time progress bar.',
+                'Opens web browser download page with live progress bar.',
                 style: TextStyle(color: Colors.white38, fontSize: 10),
               ),
               
               const SizedBox(height: 20),
               
-              // Option B: Direct API Link
-              const Text(
-                'OPTION B: DIRECT DOWNLOAD LINK',
-                style: TextStyle(color: Colors.pinkAccent, fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              // Option 2: Direct Download Link
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+                    ),
+                    child: const Text('OPTION 2', style: TextStyle(color: Color(0xFF34D399), fontSize: 9.5, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'DIRECT DOWNLOAD LINK',
+                    style: TextStyle(color: Color(0xFF34D399), fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  ),
+                ],
               ),
               const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white.withOpacity(0.06)),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
                         directUrl,
-                        style: const TextStyle(color: Colors.white60, fontSize: 11.5),
+                        style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontFamily: 'monospace'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(LucideIcons.copy, size: 14, color: Colors.pinkAccent),
+                      icon: const Icon(LucideIcons.copy, size: 15, color: Color(0xFF34D399)),
+                      tooltip: 'Copy Option 2 URL',
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: directUrl));
-                        _showSuccessSnackBar('Direct download link copied!');
+                        _showSuccessSnackBar('Option 2 (Direct Download Link) copied!');
                       },
                     ),
                   ],
@@ -832,7 +899,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Direct stream connection. Instantly downloads in background.',
+                'Direct Cloudflare edge stream. Instantly downloads APK or file.',
                 style: TextStyle(color: Colors.white38, fontSize: 10),
               ),
             ],
@@ -1442,6 +1509,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           }
                                         },
                                         onActionSelected: (action) {
+                                          if (action == 'share_file') _handleShareFile(file);
                                           if (action == 'rename') _handleRename(file);
                                           if (action == 'share') _handleToggleSharing(file);
                                           if (action == 'download') _handleDownload(file);

@@ -38,6 +38,7 @@ serve(async (req) => {
         JSON.stringify({ status: 'error', error: 'APK Version API key not found or file removed.' }),
         { status: 404, headers: corsHeaders }
       )
+    }
     let shareHash = file.unique_share_hash
     if (!shareHash) {
       shareHash = Date.now().toString(36) + Math.random().toString(36).substring(2, 8) + file.id.substring(0, 6)
@@ -47,8 +48,11 @@ serve(async (req) => {
         .eq('id', file.id)
     }
 
-    const downloadUrl = `${supabaseUrl}/functions/v1/download-file?hash=${shareHash}`
-
+    const cfWorkerUrl = Deno.env.get('CF_WORKER_URL') || 'https://neo-files-download.rupambairagya08.workers.dev'
+    const cleanWorker = cfWorkerUrl.endsWith('/') ? cfWorkerUrl.slice(0, -1) : cfWorkerUrl
+    const downloadUrl = `${cleanWorker}?hash=${shareHash}`
+    const appUrl = (Deno.env.get('APP_URL') || 'https://neo-files-transfer.pages.dev').replace(/\/$/, '')
+    const webUrl = `${appUrl}/download/${shareHash}`
 
     return new Response(
       JSON.stringify({
@@ -57,10 +61,11 @@ serve(async (req) => {
         file_name: file.file_name,
         file_size: file.file_size || 0,
         download_url: downloadUrl,
+        web_url: webUrl,
         sharing_status: file.sharing_status,
         created_at: file.created_at,
         updated_at: file.modified_at || file.created_at
-      }),
+      }, null, 2),
       { status: 200, headers: corsHeaders }
     )
   } catch (err: any) {
