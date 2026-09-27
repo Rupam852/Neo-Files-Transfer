@@ -8,12 +8,14 @@ const corsHeaders = {
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")
 const SENDER_EMAIL = "Neo Files Transfer <noreply@neofilestransfer.site>"
+const REPLY_TO_EMAIL = "rupambairagya08@gmail.com"
 
 async function sendEmail({ to, subject, html, text }: { to: string, subject: string, html?: string, text?: string }) {
   const payload: Record<string, unknown> = {
     from: SENDER_EMAIL,
     to: [to],
     subject,
+    reply_to: REPLY_TO_EMAIL,
   }
   if (text) payload.text = text
   if (html) payload.html = html
