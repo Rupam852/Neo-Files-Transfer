@@ -48,10 +48,10 @@ serve(async (req) => {
         .eq('id', file.id)
     }
 
-    const cfWorkerUrl = Deno.env.get('CF_WORKER_URL') || 'https://neo-files-download.rupambairagya08.workers.dev'
+    const cfWorkerUrl = Deno.env.get('CF_WORKER_URL') || 'https://download.neofilestransfer.site'
     const cleanWorker = cfWorkerUrl.endsWith('/') ? cfWorkerUrl.slice(0, -1) : cfWorkerUrl
     const downloadUrl = `${cleanWorker}?hash=${shareHash}`
-    const appUrl = (Deno.env.get('APP_URL') || 'https://neo-files-transfer.pages.dev').replace(/\/$/, '')
+    const appUrl = (Deno.env.get('APP_URL') || 'https://neofilestransfer.site').replace(/\/$/, '')
     const webUrl = `${appUrl}/download/${shareHash}`
 
     return new Response(

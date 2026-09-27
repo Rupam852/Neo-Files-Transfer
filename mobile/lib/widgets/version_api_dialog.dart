@@ -52,7 +52,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
       return '${AppConfig.supabaseUrl}/functions/v1/get-version?key=$apiKey';
     }
 
-    return 'https://neo-files-transfer.vercel.app/api/version/$apiKey';
+    return 'https://neofilestransfer.site/api/version/$apiKey';
   }
 
   Future<void> _handleSaveVersion() async {

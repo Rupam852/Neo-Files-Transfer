@@ -677,10 +677,10 @@ app.get(['/api/version/:key', '/api/version'], async (req, res) => {
     }
 
     // Use high-speed Cloudflare Edge Worker for direct APK download
-    const cfWorkerUrl = process.env.CF_WORKER_URL || process.env.VITE_CF_WORKER_URL || 'https://neo-files-download.rupambairagya08.workers.dev'
+    const cfWorkerUrl = process.env.CF_WORKER_URL || process.env.VITE_CF_WORKER_URL || 'https://download.neofilestransfer.site'
     const cleanWorker = cfWorkerUrl.endsWith('/') ? cfWorkerUrl.slice(0, -1) : cfWorkerUrl
     const downloadUrl = `${cleanWorker}?hash=${shareHash}`
-    const appUrl = (process.env.VITE_APP_URL || process.env.APP_URL || 'https://neo-files-transfer.pages.dev').replace(/\/$/, '')
+    const appUrl = (process.env.VITE_APP_URL || process.env.APP_URL || 'https://neofilestransfer.site').replace(/\/$/, '')
     const webUrl = `${appUrl}/download/${shareHash}`
 
     res.setHeader('Access-Control-Allow-Origin', '*')

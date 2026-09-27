@@ -362,7 +362,7 @@ serve(async (req) => {
             <p style="font-size: 14px; line-height: 1.5;">We are pleased to inform you that your request for console access has been <strong>approved</strong> by the administrator.</p>
             <p style="font-size: 14px; line-height: 1.5;">You can now log in to the console using your Google account:</p>
             <div style="text-align: center; margin: 25px 0;">
-              <a href="${Deno.env.get("VITE_APP_URL") || "https://neo-files-transfer.pages.dev"}/login" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Log In to Console</a>
+              <a href="${Deno.env.get("VITE_APP_URL") || "https://neofilestransfer.site"}/login" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Log In to Console</a>
             </div>
             <p style="font-size: 13px; color: #64748b;">If you have any questions, please contact our support team.</p>
           </div>
@@ -418,7 +418,7 @@ serve(async (req) => {
             <p style="font-size: 14px; line-height: 1.5;">Please note that your console account has been deleted by the administrator, and all your personal profile data, shared files, and records have been permanently removed from our system.</p>
             <p style="font-size: 14px; line-height: 1.5; color: #10b981; font-weight: bold;">If you wish to access the platform again, you are welcome to submit a fresh console access request using this email address.</p>
             <div style="text-align: center; margin: 25px 0;">
-              <a href="${Deno.env.get("VITE_APP_URL") || "https://neo-files-transfer.pages.dev"}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Request Access Again</a>
+              <a href="${Deno.env.get("VITE_APP_URL") || "https://neofilestransfer.site"}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Request Access Again</a>
             </div>
             <p style="font-size: 13px; color: #64748b;">Thank you,</p>
             <p style="font-size: 13px; color: #64748b;">Neo Files Transfer Team</p>
