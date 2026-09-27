@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
+import '../config.dart';
 import '../services/auth_service.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -241,6 +243,30 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     }
   }
 
+  Future<void> _sendStatusEmail(String email, String action) async {
+    try {
+      final token = _client.auth.currentSession?.accessToken;
+      if (token == null) {
+        debugPrint('No active admin session found, cannot send status email');
+        return;
+      }
+      final dio = Dio();
+      await dio.post(
+        '${AppConfig.supabaseUrl}/functions/v1/mail-service/notify-user',
+        data: {'email': email, 'action': action},
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+      debugPrint('Status email ($action) sent successfully to $email');
+    } catch (e) {
+      debugPrint('Error calling mail-service notify-user from mobile: $e');
+    }
+  }
+
   Future<void> _approveRegistration(Map<String, dynamic> reg) async {
     final regId = reg['id'];
     final email = reg['email'] as String;
@@ -265,6 +291,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
         'details': 'Approved user registration: $email',
       });
 
+      // 4. Send approval email via Resend API
+      _sendStatusEmail(email, 'approved');
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Approved user: $email'), backgroundColor: const Color(0xFF10B981)),
       );
@@ -278,7 +307,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
 
   Future<void> _rejectRegistration(Map<String, dynamic> reg) async {
     final regId = reg['id'];
-    final email = reg['email'];
+    final email = reg['email'] as String;
 
     try {
       await _client
@@ -291,6 +320,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
         'action': 'reject_user',
         'details': 'Rejected user registration: $email',
       });
+
+      // Send rejection email via Resend API
+      _sendStatusEmail(email, 'rejected');
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Rejected user request: $email')),
@@ -343,7 +375,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
 
   Future<void> _revokeUser(Map<String, dynamic> user) async {
     final userId = user['id'];
-    final email = user['email'];
+    final email = user['email'] as String;
 
     try {
       await _client.from('approved_users').delete().eq('id', userId);
@@ -356,6 +388,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
         'action': 'revoke_user',
         'details': 'Revoked user console access: $email',
       });
+
+      // Send revoke/deletion notification email via Resend API
+      _sendStatusEmail(email, 'suspended');
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Revoked access for user: $email'), backgroundColor: Colors.redAccent),
