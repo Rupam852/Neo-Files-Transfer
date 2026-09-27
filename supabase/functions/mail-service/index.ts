@@ -358,35 +358,49 @@ https://neofilestransfer.site`
         .delete()
         .eq("email", normalizedEmail)
 
-      // Send email to Admin
+      // Send email notification to Admin
       const ADMIN_EMAIL = "rupambairagya08@gmail.com"
-      await transporter.sendMail({
-        from: `"Neo Files Notification" <${SMTP_USER}>`,
-        to: ADMIN_EMAIL,
-        subject: "New Console Access Request - Neo Files Transfer",
-        html: `
-          <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #cbd5e1; border-radius: 8px;">
-            <h3 style="color: #4f46e5; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-top: 0;">New Request Received</h3>
-            <p style="font-size: 14px; line-height: 1.5;">Hello Admin,</p>
-            <p style="font-size: 14px; line-height: 1.5;">A new user has successfully verified their email address and requested access to the console node:</p>
-            <table style="width: 100%; font-size: 13px; margin: 15px 0; border-collapse: collapse;">
-              <tr>
-                <td style="font-weight: bold; padding: 6px 0; width: 35%;">Name:</td>
-                <td style="padding: 6px 0;">${name}</td>
-              </tr>
-              <tr>
-                <td style="font-weight: bold; padding: 6px 0;">Email:</td>
-                <td style="padding: 6px 0;">${normalizedEmail}</td>
-              </tr>
-              <tr>
-                <td style="font-weight: bold; padding: 6px 0;">Phone:</td>
-                <td style="padding: 6px 0;">${phone}</td>
-              </tr>
-            </table>
-            <p style="font-size: 14px; line-height: 1.5;">Please log in to your admin dashboard to review and approve/reject this request.</p>
-          </div>
-        `,
-      })
+      try {
+        await sendEmail({
+          to: ADMIN_EMAIL,
+          subject: "New Console Access Request - Neo Files Transfer",
+          text: `Hello Admin,
+
+A new user has verified their email address and requested access to the console:
+Name: ${name}
+Email: ${normalizedEmail}
+Phone: ${phone}
+
+Please log in to your admin dashboard to review and approve/reject this request:
+https://neofilestransfer.site/admin`,
+          html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+              <h3 style="color: #0284c7; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-top: 0; font-size: 18px;">⚡ New Access Request Received</h3>
+              <p style="font-size: 14px; line-height: 1.5; color: #334155;">Hello Admin,</p>
+              <p style="font-size: 14px; line-height: 1.5; color: #334155;">A new user has successfully verified their email address and requested access to the console node:</p>
+              <table style="width: 100%; font-size: 14px; margin: 16px 0; border-collapse: collapse;">
+                <tr>
+                  <td style="font-weight: 600; padding: 8px 0; color: #64748b; width: 30%;">Name:</td>
+                  <td style="padding: 8px 0; color: #0f172a; font-weight: 500;">${name}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: 600; padding: 8px 0; color: #64748b;">Email:</td>
+                  <td style="padding: 8px 0; color: #0284c7; font-weight: 500;">${normalizedEmail}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: 600; padding: 8px 0; color: #64748b;">Phone:</td>
+                  <td style="padding: 8px 0; color: #0f172a;">${phone}</td>
+                </tr>
+              </table>
+              <div style="text-align: center; margin: 24px 0 12px 0;">
+                <a href="https://neofilestransfer.site/admin" style="background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Open Admin Dashboard</a>
+              </div>
+            </div>
+          `,
+        })
+      } catch (adminMailErr) {
+        console.error("Failed to send admin notification email:", adminMailErr)
+      }
 
       return new Response(
         JSON.stringify({ success: true, message: "Email verified and request submitted successfully." }),
@@ -504,9 +518,19 @@ https://neofilestransfer.site`
         throw new Error("Invalid notification action type")
       }
 
+      let textBody = ""
+      if (action === "approved") {
+        textBody = `Hello,\n\nWe are pleased to inform you that your request for console access has been approved by the administrator.\n\nYou can now log in to the console using your Google account:\nhttps://neofilestransfer.site/login\n\nNeo Files Transfer Team`
+      } else if (action === "rejected") {
+        textBody = `Hello,\n\nWe regret to inform you that your request for console access has been rejected by the administrator.\n\nIf you believe this is a mistake, please reach out to the administrator.\n\nNeo Files Transfer Team`
+      } else if (action === "suspended") {
+        textBody = `Hello,\n\nPlease note that your console account has been deleted by the administrator, and all your personal profile data, shared files, and records have been permanently removed.\n\nYou can request access again at https://neofilestransfer.site\n\nNeo Files Transfer Team`
+      }
+
       await sendEmail({
         to: targetEmail,
         subject: subject,
+        text: textBody,
         html: htmlBody,
       })
 
