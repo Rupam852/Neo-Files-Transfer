@@ -161,25 +161,22 @@ serve(async (req) => {
           })
       }
 
-      // Send email via Resend with Plain Text + Clean Light HTML (Inbox Deliverability)
-      const plainText = `Hi ${name},\n\nYour NeoFiles verification code is: ${otp}\n\nThis code is valid for 10 minutes. Please do not share it with anyone.\n\nNeo Files Transfer Team`
+      // Send 100% Pure Plain Text Email (No HTML, No Tracking, Max Deliverability)
+      const plainText = `Hi ${name},
+
+Your NeoFiles security code is: ${otp}
+
+Enter this 6-digit code to verify your email address. This code is valid for 10 minutes.
+
+If you did not request this, you can safely ignore this email.
+
+Thanks,
+Neo Files Transfer Team`
 
       await sendEmail({
         to: normalizedEmail,
-        subject: `Your NeoFiles verification code: ${otp}`,
+        subject: `${otp} is your NeoFiles security code`,
         text: plainText,
-        html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #1e293b; background: #ffffff;">
-            <h2 style="color: #4f46e5; margin: 0 0 16px 0; font-size: 20px;">NeoFiles Verification</h2>
-            <p style="font-size: 15px; margin: 0 0 16px 0; color: #334155;">Hi ${name},</p>
-            <p style="font-size: 15px; margin: 0 0 20px 0; color: #334155;">Use the verification code below to complete your access request:</p>
-            <div style="margin: 20px 0; padding: 14px 24px; background-color: #f1f5f9; border-radius: 8px; display: inline-block;">
-              <span style="font-size: 30px; font-weight: bold; letter-spacing: 6px; color: #0f172a;">${otp}</span>
-            </div>
-            <p style="font-size: 13px; color: #64748b; margin-top: 24px; line-height: 1.5;">This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
-            <p style="font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 24px;">&copy; ${new Date().getFullYear()} Neo Files Transfer. All rights reserved.</p>
-          </div>
-        `,
       })
 
       return new Response(
