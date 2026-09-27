@@ -9,19 +9,22 @@ const corsHeaders = {
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")
 const SENDER_EMAIL = "Neo Files Transfer <noreply@neofilestransfer.site>"
 
-async function sendEmail({ to, subject, html }: { to: string, subject: string, html: string }) {
+async function sendEmail({ to, subject, html, text }: { to: string, subject: string, html?: string, text?: string }) {
+  const payload: Record<string, unknown> = {
+    from: SENDER_EMAIL,
+    to: [to],
+    subject,
+  }
+  if (text) payload.text = text
+  if (html) payload.html = html
+
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${RESEND_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      from: SENDER_EMAIL,
-      to: [to],
-      subject,
-      html,
-    }),
+    body: JSON.stringify(payload),
   })
 
   const data = await response.json()
@@ -158,22 +161,23 @@ serve(async (req) => {
           })
       }
 
-      // Send email via Resend
+      // Send email via Resend with Plain Text + Clean Light HTML (Inbox Deliverability)
+      const plainText = `Hi ${name},\n\nYour NeoFiles verification code is: ${otp}\n\nThis code is valid for 10 minutes. Please do not share it with anyone.\n\nNeo Files Transfer Team`
+
       await sendEmail({
         to: normalizedEmail,
-        subject: "Verify your email address - Neo Files Transfer",
+        subject: `Your NeoFiles verification code: ${otp}`,
+        text: plainText,
         html: `
-          <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded-lg: 12px; background-color: #030712; color: #f1f5f9;">
-            <div style="text-align: center; margin-bottom: 20px;">
-              <h2 style="color: #6366f1; font-weight: bold; font-size: 24px;">NeoFiles</h2>
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #1e293b; background: #ffffff;">
+            <h2 style="color: #4f46e5; margin: 0 0 16px 0; font-size: 20px;">NeoFiles Verification</h2>
+            <p style="font-size: 15px; margin: 0 0 16px 0; color: #334155;">Hi ${name},</p>
+            <p style="font-size: 15px; margin: 0 0 20px 0; color: #334155;">Use the verification code below to complete your access request:</p>
+            <div style="margin: 20px 0; padding: 14px 24px; background-color: #f1f5f9; border-radius: 8px; display: inline-block;">
+              <span style="font-size: 30px; font-weight: bold; letter-spacing: 6px; color: #0f172a;">${otp}</span>
             </div>
-            <p style="font-size: 15px; line-height: 1.5; color: #cbd5e1;">Hi ${name},</p>
-            <p style="font-size: 15px; line-height: 1.5; color: #cbd5e1;">Thank you for requesting access to the Neo Files Transfer console. To proceed with your request, please verify your email address using the one-time verification code below:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; padding: 12px 24px; background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #818cf8; display: inline-block;">${otp}</span>
-            </div>
-            <p style="font-size: 13px; line-height: 1.5; color: #94a3b8;">This verification code is valid for 10 minutes. If you did not make this request, you can safely ignore this email.</p>
-            <p style="font-size: 12px; color: #64748b; border-top: 1px solid #1e293b; padding-top: 15px; margin-top: 25px; text-align: center;">&copy; ${new Date().getFullYear()} Neo Files Transfer. All rights reserved.</p>
+            <p style="font-size: 13px; color: #64748b; margin-top: 24px; line-height: 1.5;">This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
+            <p style="font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 24px;">&copy; ${new Date().getFullYear()} Neo Files Transfer. All rights reserved.</p>
           </div>
         `,
       })
