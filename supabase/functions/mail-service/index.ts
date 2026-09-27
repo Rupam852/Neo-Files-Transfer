@@ -173,7 +173,7 @@ serve(async (req) => {
               <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; padding: 12px 24px; background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #818cf8; display: inline-block;">${otp}</span>
             </div>
             <p style="font-size: 13px; line-height: 1.5; color: #94a3b8;">This verification code is valid for 10 minutes. If you did not make this request, you can safely ignore this email.</p>
-            <p style="font-size: 13px; font-weight: bold; color: #fbbf24; border-top: 1px dashed #334155; padding-top: 15px; margin-top: 25px;">IMPORTANT: Please check your Spam folder if this email does not arrive in your Inbox within a minute.</p>
+            <p style="font-size: 12px; color: #64748b; border-top: 1px solid #1e293b; padding-top: 15px; margin-top: 25px; text-align: center;">&copy; ${new Date().getFullYear()} Neo Files Transfer. All rights reserved.</p>
           </div>
         `,
       })
