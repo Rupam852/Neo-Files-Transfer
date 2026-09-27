@@ -1,26 +1,35 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import nodemailer from "npm:nodemailer"
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
-const SMTP_USER = "support@neofilestransfer.site"
-const SMTP_PASS = "REDACTED_APP_PASSWORD"
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")
+const SENDER_EMAIL = "Neo Files Transfer <noreply@neofilestransfer.site>"
 
-// Create Gmail Transporter
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true, // true for 465, false for other ports
-  auth: {
-    user: SMTP_USER,
-    pass: SMTP_PASS,
-  },
-})
+async function sendEmail({ to, subject, html }: { to: string, subject: string, html: string }) {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: SENDER_EMAIL,
+      to: [to],
+      subject,
+      html,
+    }),
+  })
+
+  const data = await response.json()
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to send email via Resend")
+  }
+  return data
+}
 
 serve(async (req) => {
   // Handle CORS
@@ -149,9 +158,8 @@ serve(async (req) => {
           })
       }
 
-      // Send email via Gmail SMTP
-      await transporter.sendMail({
-        from: `"Neo Files Transfer" <${SMTP_USER}>`,
+      // Send email via Resend
+      await sendEmail({
         to: normalizedEmail,
         subject: "Verify your email address - Neo Files Transfer",
         html: `
@@ -428,8 +436,7 @@ serve(async (req) => {
         throw new Error("Invalid notification action type")
       }
 
-      await transporter.sendMail({
-        from: `"Neo Files Support" <${SMTP_USER}>`,
+      await sendEmail({
         to: targetEmail,
         subject: subject,
         html: htmlBody,
