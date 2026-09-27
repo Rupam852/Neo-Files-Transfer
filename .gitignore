@@ -32,3 +32,8 @@ coverage/
 # Supabase
 .supabase/
 supabase/.temp/
+
+# Signing & Keystores
+*.jks
+*.keystore
+key.properties
