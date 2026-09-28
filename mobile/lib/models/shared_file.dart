@@ -15,6 +15,7 @@ class SharedFile {
   final int downloadCount;
   final String? apkVersion;
   final String? versionApiKey;
+  final String? apkDescription;
 
   SharedFile({
     required this.id,
@@ -33,6 +34,7 @@ class SharedFile {
     this.downloadCount = 0,
     this.apkVersion,
     this.versionApiKey,
+    this.apkDescription,
   });
 
   factory SharedFile.fromJson(Map<String, dynamic> json) {
@@ -53,6 +55,7 @@ class SharedFile {
       downloadCount: (json['download_count'] as num?)?.toInt() ?? 0,
       apkVersion: json['apk_version'] as String?,
       versionApiKey: json['version_api_key'] as String?,
+      apkDescription: json['apk_description'] as String?,
     );
   }
 
@@ -74,6 +77,7 @@ class SharedFile {
       'download_count': downloadCount,
       'apk_version': apkVersion,
       'version_api_key': versionApiKey,
+      'apk_description': apkDescription,
     };
   }
 }

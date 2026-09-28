@@ -22,7 +22,7 @@ export default function VersionApiPage() {
       try {
         const { data: file, error: dbError } = await supabase
           .from('shared_files')
-          .select('id, file_name, mime_type, apk_version, version_api_key, unique_share_hash, sharing_status, file_size, created_at, modified_at')
+          .select('id, file_name, mime_type, apk_version, apk_description, version_api_key, unique_share_hash, sharing_status, file_size, created_at, modified_at')
           .eq('version_api_key', apiKey)
           .maybeSingle()
 
@@ -40,6 +40,7 @@ export default function VersionApiPage() {
         setData({
           status: 'success',
           version: file.apk_version || 'v1.0.1',
+          description: file.apk_description || '',
           file_name: file.file_name,
           file_size: file.file_size || 0,
           download_url: downloadUrl,

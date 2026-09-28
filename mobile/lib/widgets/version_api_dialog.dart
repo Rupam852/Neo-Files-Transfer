@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -17,6 +18,7 @@ class VersionApiDialog extends StatefulWidget {
 
 class _VersionApiDialogState extends State<VersionApiDialog> {
   late TextEditingController _versionController;
+  late TextEditingController _descriptionController;
   late SharedFile _currentFile;
   bool _isSaving = false;
   bool _isRegenerating = false;
@@ -29,11 +31,15 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
     _versionController = TextEditingController(
       text: _currentFile.apkVersion ?? 'v1.0.1',
     );
+    _descriptionController = TextEditingController(
+      text: _currentFile.apkDescription ?? '',
+    );
   }
 
   @override
   void dispose() {
     _versionController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -56,8 +62,9 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
   }
 
   Future<void> _handleSaveVersion() async {
-    final text = _versionController.text.trim();
-    if (text.isEmpty) {
+    final versionText = _versionController.text.trim();
+    final descText = _descriptionController.text; // Preserves newlines, bullet points, and emojis exactly
+    if (versionText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a valid version string')),
       );
@@ -67,20 +74,28 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
     setState(() => _isSaving = true);
     try {
       final fileService = Provider.of<FileService>(context, listen: false);
-      final updated = await fileService.updateApkVersion(_currentFile, text);
+      final updated = await fileService.updateApkVersion(
+        _currentFile,
+        versionText,
+        newDescription: descText,
+      );
       setState(() {
         _currentFile = updated;
-        _versionController.text = updated.apkVersion ?? text;
+        _versionController.text = updated.apkVersion ?? versionText;
+        _descriptionController.text = updated.apkDescription ?? descText;
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('APK version updated to ${updated.apkVersion}')),
+          SnackBar(
+            content: Text('Saved: ${updated.apkVersion} with description!'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save version: $e')),
+          SnackBar(content: Text('Failed to save version and description: $e')),
         );
       }
     } finally {
@@ -226,69 +241,127 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                 ),
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _versionController,
-                      style: const TextStyle(
-                        color: Color(0xFF6EE7B7),
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'monospace',
-                        fontSize: 14,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'e.g. v1.0.1',
-                        hintStyle: TextStyle(color: Colors.grey.shade600),
-                        filled: true,
-                        fillColor: const Color(0xFF1E293B),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Color(0xFF34D399)),
-                        ),
-                      ),
-                    ),
+              TextField(
+                controller: _versionController,
+                style: const TextStyle(
+                  color: Color(0xFF6EE7B7),
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                  fontSize: 14,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'e.g. v1.0.1',
+                  hintStyle: TextStyle(color: Colors.grey.shade600),
+                  filled: true,
+                  fillColor: const Color(0xFF1E293B),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: _isSaving ? null : _handleSaveVersion,
-                    icon: _isSaving
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(LucideIcons.save, size: 14),
-                    label: const Text('Save', style: TextStyle(fontSize: 12)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.indigo.shade600,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
                   ),
-                ],
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFF34D399)),
+                  ),
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 'This version will be returned when your app calls the API endpoint. Default is v1.0.1.',
                 style: TextStyle(color: Colors.grey.shade500, fontSize: 10.5),
+              ),
+              const SizedBox(height: 16),
+
+              // Editable Release Notes / Description Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'RELEASE NOTES / DESCRIPTION (EDITABLE)',
+                    style: TextStyle(
+                      color: Colors.grey.shade300,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  Text(
+                    'Supports emojis & bullets',
+                    style: TextStyle(color: Colors.indigo.shade300, fontSize: 10),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _descriptionController,
+                keyboardType: TextInputType.multiline,
+                maxLines: null,
+                minLines: 3,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  height: 1.45,
+                ),
+                decoration: InputDecoration(
+                  hintText: "🚀 What's new in this version:\n• Fast download engine\n• Bug fixes and UI improvements\n• Enjoy the new update!",
+                  hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  filled: true,
+                  fillColor: const Color(0xFF1E293B),
+                  contentPadding: const EdgeInsets.all(12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFF34D399)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Preserves newlines, emojis, bullet points, and all formatting in the API response.',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 10.5),
+              ),
+              const SizedBox(height: 12),
+
+              // Save Version & Description Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isSaving ? null : _handleSaveVersion,
+                  icon: _isSaving
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(LucideIcons.save, size: 15),
+                  label: Text(
+                    _isSaving ? 'Saving Changes...' : 'Save Version & Description',
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo.shade600,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
 
@@ -303,7 +376,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                       Text(
                         'VERSION API LINK',
                         style: TextStyle(
-                          color: Colors.indigo.shade300,
+                          color: Colors.grey.shade300,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.5,
@@ -315,8 +388,8 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                     onPressed: _isRegenerating ? null : _handleRegenerateKey,
                     icon: _isRegenerating
                         ? const SizedBox(
-                            width: 12,
-                            height: 12,
+                            width: 10,
+                            height: 10,
                             child: CircularProgressIndicator(
                               strokeWidth: 1.5,
                               color: Colors.grey,
@@ -389,17 +462,19 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   ),
                   InkWell(
                     onTap: () {
-                      final jsonText = '{\n'
-                          '  "status": "success",\n'
-                          '  "version": "${_currentFile.apkVersion ?? 'v1.0.1'}",\n'
-                          '  "file_name": "${_currentFile.fileName}",\n'
-                          '  "file_size": ${_currentFile.fileSize},\n'
-                          '  "download_url": "${AppConfig.cfWorkerUrl}?hash=${_currentFile.uniqueShareHash ?? 'apk_share_link'}",\n'
-                          '  "web_url": "${AppConfig.appUrl}/download/${_currentFile.uniqueShareHash ?? ''}",\n'
-                          '  "sharing_status": "${_currentFile.sharingStatus}",\n'
-                          '  "created_at": "${_currentFile.createdAt.toIso8601String()}",\n'
-                          '  "updated_at": "${(_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String()}"\n'
-                          '}';
+                      final jsonMap = {
+                        "status": "success",
+                        "version": _currentFile.apkVersion ?? 'v1.0.1',
+                        "description": _currentFile.apkDescription ?? '',
+                        "file_name": _currentFile.fileName,
+                        "file_size": _currentFile.fileSize,
+                        "download_url": "${AppConfig.cfWorkerUrl}?hash=${_currentFile.uniqueShareHash ?? 'apk_share_link'}",
+                        "web_url": "${AppConfig.appUrl}/download/${_currentFile.uniqueShareHash ?? ''}",
+                        "sharing_status": _currentFile.sharingStatus,
+                        "created_at": _currentFile.createdAt.toIso8601String(),
+                        "updated_at": (_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String(),
+                      };
+                      final jsonText = const JsonEncoder.withIndent('  ').convert(jsonMap);
                       Clipboard.setData(ClipboardData(text: jsonText));
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Sample JSON response copied!')),
@@ -407,22 +482,22 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                     },
                     borderRadius: BorderRadius.circular(4),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      child: Row(
-                        children: [
-                          Icon(Icons.copy, size: 12, color: Colors.grey.shade400),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Copy JSON',
-                            style: TextStyle(
-                              color: Colors.grey.shade400,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        child: Row(
+                          children: [
+                            Icon(Icons.copy, size: 12, color: Colors.grey.shade400),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Copy JSON',
+                              style: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
                   ),
                 ],
               ),
@@ -438,17 +513,18 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: SelectableText(
-                    '{\n'
-                    '  "status": "success",\n'
-                    '  "version": "${_currentFile.apkVersion ?? 'v1.0.1'}",\n'
-                    '  "file_name": "${_currentFile.fileName}",\n'
-                    '  "file_size": ${_currentFile.fileSize},\n'
-                    '  "download_url": "${AppConfig.cfWorkerUrl}?hash=${_currentFile.uniqueShareHash ?? 'apk_share_link'}",\n'
-                    '  "web_url": "${AppConfig.appUrl}/download/${_currentFile.uniqueShareHash ?? ''}",\n'
-                    '  "sharing_status": "${_currentFile.sharingStatus}",\n'
-                    '  "created_at": "${_currentFile.createdAt.toIso8601String()}",\n'
-                    '  "updated_at": "${(_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String()}"\n'
-                    '}',
+                    const JsonEncoder.withIndent('  ').convert({
+                      "status": "success",
+                      "version": _currentFile.apkVersion ?? 'v1.0.1',
+                      "description": _currentFile.apkDescription ?? '',
+                      "file_name": _currentFile.fileName,
+                      "file_size": _currentFile.fileSize,
+                      "download_url": "${AppConfig.cfWorkerUrl}?hash=${_currentFile.uniqueShareHash ?? 'apk_share_link'}",
+                      "web_url": "${AppConfig.appUrl}/download/${_currentFile.uniqueShareHash ?? ''}",
+                      "sharing_status": _currentFile.sharingStatus,
+                      "created_at": _currentFile.createdAt.toIso8601String(),
+                      "updated_at": (_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String(),
+                    }),
                     style: TextStyle(
                       color: const Color(0xFF34D399).withOpacity(0.9),
                       fontSize: 10.5,

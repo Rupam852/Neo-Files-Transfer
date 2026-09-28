@@ -362,11 +362,14 @@ class FileService extends ChangeNotifier {
   }
 
 
-  // Update APK Version in DB
-  Future<SharedFile> updateApkVersion(SharedFile file, String newVersion) async {
+  // Update APK Version and Description in DB
+  Future<SharedFile> updateApkVersion(SharedFile file, String newVersion, {String? newDescription}) async {
     final formatted = newVersion.trim().startsWith('v') ? newVersion.trim() : 'v${newVersion.trim()}';
+    final desc = newDescription ?? file.apkDescription ?? '';
+
     await _client.from('shared_files').update({
       'apk_version': formatted,
+      'apk_description': desc,
       'modified_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', file.id);
 
@@ -387,6 +390,7 @@ class FileService extends ChangeNotifier {
       downloadCount: file.downloadCount,
       apkVersion: formatted,
       versionApiKey: file.versionApiKey,
+      apkDescription: desc,
     );
   }
 
@@ -418,6 +422,7 @@ class FileService extends ChangeNotifier {
       downloadCount: file.downloadCount,
       apkVersion: defaultVersion,
       versionApiKey: newKey,
+      apkDescription: file.apkDescription,
     );
   }
 

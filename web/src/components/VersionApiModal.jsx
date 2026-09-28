@@ -6,6 +6,7 @@ import { generateVersionApiUrl, generateDirectDownloadUrl } from '../utils/helpe
 
 export default function VersionApiModal({ file, onClose, onFileUpdated }) {
   const [version, setVersion] = useState(file.apk_version || 'v1.0.1')
+  const [description, setDescription] = useState(file.apk_description || '')
   const [apiKey, setApiKey] = useState(file.version_api_key || '')
   const [copied, setCopied] = useState(false)
   const [jsonCopied, setJsonCopied] = useState(false)
@@ -36,6 +37,7 @@ export default function VersionApiModal({ file, onClose, onFileUpdated }) {
         .from('shared_files')
         .update({
           apk_version: formattedVersion,
+          apk_description: description,
           modified_at: new Date().toISOString()
         })
         .eq('id', file.id)
@@ -43,9 +45,9 @@ export default function VersionApiModal({ file, onClose, onFileUpdated }) {
       if (error) throw error
 
       setVersion(formattedVersion)
-      toast.success(`APK version updated to ${formattedVersion}`)
+      toast.success(`APK version and release notes saved!`)
       if (onFileUpdated) {
-        onFileUpdated({ ...file, apk_version: formattedVersion })
+        onFileUpdated({ ...file, apk_version: formattedVersion, apk_description: description })
       }
     } catch (err) {
       console.error('Failed to update version:', err)
@@ -66,6 +68,7 @@ export default function VersionApiModal({ file, onClose, onFileUpdated }) {
         .update({
           version_api_key: newKey,
           apk_version: formattedVersion,
+          apk_description: description,
           modified_at: new Date().toISOString()
         })
         .eq('id', file.id)
@@ -75,7 +78,7 @@ export default function VersionApiModal({ file, onClose, onFileUpdated }) {
       setApiKey(newKey)
       toast.success('New Version API Link generated!')
       if (onFileUpdated) {
-        onFileUpdated({ ...file, version_api_key: newKey, apk_version: formattedVersion })
+        onFileUpdated({ ...file, version_api_key: newKey, apk_version: formattedVersion, apk_description: description })
       }
     } catch (err) {
       console.error('Failed to regenerate key:', err)
@@ -96,6 +99,7 @@ export default function VersionApiModal({ file, onClose, onFileUpdated }) {
   const sampleJsonObject = {
     status: "success",
     version: version || "v1.0.1",
+    description: description || "",
     file_name: file.file_name,
     file_size: file.file_size || 0,
     download_url: directDownloadUrl,
@@ -148,37 +152,57 @@ export default function VersionApiModal({ file, onClose, onFileUpdated }) {
         </div>
 
         {/* Modal Content */}
-        <div className="p-6 space-y-6 overflow-y-auto">
+        <div className="p-6 space-y-5 overflow-y-auto">
           {/* Editable Version Input Section */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider">
               APK Version (Editable)
             </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                className="input-field flex-1 font-mono text-sm font-semibold text-emerald-400 bg-dark-700 border-dark-400"
-                value={version}
-                onChange={(e) => setVersion(e.target.value)}
-                placeholder="e.g. v1.0.1"
-              />
-              <button
-                onClick={handleSaveVersion}
-                disabled={saving}
-                className="btn-primary px-4 py-2 text-xs font-bold flex items-center gap-1.5 shrink-0"
-              >
-                {saving ? (
-                  <RefreshCw size={14} className="animate-spin" />
-                ) : (
-                  <Save size={14} />
-                )}
-                Save Version
-              </button>
-            </div>
+            <input
+              type="text"
+              className="input-field w-full font-mono text-sm font-semibold text-emerald-400 bg-dark-700 border-dark-400"
+              value={version}
+              onChange={(e) => setVersion(e.target.value)}
+              placeholder="e.g. v1.0.1"
+            />
             <p className="text-[11px] text-gray-400">
-              This version will be returned when your app calls the API endpoint below. Default for new APKs is <code className="text-emerald-400">v1.0.1</code>.
+              Default for new APKs is <code className="text-emerald-400">v1.0.1</code>.
             </p>
           </div>
+
+          {/* Editable Release Notes / Description Section */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider">
+                Release Notes / Description (Editable)
+              </label>
+              <span className="text-[10px] text-indigo-400 font-medium">Supports emojis, bullets & newlines</span>
+            </div>
+            <textarea
+              rows={4}
+              className="input-field w-full text-xs font-sans text-gray-100 bg-dark-700 border-dark-400 focus:border-emerald-500 p-3 leading-relaxed resize-y"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={"🚀 What's new in this update:\n• Feature 1\n• Bug fixes and speed improvements\n• Enjoy the new update!"}
+            />
+            <p className="text-[11px] text-gray-400">
+              Preserves newlines, emojis, bullet points, and all formatting in the API response.
+            </p>
+          </div>
+
+          {/* Save Button */}
+          <button
+            onClick={handleSaveVersion}
+            disabled={saving}
+            className="btn-primary w-full py-2.5 text-xs font-bold flex items-center justify-center gap-1.5"
+          >
+            {saving ? (
+              <RefreshCw size={14} className="animate-spin" />
+            ) : (
+              <Save size={14} />
+            )}
+            Save Version & Release Notes
+          </button>
 
           {/* Version API Link Section */}
           <div className="space-y-2">
