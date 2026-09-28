@@ -48,9 +48,12 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white font-['Space_Grotesk']">2. Google API Permissions</h2>
+            <h2 className="text-lg font-bold text-white font-['Space_Grotesk']">2. Google API Permissions & Limited Use</h2>
             <p>
-              We request access to your Google Drive to execute proxy downloads. We do not store, copy, or read your private personal data beyond the specific files you upload and request through the platform. Your credentials are authenticated directly by Google OAuth and are not accessible by us.
+              We request access to your Google Drive to execute file uploads and proxy downloads to your designated folder. We do not store, copy, or read your private personal data beyond the specific files you upload and manage through the platform. Your credentials are authenticated directly by Google OAuth and are not accessible by us.
+            </p>
+            <p className="text-slate-400 bg-white/5 p-4 rounded-xl border border-white/10 text-xs">
+              <strong>Google API Services User Data Policy:</strong> Neo Files Transfer's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer" className="text-indigo-400 underline">Google API Services User Data Policy</a>, including the Limited Use requirements.
             </p>
           </section>
 
