@@ -7,6 +7,7 @@ import 'config.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'services/file_service.dart';
+import 'services/update_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/pending_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -52,9 +53,13 @@ class MyApp extends StatelessWidget {
             return fileService;
           },
         ),
+        ChangeNotifierProvider<UpdateService>(
+          create: (_) => UpdateService()..initialize(),
+        ),
       ],
       child: MaterialApp(
         title: 'Neo Files',
+        navigatorKey: UpdateService.navigatorKey,
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,

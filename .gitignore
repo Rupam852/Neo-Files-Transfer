@@ -37,3 +37,7 @@ supabase/.temp/
 *.jks
 *.keystore
 key.properties
+
+# Large media & APKs
+*.mp4
+*.apk

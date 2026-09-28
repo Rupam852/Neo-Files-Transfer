@@ -4,4 +4,5 @@ class AppConfig {
   static const String appUrl = 'https://neofilestransfer.site';
   static const String proxyUrl = 'https://api.neofilestransfer.site';
   static const String cfWorkerUrl = 'https://download.neofilestransfer.site';
+  static const String updateApiUrl = 'https://api.neofilestransfer.site/api/version/apk_hlem7seqty4c9ck';
 }

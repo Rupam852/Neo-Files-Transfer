@@ -22,6 +22,8 @@ import '../services/file_service.dart';
 import '../config.dart';
 import 'settings_screen.dart';
 import 'admin_screen.dart';
+import 'update_screen.dart';
+import '../services/update_service.dart';
 import '../widgets/file_list_item.dart';
 import '../widgets/upload_progress.dart';
 import '../widgets/version_api_dialog.dart';
@@ -1302,12 +1304,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.settings, color: Colors.white, size: 20),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const SettingsScreen()),
-            ),
+          Consumer<UpdateService>(
+            builder: (context, updateService, _) {
+              return IconButton(
+                tooltip: updateService.hasUpdate ? 'Update Available!' : 'Settings',
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(LucideIcons.settings, color: Colors.white, size: 20),
+                    if (updateService.hasUpdate)
+                      Positioned(
+                        top: -2,
+                        right: -2,
+                        child: Container(
+                          width: 9,
+                          height: 9,
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFF030712), width: 1.5),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                ),
+              );
+            },
           ),
         ],
       ),

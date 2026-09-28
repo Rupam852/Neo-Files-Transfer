@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
+import '../services/update_service.dart';
+import 'update_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -221,6 +223,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
     final profile = authService.profile;
+    final updateService = Provider.of<UpdateService>(context);
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -551,6 +554,252 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            // App Updates section
+            const Text(
+              'APP UPDATES',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.0,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A).withOpacity(0.5),
+                borderRadius: BorderRadius.circular(16.0),
+                border: Border.all(
+                  color: updateService.hasUpdate
+                      ? Colors.indigoAccent.withOpacity(0.3)
+                      : Colors.white.withOpacity(0.04),
+                ),
+              ),
+              child: Column(
+                children: [
+                  // Navigate to Update Screen
+                  InkWell(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const UpdateScreen()),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(18.0),
+                      child: Row(
+                        children: [
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: (updateService.hasUpdate ? Colors.indigoAccent : Colors.white10).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  LucideIcons.sparkles,
+                                  color: updateService.hasUpdate ? Colors.indigoAccent : Colors.white70,
+                                  size: 18,
+                                ),
+                              ),
+                              if (updateService.hasUpdate)
+                                Positioned(
+                                  top: -3,
+                                  right: -3,
+                                  child: Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: Colors.redAccent,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: const Color(0xFF0F172A), width: 1.5),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text(
+                                      'Software Update',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    if (updateService.hasUpdate) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.redAccent.withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.circle, color: Colors.redAccent, size: 6),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              'UPDATE AVAILABLE',
+                                              style: TextStyle(
+                                                color: Colors.redAccent,
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Installed: ${updateService.currentVersion}${updateService.hasUpdate && updateService.latestVersion != null ? " • New: ${updateService.latestVersion}" : ""}',
+                                  style: TextStyle(
+                                    color: updateService.hasUpdate ? Colors.indigoAccent.shade100 : Colors.white54,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(LucideIcons.chevronRight, color: Colors.white38, size: 18),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  Divider(height: 1, color: Colors.white.withOpacity(0.06)),
+
+                  // Auto-check on Startup Toggle
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white10.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(LucideIcons.bellRing, color: Colors.white70, size: 18),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Auto-check on App Open',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Check for updates when app launches',
+                                style: TextStyle(color: Colors.white54, fontSize: 11.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: updateService.autoCheckEnabled,
+                          activeColor: Colors.indigoAccent,
+                          activeTrackColor: Colors.indigoAccent.withOpacity(0.4),
+                          inactiveTrackColor: Colors.white10,
+                          onChanged: (value) => updateService.setAutoCheck(value),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  if (!updateService.notificationsAllowed) ...[
+                    Divider(height: 1, color: Colors.white.withOpacity(0.06)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.amber.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(LucideIcons.bellOff, color: Colors.amber, size: 16),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Text(
+                                'Notifications are off. Allow to get update alerts.',
+                                style: TextStyle(color: Colors.amber, fontSize: 11.5),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => updateService.requestNotificationPermission(),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text('Allow', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  Divider(height: 1, color: Colors.white.withOpacity(0.06)),
+
+                  // Manual Check Button
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: ElevatedButton.icon(
+                      onPressed: updateService.isChecking
+                          ? null
+                          : () => updateService.checkForUpdates(context: context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E293B),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.white.withOpacity(0.08)),
+                        ),
+                      ),
+                      icon: updateService.isChecking
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(LucideIcons.refreshCw, size: 14),
+                      label: Text(
+                        updateService.isChecking ? 'Checking Updates...' : 'Check for Updates Now',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

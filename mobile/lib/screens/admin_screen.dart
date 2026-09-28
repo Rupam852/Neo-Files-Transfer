@@ -8,6 +8,8 @@ import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import '../config.dart';
 import '../services/auth_service.dart';
+import '../services/update_service.dart';
+import 'update_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({Key? key}) : super(key: key);
@@ -675,6 +677,55 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                 _showLogsBottomSheet();
               },
             ),
+            Consumer<UpdateService>(
+              builder: (context, updateService, _) {
+                return ListTile(
+                  leading: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Icon(LucideIcons.sparkles, color: Colors.purpleAccent),
+                      if (updateService.hasUpdate)
+                        Positioned(
+                          top: -2,
+                          right: -2,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.redAccent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  title: Row(
+                    children: [
+                      const Text('App Updates', style: TextStyle(color: Colors.white, fontSize: 14)),
+                      if (updateService.hasUpdate) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('NEW', style: TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  subtitle: Text(
+                    updateService.hasUpdate ? 'Update ${updateService.latestVersion} available' : 'Current: ${updateService.currentVersion}',
+                    style: const TextStyle(color: Colors.white30, fontSize: 11),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const UpdateScreen()));
+                  },
+                );
+              },
+            ),
             const Spacer(),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
@@ -940,6 +991,38 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               'Admin Dashboard',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
+            actions: [
+              Consumer<UpdateService>(
+                builder: (context, updateService, _) {
+                  return IconButton(
+                    tooltip: updateService.hasUpdate ? 'Update Available!' : 'Software Updates',
+                    icon: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(LucideIcons.sparkles, color: Colors.white, size: 20),
+                        if (updateService.hasUpdate)
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Colors.redAccent,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const UpdateScreen()),
+                    ),
+                  );
+                },
+              ),
+            ],
             bottom: TabBar(
               controller: _tabController,
               indicatorColor: Colors.indigoAccent,
