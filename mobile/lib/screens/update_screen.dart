@@ -44,8 +44,6 @@ class _UpdateScreenState extends State<UpdateScreen> {
       final uri = Uri.parse(downloadTarget);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
-        // Clear red dot badge since user proceeded to download
-        updateService.clearBadge();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

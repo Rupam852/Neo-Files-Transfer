@@ -204,25 +204,11 @@ class UpdateService extends ChangeNotifier {
             _hasUpdate = true;
             notifyListeners();
 
-            // Trigger notification if auto check or when an update is found
+            // Trigger system notification in status bar if auto check or when an update is found
             await _showSystemNotification(
               title: 'New Update Available: $_latestVersion 🚀',
               body: 'Tap to view what\'s new and download the latest update.',
             );
-
-            if (context != null && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Update $_latestVersion available!'),
-                  backgroundColor: Colors.indigo,
-                  action: SnackBarAction(
-                    label: 'View',
-                    textColor: Colors.white,
-                    onPressed: _navigateToUpdateScreen,
-                  ),
-                ),
-              );
-            }
           } else {
             _hasUpdate = false;
             notifyListeners();
