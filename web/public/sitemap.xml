@@ -1,19 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <!-- Homepage / Landing Page -->
+  <!-- Primary Landing Page (Redirects to Dashboard if logged in) -->
   <url>
     <loc>https://neofilestransfer.site/</loc>
     <lastmod>2026-09-30</lastmod>
-    <changefreq>weekly</changefreq>
+    <changefreq>daily</changefreq>
     <priority>1.0</priority>
-  </url>
-
-  <!-- Login Page -->
-  <url>
-    <loc>https://neofilestransfer.site/login</loc>
-    <lastmod>2026-09-30</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
   </url>
 
   <!-- Privacy Policy -->

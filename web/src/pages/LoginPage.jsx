@@ -12,6 +12,23 @@ export default function LoginPage() {
   const errorMsg = location.state?.error
 
   useEffect(() => {
+    let meta = document.querySelector('meta[name="robots"]')
+    const originalContent = meta ? meta.getAttribute('content') : null
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.setAttribute('name', 'robots')
+      document.head.appendChild(meta)
+    }
+    meta.setAttribute('content', 'noindex, nofollow')
+
+    return () => {
+      if (originalContent && meta) {
+        meta.setAttribute('content', originalContent)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     if (user && !loading) {
       navigate('/', { replace: true })
     }

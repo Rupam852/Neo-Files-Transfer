@@ -5,7 +5,9 @@ Allow: /privacy
 Allow: /terms
 Allow: /download/
 
-# Protect authenticated and private administrative routes
+# Keep Google Search pointing to the main Landing Page, not the login screen
+Disallow: /login
+Disallow: /admin
 Disallow: /admin-dashboard
 Disallow: /auth/callback
 Disallow: /access-denied
