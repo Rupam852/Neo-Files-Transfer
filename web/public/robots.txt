@@ -1,0 +1,14 @@
+# Robots.txt for Neo Files Transfer
+User-agent: *
+Allow: /
+Allow: /privacy
+Allow: /terms
+Allow: /download/
+
+# Protect authenticated and private administrative routes
+Disallow: /admin-dashboard
+Disallow: /auth/callback
+Disallow: /access-denied
+
+# Sitemap location
+Sitemap: https://neofilestransfer.site/sitemap.xml
