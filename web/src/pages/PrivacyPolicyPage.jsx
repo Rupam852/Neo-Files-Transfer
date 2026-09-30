@@ -29,7 +29,7 @@ export default function PrivacyPolicyPage() {
             Privacy Policy
           </h1>
           <p className="text-xs text-slate-500">
-            Last Updated: June 23, 2026
+            Last Updated: October 1, 2026
           </p>
         </div>
 
@@ -50,7 +50,7 @@ export default function PrivacyPolicyPage() {
           <section className="space-y-3">
             <h2 className="text-lg font-bold text-white font-['Space_Grotesk']">2. Google API Permissions & Limited Use</h2>
             <p>
-              We request access to your Google Drive to execute file uploads and proxy downloads to your designated folder. We do not store, copy, or read your private personal data beyond the specific files you upload and manage through the platform. Your credentials are authenticated directly by Google OAuth and are not accessible by us.
+              We request access to your Google Drive via the <code className="text-indigo-400 bg-white/5 px-1.5 py-0.5 rounded text-xs">drive.file</code> scope solely to upload files, manage file versions, create destination folders, and facilitate proxy downloads for files created or managed by Neo Files Transfer. We do not inspect, copy, or read your private files outside of what you directly transfer through the application.
             </p>
             <p className="text-slate-400 bg-white/5 p-4 rounded-xl border border-white/10 text-xs">
               <strong>Google API Services User Data Policy:</strong> Neo Files Transfer's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer" className="text-indigo-400 underline">Google API Services User Data Policy</a>, including the Limited Use requirements.
@@ -58,23 +58,50 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white font-['Space_Grotesk']">3. Data Security & Storage</h2>
+            <h2 className="text-lg font-bold text-white font-['Space_Grotesk']">3. Google User Data Sharing, Transfer, and Disclosure</h2>
             <p>
-              All database communications are governed by Row Level Security (RLS) policies on Supabase. Uploaded files remain stored inside your designated Google Drive folder, shielded behind our private proxy links. We do not host your files on our database servers.
+              We value your privacy above all else. With respect to Google user data:
+            </p>
+            <ul className="list-disc list-inside pl-4 space-y-1.5 text-slate-400">
+              <li><strong className="text-slate-200">No Third-Party Sharing:</strong> We do <strong className="text-slate-200">not</strong> sell, rent, trade, lease, or share Google user data with any third parties, advertisers, or data brokers.</li>
+              <li><strong className="text-slate-200">Functional Data Transfers:</strong> Google user data and OAuth tokens are only transmitted directly to official Google APIs to execute requested operations (uploading, streaming, or deleting files) on your behalf.</li>
+              <li><strong className="text-slate-200">No AI/ML Model Training:</strong> Google user data is <strong className="text-slate-200">never</strong> used or transferred to develop, train, fine-tune, or improve generalized Artificial Intelligence (AI) or Machine Learning (ML) models.</li>
+              <li><strong className="text-slate-200">No Advertising:</strong> Google user data is strictly prohibited from being used for personalized or targeted advertising.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-lg font-bold text-white font-['Space_Grotesk']">4. Data Security, Storage & Retention</h2>
+            <p>
+              All database communications are governed by Row Level Security (RLS) policies on Supabase. Uploaded files remain safely stored inside your Google Drive, shielded behind our private proxy links. We do not host your files on our database servers.
+            </p>
+            <p>
+              OAuth tokens are securely stored in your private database record to facilitate automated transfers. We retain this data only for as long as your account remains active.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white font-['Space_Grotesk']">4. Access Controls</h2>
+            <h2 className="text-lg font-bold text-white font-['Space_Grotesk']">5. User Control & Data Deletion</h2>
             <p>
-              We maintain logs of users who sign in. Admins have the authority to revoke user authentication and delete pending/approved registrations. Revoked users lose access instantly to database records and proxy features.
+              You maintain total control over your Google data at all times:
+            </p>
+            <ul className="list-disc list-inside pl-4 space-y-1.5 text-slate-400">
+              <li>You can revoke Neo Files Transfer's access to your Google account at any moment through <a href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer" className="text-indigo-400 underline">Google Account Security Settings</a>.</li>
+              <li>You can request complete deletion of your account metadata and stored credentials by contacting us at the email below. Upon request, your profile records and associated access keys will be permanently deleted immediately.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-lg font-bold text-white font-['Space_Grotesk']">6. Access Controls & Administration</h2>
+            <p>
+              We maintain logs of users who sign in. Administrators have the authority to revoke user authentication and delete pending/approved registrations. Revoked users lose access instantly to database records and proxy features.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white font-['Space_Grotesk']">5. Contact Info</h2>
+            <h2 className="text-lg font-bold text-white font-['Space_Grotesk']">7. Contact Info</h2>
             <p>
-              For privacy concerns or to request data erasure, contact us at: <a href="mailto:rupambairagya08@gmail.com" className="text-indigo-400 hover:underline font-mono">rupambairagya08@gmail.com</a>.
+              For privacy concerns, data deletion requests, or questions regarding our practices, contact us at: <a href="mailto:rupambairagya08@gmail.com" className="text-indigo-400 hover:underline font-mono">rupambairagya08@gmail.com</a>.
             </p>
           </section>
         </div>

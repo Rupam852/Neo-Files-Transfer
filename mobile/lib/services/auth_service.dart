@@ -441,7 +441,7 @@ class AuthService extends ChangeNotifier {
       final res = await _client.auth.getOAuthSignInUrl(
         provider: OAuthProvider.google,
         redirectTo: 'com.neofiles.neofilestransfer://login-callback/',
-        scopes: 'email profile https://www.googleapis.com/auth/drive',
+        scopes: 'email profile https://www.googleapis.com/auth/drive.file',
         queryParams: queryParams,
       );
 
