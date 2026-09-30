@@ -92,6 +92,13 @@ export default function DownloadPage() {
 
         setStatus('preview')
 
+        // Universal Download Handshake Pre-warm for ALL file types (APK, ZIP, Video, PDF, Docs, etc.)
+        // Triggers early background connection so TLS & edge routing are primed before user clicks download
+        try {
+          const prewarmUrl = generateDirectDownloadUrl(hash, file.is_folder, file.file_size, true)
+          fetch(prewarmUrl, { method: 'HEAD', mode: 'no-cors' }).catch(() => {})
+        } catch (_) {}
+
       } catch (err) {
         console.error('Metadata resolve error:', err)
         setErrorMsg('Failed to resolve sharing details.')
