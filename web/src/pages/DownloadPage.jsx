@@ -132,10 +132,14 @@ export default function DownloadPage() {
       // Switch to completed state immediately with guidance
       setStatus('completed')
 
-      // Increment download count asynchronously via RPC
-      supabase.rpc('increment_download_count', { file_id: fileInfo.id }).catch(err => {
-        console.error('Error invoking increment_download_count RPC:', err)
-      })
+      // Increment download count asynchronously via RPC without blocking
+      (async () => {
+        try {
+          await supabase.rpc('increment_download_count', { file_id: fileInfo.id })
+        } catch (rpcErr) {
+          console.error('Error invoking increment_download_count RPC:', rpcErr)
+        }
+      })()
 
     } catch (err) {
       console.error('Download error:', err)
