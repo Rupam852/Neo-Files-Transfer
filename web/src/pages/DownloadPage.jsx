@@ -24,6 +24,7 @@ export default function DownloadPage() {
   const [fileInfo, setFileInfo] = useState(null)
   const [totalBytes, setTotalBytes] = useState(0)
   const [errorMsg, setErrorMsg] = useState('')
+  const [isInitiating, setIsInitiating] = useState(false)
 
   useEffect(() => {
     // Preconnect to high-speed CDN and download endpoints to eliminate DNS/TLS latency
@@ -111,9 +112,10 @@ export default function DownloadPage() {
 
   const handleStartDownload = (e) => {
     if (e) e.preventDefault()
-    if (!fileInfo) return
+    if (!fileInfo || isInitiating) return
 
     try {
+      setIsInitiating(true)
       const downloadUrl = generateDirectDownloadUrl(hash, fileInfo.is_folder, fileInfo.file_size, true)
 
       // Trigger instant native browser download without page navigation lag
@@ -129,9 +131,6 @@ export default function DownloadPage() {
         try { document.body.removeChild(link) } catch (_) {}
       }, 1500)
 
-      // Switch to completed state immediately with guidance
-      setStatus('completed');
-
       // Increment download count asynchronously via RPC without blocking
       supabase
         .rpc('increment_download_count', { file_id: fileInfo.id })
@@ -142,8 +141,15 @@ export default function DownloadPage() {
           }
         );
 
+      // Keep button spinning while handshake initiates, then transition to completed screen
+      setTimeout(() => {
+        setIsInitiating(false)
+        setStatus('completed')
+      }, 900)
+
     } catch (err) {
       console.error('Download error:', err)
+      setIsInitiating(false)
       setErrorMsg(formatErrorMessage(err))
       setStatus('error')
     }
@@ -214,10 +220,24 @@ export default function DownloadPage() {
 
             <button
               type="button"
+              disabled={isInitiating}
               onClick={handleStartDownload}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] active:scale-[0.98] text-center cursor-pointer"
+              className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300 text-center cursor-pointer ${
+                isInitiating
+                  ? 'bg-indigo-600/70 text-white/90 cursor-not-allowed shadow-none'
+                  : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] active:scale-[0.98]'
+              }`}
             >
-              <Download size={18} /> Download Now
+              {isInitiating ? (
+                <div className="flex items-center justify-center gap-2.5">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Connecting to Cloud Node...</span>
+                </div>
+              ) : (
+                <>
+                  <Download size={18} /> Download Now
+                </>
+              )}
             </button>
             
             <p className="text-center text-xs text-slate-500">
