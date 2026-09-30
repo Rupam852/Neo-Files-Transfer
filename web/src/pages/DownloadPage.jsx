@@ -297,17 +297,31 @@ export default function DownloadPage() {
               </div>
             )}
 
-            {/* Quick Re-download Button if user missed it */}
+            {/* Quick Retry / Re-download Button with live spinner */}
             <div className="pt-2">
               <button
                 type="button"
+                disabled={isInitiating}
                 onClick={handleStartDownload}
-                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+                className={`w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  isInitiating
+                    ? 'bg-slate-800/80 text-slate-300 border border-slate-700/60 cursor-not-allowed shadow-inner'
+                    : 'bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 active:scale-[0.98]'
+                }`}
               >
-                <RefreshCw size={16} /> Re-download / Restart File
+                {isInitiating ? (
+                  <div className="flex items-center justify-center gap-2.5">
+                    <div className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                    <span className="text-indigo-300 font-medium">Retrying Download...</span>
+                  </div>
+                ) : (
+                  <>
+                    <RefreshCw size={16} /> Retry Download / Re-download
+                  </>
+                )}
               </button>
               <p className="text-xs text-slate-500 mt-3">
-                Didn't see the download? Tap above to trigger again.
+                Didn't see the download? Tap above to retry download.
               </p>
             </div>
           </div>
@@ -382,22 +396,52 @@ export default function DownloadPage() {
             
             <div className="flex flex-col gap-3">
               <button
+                type="button"
+                disabled={isInitiating}
                 onClick={() => {
-                  setStatus('loading')
-                  window.location.reload()
+                  setIsInitiating(true)
+                  setTimeout(() => {
+                    window.location.reload()
+                  }, 400)
                 }}
-                className="w-full btn-primary py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
+                className={`w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                  isInitiating
+                    ? 'bg-indigo-600/70 text-white/90 cursor-not-allowed'
+                    : 'btn-primary active:scale-[0.98]'
+                }`}
               >
-                <Download size={16} /> Retry Streaming
+                {isInitiating ? (
+                  <div className="flex items-center justify-center gap-2.5">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Retrying Download...</span>
+                  </div>
+                ) : (
+                  <>
+                    <RefreshCw size={16} /> Retry Download
+                  </>
+                )}
               </button>
-              <a
-                href={generateDirectDownloadUrl(hash, fileInfo?.is_folder, fileInfo?.file_size, true)}
+              <button
+                type="button"
+                disabled={isInitiating}
                 onClick={handleStartDownload}
-                rel="noopener noreferrer"
-                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-200 text-center"
+                className={`w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  isInitiating
+                    ? 'bg-slate-800/80 text-slate-400 border border-slate-800 cursor-not-allowed'
+                    : 'bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 active:scale-[0.98]'
+                }`}
               >
-                <Download size={16} /> Download Directly (No Stream)
-              </a>
+                {isInitiating ? (
+                  <div className="flex items-center justify-center gap-2.5">
+                    <div className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                    <span>Connecting to Cloud Node...</span>
+                  </div>
+                ) : (
+                  <>
+                    <Download size={16} /> Download Directly (No Stream)
+                  </>
+                )}
+              </button>
             </div>
 
             <p className="text-xs text-slate-500">
