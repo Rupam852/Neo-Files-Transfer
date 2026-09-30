@@ -155,6 +155,9 @@ export default function DownloadPage() {
     }
   }
 
+  // Detect if user is on an Android mobile device
+  const isAndroidPhone = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent)
+
   // Get file icon based on mime type
   const iconName = getFileIcon(fileInfo?.mime_type)
   const FileIcon = fileInfo?.is_folder ? Folder : (ICON_MAP[iconName] || File)
@@ -205,8 +208,8 @@ export default function DownloadPage() {
               </div>
             </div>
 
-            {/* APK Security Info Banner */}
-            {fileInfo?.file_name?.toLowerCase().endsWith('.apk') && (
+            {/* APK Security Info Banner (Only shown on Android mobile devices) */}
+            {fileInfo?.file_name?.toLowerCase().endsWith('.apk') && isAndroidPhone && (
               <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex gap-3 text-left">
                 <AlertTriangle className="text-amber-500 flex-shrink-0 mt-0.5" size={18} />
                 <div className="space-y-1">
@@ -262,8 +265,8 @@ export default function DownloadPage() {
               <p className="text-sm text-slate-400 truncate max-w-xs mx-auto">{fileInfo?.file_name}</p>
             </div>
 
-            {/* APK Browser Permission Notice (Crucial for mobile Chrome) */}
-            {fileInfo?.file_name?.toLowerCase().endsWith('.apk') ? (
+            {/* APK Browser Permission Notice (Only shown on Android mobile devices) */}
+            {fileInfo?.file_name?.toLowerCase().endsWith('.apk') && isAndroidPhone ? (
               <div className="space-y-4">
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-left space-y-2 relative overflow-hidden">
                   <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
@@ -290,7 +293,7 @@ export default function DownloadPage() {
               </div>
             ) : (
               <div className="bg-slate-900/40 rounded-xl p-4 text-sm text-slate-300 leading-relaxed border border-slate-900">
-                Your file download has started. Check your browser's download manager or notification bar.
+                Your file download has started. Check your browser's download manager or Downloads folder.
               </div>
             )}
 
