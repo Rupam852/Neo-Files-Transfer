@@ -80,5 +80,45 @@ class SharedFile {
       'apk_description': apkDescription,
     };
   }
+
+  SharedFile copyWith({
+    String? id,
+    String? userId,
+    String? googleDriveFileId,
+    String? fileName,
+    int? fileSize,
+    String? mimeType,
+    int? currentVersionNum,
+    String? uniqueShareHash,
+    String? sharingStatus,
+    DateTime? createdAt,
+    DateTime? modifiedAt,
+    bool? isFolder,
+    String? parentFolderId,
+    int? downloadCount,
+    String? apkVersion,
+    String? versionApiKey,
+    String? apkDescription,
+  }) {
+    return SharedFile(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      googleDriveFileId: googleDriveFileId ?? this.googleDriveFileId,
+      fileName: fileName ?? this.fileName,
+      fileSize: fileSize ?? this.fileSize,
+      mimeType: mimeType ?? this.mimeType,
+      currentVersionNum: currentVersionNum ?? this.currentVersionNum,
+      uniqueShareHash: uniqueShareHash ?? this.uniqueShareHash,
+      sharingStatus: sharingStatus ?? this.sharingStatus,
+      createdAt: createdAt ?? this.createdAt,
+      modifiedAt: modifiedAt ?? this.modifiedAt,
+      isFolder: isFolder ?? this.isFolder,
+      parentFolderId: parentFolderId ?? this.parentFolderId,
+      downloadCount: downloadCount ?? this.downloadCount,
+      apkVersion: apkVersion ?? this.apkVersion,
+      versionApiKey: versionApiKey ?? this.versionApiKey,
+      apkDescription: apkDescription ?? this.apkDescription,
+    );
+  }
 }
 

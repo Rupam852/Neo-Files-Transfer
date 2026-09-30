@@ -28,6 +28,7 @@ import '../widgets/file_list_item.dart';
 import '../widgets/upload_progress.dart';
 import '../widgets/version_api_dialog.dart';
 import '../widgets/manage_versions_dialog.dart';
+import '../widgets/share_file_dialog.dart';
 
 
 class DashboardScreen extends StatefulWidget {
@@ -686,29 +687,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
-      if (!isPublic && (file.uniqueShareHash == null || file.uniqueShareHash!.isEmpty)) {
-        // Generate a new share hash in Supabase
-        final newHash = DateTime.now().millisecondsSinceEpoch.toString() + file.id.substring(0, 8);
-        await Supabase.instance.client
-            .from('shared_files')
-            .update({'unique_share_hash': newHash})
-            .eq('id', file.id);
-      }
-
-      await fileService.toggleSharing(file, nextStatus);
+      final updatedFile = await fileService.toggleSharing(file, nextStatus);
       await _refreshFiles();
 
       if (mounted) {
         if (!isPublic) {
           _showSuccessSnackBar('"${file.fileName}" is now public and ready for sharing.');
-
-          final updatedData = await Supabase.instance.client
-              .from('shared_files')
-              .select()
-              .eq('id', file.id)
-              .single();
-          final updatedFile = SharedFile.fromJson(updatedData);
-
           _showShareDialog(updatedFile);
         } else {
           _showSuccessSnackBar('"${file.fileName}" is now private.');
@@ -727,192 +711,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  String _getDirectDownloadUrl(SharedFile file) {
-    final hash = file.uniqueShareHash ?? '';
-    if (file.isFolder) {
-      return '${AppConfig.proxyUrl}/api/download/folder/$hash';
-    }
-    // Single files go through the Cloudflare Worker
-    return '${AppConfig.cfWorkerUrl}?hash=$hash';
-  }
-
-  Future<void> _handleShareFile(SharedFile file) async {
-    try {
-      if (file.sharingStatus != 'public' || file.uniqueShareHash == null || file.uniqueShareHash!.isEmpty) {
-        setState(() => _isActionLoading = true);
-        final fileService = Provider.of<FileService>(context, listen: false);
-        await fileService.toggleSharing(file, 'public');
-        await _refreshFiles();
-
-        final updatedData = await Supabase.instance.client
-            .from('shared_files')
-            .select()
-            .eq('id', file.id)
-            .single();
-        final updatedFile = SharedFile.fromJson(updatedData);
-        setState(() => _isActionLoading = false);
-        if (mounted) {
-          _showShareDialog(updatedFile);
-        }
-      } else {
-        _showShareDialog(file);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isActionLoading = false);
-        _showErrorSnackBar('Failed to open share options: ${_formatError(e)}');
-      }
-    }
+  void _handleShareFile(SharedFile file) {
+    _showShareDialog(file);
   }
 
   void _showShareDialog(SharedFile file) {
-    final hash = file.uniqueShareHash ?? '';
-    final webUrl = '${AppConfig.appUrl}/download/$hash';
-    final directUrl = _getDirectDownloadUrl(file);
-
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: const [
-            Icon(LucideIcons.share2, color: Color(0xFF818CF8), size: 20),
-            SizedBox(width: 10),
-            Text('Share File Links', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                file.fileName,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 18),
-              
-              // Option 1: Web Link
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.indigoAccent.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.indigoAccent.withOpacity(0.4)),
-                    ),
-                    child: const Text('OPTION 1', style: TextStyle(color: Colors.indigoAccent, fontSize: 9.5, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'WEB DOWNLOAD PAGE LINK',
-                    style: TextStyle(color: Colors.indigoAccent, fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withOpacity(0.06)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        webUrl,
-                        style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontFamily: 'monospace'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.copy, size: 15, color: Colors.indigoAccent),
-                      tooltip: 'Copy Option 1 URL',
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: webUrl));
-                        _showSuccessSnackBar('Option 1 (Web Download Link) copied!');
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Opens web browser download page with live progress bar.',
-                style: TextStyle(color: Colors.white38, fontSize: 10),
-              ),
-              
-              const SizedBox(height: 20),
-              
-              // Option 2: Direct Download Link
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
-                    ),
-                    child: const Text('OPTION 2', style: TextStyle(color: Color(0xFF34D399), fontSize: 9.5, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'DIRECT DOWNLOAD LINK',
-                    style: TextStyle(color: Color(0xFF34D399), fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withOpacity(0.06)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        directUrl,
-                        style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontFamily: 'monospace'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.copy, size: 15, color: Color(0xFF34D399)),
-                      tooltip: 'Copy Option 2 URL',
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: directUrl));
-                        _showSuccessSnackBar('Option 2 (Direct Download Link) copied!');
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Direct Cloudflare edge stream. Instantly downloads APK or file.',
-                style: TextStyle(color: Colors.white38, fontSize: 10),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: Colors.white60)),
-          ),
-        ],
+      builder: (context) => ShareFileDialog(
+        file: file,
+        onFileUpdated: (updatedFile) {
+          _refreshFiles();
+        },
       ),
     );
   }
@@ -1796,21 +1606,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        '${AppConfig.appUrl}/download/${file.uniqueShareHash}',
-                        style: TextStyle(color: Colors.grey.shade400, fontSize: 11, fontFamily: 'monospace'),
+                        file.uniqueShareHash != null && file.uniqueShareHash!.isNotEmpty
+                            ? '${AppConfig.appUrl}/download/${file.uniqueShareHash}'
+                            : 'No share link generated yet',
+                        style: TextStyle(
+                          color: file.uniqueShareHash != null && file.uniqueShareHash!.isNotEmpty
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
+                          fontSize: 11,
+                          fontFamily: file.uniqueShareHash != null && file.uniqueShareHash!.isNotEmpty
+                              ? 'monospace'
+                              : null,
+                          fontStyle: file.uniqueShareHash != null && file.uniqueShareHash!.isNotEmpty
+                              ? null
+                              : FontStyle.italic,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.copy, size: 14, color: Colors.white60),
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: '${AppConfig.appUrl}/download/${file.uniqueShareHash}'));
-                        _showSuccessSnackBar('Share URL copied to clipboard!');
-                      },
-                      constraints: const BoxConstraints(),
-                      padding: EdgeInsets.zero,
-                    ),
+                    if (file.uniqueShareHash != null && file.uniqueShareHash!.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(LucideIcons.copy, size: 14, color: Colors.white60),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: '${AppConfig.appUrl}/download/${file.uniqueShareHash}'));
+                          _showSuccessSnackBar('Share URL copied to clipboard!');
+                        },
+                        constraints: const BoxConstraints(),
+                        padding: EdgeInsets.zero,
+                      ),
                   ],
                 ),
               ),

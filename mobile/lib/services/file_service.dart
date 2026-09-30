@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -583,14 +584,66 @@ class FileService extends ChangeNotifier {
     });
   }
 
-  // Update sharing status
-  Future<void> toggleSharing(SharedFile file, String status) async {
+  // Generate a unique 12-char alphanumeric share hash and make file public
+  Future<SharedFile> generateShareHash(SharedFile file) async {
     final userId = _authService.currentUser?.id;
-    if (userId == null) return;
+    if (userId == null) throw Exception('User not authenticated');
+
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final rnd = Random.secure();
+    final newHash = List.generate(12, (index) => chars[rnd.nextInt(chars.length)]).join();
+
+    await _client.from('shared_files').update({
+      'unique_share_hash': newHash,
+      'sharing_status': 'public',
+    }).eq('id', file.id);
+
+    await _client.from('activity_logs').insert({
+      'user_id': userId,
+      'action': 'share_generate',
+      'details': 'Generated share link for: ${file.fileName}',
+    });
+
+    final updated = file.copyWith(
+      uniqueShareHash: newHash,
+      sharingStatus: 'public',
+      modifiedAt: DateTime.now(),
+    );
+
+    final index = _files.indexWhere((f) => f.id == file.id);
+    if (index != -1) {
+      _files[index] = updated;
+    }
+    final sharedIndex = _sharedFiles.indexWhere((f) => f.id == file.id);
+    if (sharedIndex != -1) {
+      _sharedFiles[sharedIndex] = updated;
+    } else {
+      _sharedFiles.insert(0, updated);
+    }
+    notifyListeners();
+
+    return updated;
+  }
+
+  // Update sharing status
+  Future<SharedFile> toggleSharing(SharedFile file, String status) async {
+    final userId = _authService.currentUser?.id;
+    if (userId == null) throw Exception('User not authenticated');
+
+    String? hash = file.uniqueShareHash;
+    final updates = <String, dynamic>{'sharing_status': status};
+
+    // If making public and has no share hash yet, generate it
+    if (status == 'public' && (hash == null || hash.isEmpty)) {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      final rnd = Random.secure();
+      hash = List.generate(12, (index) => chars[rnd.nextInt(chars.length)]).join();
+      updates['unique_share_hash'] = hash;
+    }
 
     await _client
         .from('shared_files')
-        .update({'sharing_status': status})
+        .update(updates)
         .eq('id', file.id);
 
     await _client.from('activity_logs').insert({
@@ -598,6 +651,26 @@ class FileService extends ChangeNotifier {
       'action': 'sharing',
       'details': 'Changed sharing of ${file.fileName} to $status',
     });
+
+    final updated = file.copyWith(
+      sharingStatus: status,
+      uniqueShareHash: hash,
+      modifiedAt: DateTime.now(),
+    );
+
+    final index = _files.indexWhere((f) => f.id == file.id);
+    if (index != -1) {
+      _files[index] = updated;
+    }
+    final sharedIndex = _sharedFiles.indexWhere((f) => f.id == file.id);
+    if (sharedIndex != -1) {
+      _sharedFiles[sharedIndex] = updated;
+    } else if (status == 'public' && hash != null) {
+      _sharedFiles.insert(0, updated);
+    }
+    notifyListeners();
+
+    return updated;
   }
 
   // Bulk move files to another folder
