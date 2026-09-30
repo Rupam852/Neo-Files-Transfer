@@ -7,13 +7,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/rendering.dart';
-
 
 import 'package:intl/intl.dart';
 import '../models/shared_file.dart';
@@ -21,8 +19,6 @@ import '../services/auth_service.dart';
 import '../services/file_service.dart';
 import '../config.dart';
 import 'settings_screen.dart';
-import 'admin_screen.dart';
-import 'update_screen.dart';
 import '../services/update_service.dart';
 import '../widgets/file_list_item.dart';
 import '../widgets/upload_progress.dart';
@@ -32,7 +28,7 @@ import '../widgets/share_file_dialog.dart';
 
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({Key? key}) : super(key: key);
+  const DashboardScreen({super.key});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -42,6 +38,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   SharedFile? _currentFolder;
   final List<SharedFile> _folderPath = [];
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   final TextEditingController _renameController = TextEditingController();
   final TextEditingController _folderNameController = TextEditingController();
   String _searchQuery = '';
@@ -74,6 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _renameController.dispose();
     _folderNameController.dispose();
     super.dispose();
@@ -1237,17 +1235,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
         canPop: false,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
+
+          // 1. If search is active or focused, dismiss search first and return to full file list
+          if (_searchQuery.isNotEmpty || _searchFocusNode.hasFocus) {
+            _searchFocusNode.unfocus();
+            if (_searchQuery.isNotEmpty) {
+              setState(() {
+                _searchController.clear();
+                _searchQuery = '';
+              });
+            }
+            return;
+          }
+
+          // 2. If inside a sub-folder, navigate back up one level
+          if (_folderPath.isNotEmpty) {
+            _navigateBackOneLevel();
+            return;
+          }
+
+          // 3. If on Shared Files or other tab, return to My Files tab (tab 0)
           if (_currentTab != 0) {
             setState(() {
               _currentTab = 0;
               _isFabVisible = true;
             });
             _refreshFiles();
-          } else if (_folderPath.isNotEmpty) {
-            _navigateBackOneLevel();
-          } else {
-            SystemNavigator.pop();
+            return;
           }
+
+          // 4. At the root of My Files with no search active -> exit app
+          SystemNavigator.pop();
         },
         child: NotificationListener<UserScrollNotification>(
           onNotification: (notification) {
@@ -1274,10 +1292,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
                         child: TextFormField(
                           controller: _searchController,
+                          focusNode: _searchFocusNode,
                           style: const TextStyle(color: Colors.white, fontSize: 13.5),
+                          textInputAction: TextInputAction.search,
+                          onFieldSubmitted: (_) => _searchFocusNode.unfocus(),
                           onChanged: (val) => setState(() => _searchQuery = val),
                           decoration: InputDecoration(
                             prefixIcon: const Icon(LucideIcons.search, color: Colors.white38, size: 16),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(LucideIcons.x, color: Colors.white54, size: 16),
+                                    tooltip: 'Clear search',
+                                    splashRadius: 18,
+                                    onPressed: () {
+                                      setState(() {
+                                        _searchController.clear();
+                                        _searchQuery = '';
+                                      });
+                                      _searchFocusNode.unfocus();
+                                    },
+                                  )
+                                : null,
                             hintText: 'Search files and folders...',
                             hintStyle: const TextStyle(color: Colors.white30, fontSize: 12.5),
                             filled: true,
@@ -1289,6 +1324,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.indigoAccent.withOpacity(0.4)),
                             ),
                           ),
                         ),
@@ -1450,13 +1489,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildEmptyState() {
+    if (_searchQuery.isNotEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(LucideIcons.searchX, color: Colors.white24, size: 48),
+              const SizedBox(height: 12),
+              Text(
+                'No results found for "$_searchQuery"',
+                style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Check for spelling errors or try different keywords',
+                style: TextStyle(color: Colors.white30, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _searchController.clear();
+                    _searchQuery = '';
+                  });
+                  _searchFocusNode.unfocus();
+                },
+                icon: const Icon(LucideIcons.x, size: 14),
+                label: const Text('Clear Search', style: TextStyle(fontSize: 12)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.indigoAccent,
+                  side: BorderSide(color: Colors.indigoAccent.withOpacity(0.3)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+        children: const [
           Icon(LucideIcons.folderOpen, color: Colors.white24, size: 48),
-          const SizedBox(height: 12),
-          const Text(
+          SizedBox(height: 12),
+          Text(
             'This folder is empty',
             style: TextStyle(color: Colors.white30, fontSize: 13.5),
           ),
