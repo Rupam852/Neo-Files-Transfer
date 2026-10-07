@@ -201,12 +201,14 @@ app.get('/refresh-token', async (req, res) => {
 // Main download endpoint
 app.get('/download-file', async (req, res) => {
   const hash = req.query.hash
+  const fileId = req.query.file_id
+  const isPreview = req.query.preview === 'true'
   const isStream = req.query.stream === 'true'
-  const skipIncrement = req.query.skip_increment === 'true'
+  const skipIncrement = req.query.skip_increment === 'true' || isPreview
   const pin = req.query.pin || req.headers['x-share-pin']
 
-  if (!hash) {
-    return res.status(400).json({ error: 'File Hash Required' })
+  if (!hash && !fileId) {
+    return res.status(400).json({ error: 'File Hash or File ID Required' })
   }
 
   try {
@@ -215,44 +217,59 @@ app.get('/download-file', async (req, res) => {
     let file = null
     let customLink = null
 
-    // 1. Check standard shared_files (Permanent main link - 100% untouched)
-    const { data: standardFile } = await supabaseAdmin
-      .from('shared_files')
-      .select('id, file_name, mime_type, sharing_status, current_version_num, google_drive_file_id, is_folder, user_id, file_size')
-      .eq('unique_share_hash', hash)
-      .maybeSingle()
-
-    if (standardFile) {
-      file = standardFile
-    } else {
-      // 2. Check custom protected share links
-      const { data: linkRecord } = await supabaseAdmin
-        .from('custom_share_links')
-        .select('*')
-        .eq('custom_share_hash', hash)
+    // 0. Direct lookup by file_id (for in-app owner media preview)
+    if (fileId) {
+      const { data: fileById } = await supabaseAdmin
+        .from('shared_files')
+        .select('id, file_name, mime_type, sharing_status, current_version_num, google_drive_file_id, is_folder, user_id, file_size')
+        .eq('id', fileId)
         .maybeSingle()
 
-      if (linkRecord) {
-        if (linkRecord.expires_at && new Date(linkRecord.expires_at) < new Date()) {
-          return res.status(410).json({ error: 'This share link has expired and is no longer accessible.' })
-        }
-        if (linkRecord.max_downloads && linkRecord.download_count >= linkRecord.max_downloads) {
-          return res.status(410).json({ error: 'This share link has reached its maximum allowed downloads.' })
-        }
-        if (linkRecord.pin_code && linkRecord.pin_code !== pin) {
-          return res.status(401).json({ error: 'PIN protection required to download this file.', requires_pin: true })
-        }
+      if (fileById) {
+        file = fileById
+      }
+    }
 
-        customLink = linkRecord
+    if (!file && hash) {
+      // 1. Check standard shared_files (Permanent main link - 100% untouched)
+      const { data: standardFile } = await supabaseAdmin
+        .from('shared_files')
+        .select('id, file_name, mime_type, sharing_status, current_version_num, google_drive_file_id, is_folder, user_id, file_size')
+        .eq('unique_share_hash', hash)
+        .maybeSingle()
 
-        const { data: linkedFile } = await supabaseAdmin
-          .from('shared_files')
-          .select('id, file_name, mime_type, sharing_status, current_version_num, google_drive_file_id, is_folder, user_id, file_size')
-          .eq('id', linkRecord.file_id)
+      if (standardFile) {
+        file = standardFile
+      } else {
+        // 2. Check custom protected share links
+        const { data: linkRecord } = await supabaseAdmin
+          .from('custom_share_links')
+          .select('*')
+          .eq('custom_share_hash', hash)
           .maybeSingle()
 
-        if (linkedFile) {
-          file = linkedFile
+        if (linkRecord) {
+          if (linkRecord.expires_at && new Date(linkRecord.expires_at) < new Date()) {
+            return res.status(410).json({ error: 'This share link has expired and is no longer accessible.' })
+          }
+          if (linkRecord.max_downloads && linkRecord.download_count >= linkRecord.max_downloads) {
+            return res.status(410).json({ error: 'This share link has reached its maximum allowed downloads.' })
+          }
+          if (linkRecord.pin_code && linkRecord.pin_code !== pin) {
+            return res.status(401).json({ error: 'PIN protection required to download this file.', requires_pin: true })
+          }
+
+          customLink = linkRecord
+
+          const { data: linkedFile } = await supabaseAdmin
+            .from('shared_files')
+            .select('id, file_name, mime_type, sharing_status, current_version_num, google_drive_file_id, is_folder, user_id, file_size')
+            .eq('id', linkRecord.file_id)
+            .maybeSingle()
+
+          if (linkedFile) {
+            file = linkedFile
+          }
         }
       }
     }
@@ -261,8 +278,8 @@ app.get('/download-file', async (req, res) => {
       return res.status(404).json({ error: 'The requested file does not exist or has been removed.' })
     }
 
-    // 2. Check sharing status (only if standard link)
-    if (!customLink && file.sharing_status === 'private') {
+    // 2. Check sharing status (allow if owner preview mode or custom link)
+    if (!isPreview && !customLink && file.sharing_status === 'private') {
       return res.status(403).json({ error: 'This file is private and cannot be downloaded.' })
     }
 

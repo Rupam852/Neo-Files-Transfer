@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { generateDirectDownloadUrl, formatFileSize } from '../utils/helpers'
+import { generateMediaPreviewUrl, generateDirectDownloadUrl, formatFileSize } from '../utils/helpers'
 import {
   X, Download, Play, Pause, Volume2, Maximize2, FileText,
   Video, Music, Image as ImageIcon, Code, ExternalLink, RefreshCw
@@ -17,8 +17,11 @@ export default function MediaPreviewModal({ file, onClose }) {
   const isPdf = ext === 'pdf' || file?.mime_type === 'application/pdf'
   const isTextOrCode = ['txt', 'json', 'js', 'jsx', 'ts', 'tsx', 'css', 'html', 'py', 'dart', 'log', 'sql', 'md', 'xml', 'yaml', 'yml', 'env'].includes(ext)
 
-  // Use skip_increment to not pollute download counters while previewing
-  const mediaStreamUrl = generateDirectDownloadUrl(file.unique_share_hash, file.is_folder, file.file_size, true)
+  // Use owner preview url (supports private files and files without public hash)
+  const mediaStreamUrl = generateMediaPreviewUrl(file)
+  const downloadUrl = file?.unique_share_hash 
+    ? generateDirectDownloadUrl(file.unique_share_hash, file.is_folder, file.file_size)
+    : mediaStreamUrl
 
   useEffect(() => {
     if (isTextOrCode && mediaStreamUrl) {
@@ -68,7 +71,7 @@ export default function MediaPreviewModal({ file, onClose }) {
 
           <div className="flex items-center gap-2">
             <a
-              href={generateDirectDownloadUrl(file.unique_share_hash, file.is_folder, file.file_size)}
+              href={downloadUrl}
               download={file.file_name}
               className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 font-medium"
             >
@@ -167,7 +170,7 @@ export default function MediaPreviewModal({ file, onClose }) {
                 <p className="text-xs text-gray-400 mt-1">You can download the file to view it on your device.</p>
               </div>
               <a
-                href={generateDirectDownloadUrl(file.unique_share_hash, file.is_folder, file.file_size)}
+                href={downloadUrl}
                 download={file.file_name}
                 className="btn-primary py-2 px-6 text-xs font-semibold inline-flex items-center gap-2"
               >

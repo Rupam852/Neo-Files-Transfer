@@ -63,6 +63,20 @@ export function generateDirectDownloadUrl(hash, isFolder, fileSize, skipIncremen
   return `${supabaseUrl}/functions/v1/download-file?hash=${hash}${incrementParam}`
 }
 
+export function generateMediaPreviewUrl(file) {
+  if (!file) return ''
+  const proxyUrl = import.meta.env.VITE_PROXY_URL
+  const cleanProxy = proxyUrl ? (proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl) : ''
+  if (cleanProxy && file.id) {
+    return `${cleanProxy}/download-file?file_id=${file.id}&preview=true&skip_increment=true`
+  }
+  if (file.unique_share_hash) {
+    return generateDirectDownloadUrl(file.unique_share_hash, file.is_folder, file.file_size, true)
+  }
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  return `${supabaseUrl}/functions/v1/download-file?file_id=${file.id}&preview=true&skip_increment=true`
+}
+
 export function generateVersionApiUrl(apiKey) {
   if (!apiKey) return ''
   const proxyUrl = import.meta.env.VITE_PROXY_URL

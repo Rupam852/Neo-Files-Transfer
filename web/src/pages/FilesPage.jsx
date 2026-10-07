@@ -1463,7 +1463,7 @@ export default function FilesPage({ onViewVersions }) {
                               </button>
                             ) : (
                               <button
-                                onClick={() => viewMode === 'files' && file.unique_share_hash && setPreviewModalFile(file)}
+                                onClick={() => viewMode === 'files' && setPreviewModalFile(file)}
                                 className="text-sm font-medium text-gray-100 hover:text-primary-400 text-left truncate block w-full"
                               >
                                 {file.file_name}
