@@ -6,8 +6,20 @@ import {
   Table, Presentation, File, CheckCircle2, AlertCircle, Folder,
   ArrowDown, Sparkles, RefreshCw, Lock, KeyRound, QrCode, Play, Eye, EyeOff, Music, ExternalLink, X
 } from 'lucide-react'
-import { QRCodeSVG } from 'qrcode.react'
+import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react'
 import { formatFileSize, getFileIcon, generateDirectDownloadUrl, formatErrorMessage } from '../utils/helpers'
+
+function downloadQrPng(canvasId, fileName) {
+  const canvas = document.getElementById(canvasId)
+  if (!canvas) return
+  const url = canvas.toDataURL('image/png')
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${(fileName || 'download_link').replace(/[^a-zA-Z0-9_-]/g, '_')}_qr.png`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
 
 const ICON_MAP = {
   'file-text': FileText,
@@ -598,10 +610,23 @@ export default function DownloadPage() {
               <h3 className="font-bold text-white text-lg font-['Space_Grotesk']">Scan with Mobile</h3>
               <p className="text-xs text-slate-400">Open camera or Google Lens to download instantly on phone.</p>
             </div>
-            <div className="bg-white p-4 rounded-2xl inline-block shadow-inner">
-              <QRCodeSVG value={window.location.href} size={180} level="M" />
+            <div className="bg-white p-3.5 rounded-2xl inline-block shadow-inner">
+              <QRCodeCanvas
+                id="qr-download-page-canvas"
+                value={window.location.href}
+                size={180}
+                level="H"
+                includeMargin={true}
+              />
             </div>
-            <p className="text-[11px] text-slate-500 truncate max-w-[220px] mx-auto">{fileInfo?.file_name}</p>
+            <p className="text-[11px] text-slate-400 truncate max-w-[220px] mx-auto font-medium">{fileInfo?.file_name}</p>
+            <button
+              type="button"
+              onClick={() => downloadQrPng('qr-download-page-canvas', fileInfo?.file_name)}
+              className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-95"
+            >
+              <Download size={14} /> Download QR Code (PNG)
+            </button>
           </div>
         </div>
       )}

@@ -1,16 +1,33 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
-import { QRCodeSVG } from 'qrcode.react'
+import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react'
 import {
   Share2, Shield, Lock, Clock, Hash, Zap, Copy, Trash2,
-  QrCode, ExternalLink, Download, Check, AlertTriangle, Eye, EyeOff
+  QrCode, ExternalLink, Download, Check, AlertTriangle, Eye, EyeOff, Sparkles
 } from 'lucide-react'
 import { generateShareUrl, generateDirectDownloadUrl } from '../utils/helpers'
+
+function downloadQrImage(canvasId, baseFileName) {
+  const canvas = document.getElementById(canvasId)
+  if (!canvas) {
+    toast.error('Could not export QR Code image')
+    return
+  }
+  const url = canvas.toDataURL('image/png')
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${(baseFileName || 'share_file').replace(/[^a-zA-Z0-9_-]/g, '_')}_qrcode.png`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  toast.success('QR Code image downloaded!')
+}
 
 export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdated }) {
   const [activeTab, setActiveTab] = useState('direct') // 'direct' | 'custom'
   const [showQr, setShowQr] = useState(false)
+  const [activeCustomQrId, setActiveCustomQrId] = useState(null)
   const [copiedLink, setCopiedLink] = useState('')
 
   // Custom link creation form state
@@ -293,11 +310,28 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
 
                   {/* QR Code view */}
                   {showQr && (
-                    <div className="p-4 bg-white rounded-xl flex flex-col items-center justify-center gap-3 animate-fade-in">
-                      <QRCodeSVG value={webShareUrl} size={160} level="H" includeMargin={true} />
-                      <p className="text-[11px] text-gray-700 font-medium text-center">
-                        Scan with your smartphone camera to open download page instantly
-                      </p>
+                    <div className="p-4 bg-white rounded-2xl flex flex-col items-center justify-center gap-3 animate-fade-in shadow-xl">
+                      <div className="p-2 bg-white rounded-xl shadow-sm border border-gray-100">
+                        <QRCodeCanvas
+                          id="qr-canvas-direct"
+                          value={webShareUrl}
+                          size={180}
+                          level="H"
+                          includeMargin={true}
+                        />
+                      </div>
+                      <div className="text-center space-y-2">
+                        <p className="text-xs text-gray-700 font-medium">
+                          Scan with smartphone camera to open download page
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => downloadQrImage('qr-canvas-direct', file.file_name)}
+                          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 mx-auto shadow-md hover:shadow-lg transition-all active:scale-95"
+                        >
+                          <Download size={14} /> Download QR Code (PNG)
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -494,6 +528,14 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
                               className="input-field text-[11px] py-1 bg-dark-600 font-mono select-all flex-1"
                             />
                             <button
+                              type="button"
+                              onClick={() => setActiveCustomQrId(activeCustomQrId === lnk.id ? null : lnk.id)}
+                              className="btn-secondary text-xs py-1 px-2.5 flex items-center gap-1 text-indigo-300 hover:text-indigo-200"
+                              title="View & Download QR"
+                            >
+                              <QrCode size={12} /> {activeCustomQrId === lnk.id ? 'Hide' : 'QR'}
+                            </button>
+                            <button
                               onClick={() => copyToClipboard(linkUrl, lnk.id)}
                               className="btn-secondary text-xs py-1 px-3 flex items-center gap-1 font-semibold"
                             >
@@ -501,6 +543,26 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
                               {copiedLink === lnk.id ? 'Copied' : 'Copy'}
                             </button>
                           </div>
+
+                          {/* Expandable QR for Custom Link */}
+                          {activeCustomQrId === lnk.id && (
+                            <div className="p-3 bg-white rounded-xl flex flex-col items-center justify-center gap-2 animate-fade-in shadow-inner mt-2">
+                              <QRCodeCanvas
+                                id={`qr-canvas-custom-${lnk.id}`}
+                                value={linkUrl}
+                                size={140}
+                                level="H"
+                                includeMargin={true}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => downloadQrImage(`qr-canvas-custom-${lnk.id}`, `${file.file_name}_${lnk.label || 'link'}`)}
+                                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-semibold flex items-center gap-1.5 shadow"
+                              >
+                                <Download size={12} /> Download QR (PNG)
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
