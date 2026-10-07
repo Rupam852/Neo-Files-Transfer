@@ -33,108 +33,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  Future<void> _handleVerifyAndSave() async {
-    setState(() {
-      _validationError = null;
-    });
-    final folderIdInput = _folderIdController.text.trim();
-    if (folderIdInput.isEmpty) {
-      setState(() {
-        _validationError = 'Please enter a Google Drive Folder ID or Link';
-      });
-      return;
-    }
-
-    String folderId = folderIdInput;
-    // Extract folder ID if a URL is pasted
-    final regExp1 = RegExp(r'/folders/([a-zA-Z0-9_-]+)');
-    final regExp2 = RegExp(r'id=([a-zA-Z0-9_-]+)');
-
-    final match1 = regExp1.firstMatch(folderIdInput);
-    if (match1 != null) {
-      folderId = match1.group(1)!;
-    } else {
-      final match2 = regExp2.firstMatch(folderIdInput);
-      if (match2 != null) {
-        folderId = match2.group(1)!;
-      }
-    }
-
-    // Update text field to show the extracted raw ID
-    _folderIdController.text = folderId;
-
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final currentFolderId = authService.profile?.driveFolderId;
-
-    if (currentFolderId != null && currentFolderId.isNotEmpty && currentFolderId != folderId) {
-      final confirm = await _showFolderChangeConfirmDialog();
-      if (confirm == true) {
-        await _executeVerifyAndSave(folderId, deleteExisting: true);
-      }
-    } else {
-      await _executeVerifyAndSave(folderId, deleteExisting: false);
-    }
-  }
-
-  Future<bool?> _showFolderChangeConfirmDialog() {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(LucideIcons.alertTriangle, color: Colors.amber, size: 20),
-            SizedBox(width: 8),
-            Text(
-              'Change target folder?',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'You are connecting a new Google Drive folder. By doing this, all previously stored metadata and shared files from your current folder will be permanently deleted from the database.',
-              style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'What will be deleted:',
-              style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-            SizedBox(height: 8),
-            Text(
-              '• All shared files and folder structures\n• All file version histories\n• All active public share links',
-              style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.5),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Note: Files on your Google Drive will not be affected.',
-              style: TextStyle(color: Colors.white38, fontSize: 10.5, fontStyle: FontStyle.italic),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber.shade700,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Proceed', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _handleAutoCreateFolder() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     final userId = authService.currentUser?.id;
@@ -223,57 +121,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             backgroundColor: Colors.green,
           ),
         );
-      }
-    } catch (e) {
-      String msg = e.toString();
-      if (msg.startsWith('Exception: ')) {
-        msg = msg.substring('Exception: '.length);
-      }
-      setState(() {
-        _validationError = msg;
-      });
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }
-
-  Future<void> _executeVerifyAndSave(String folderId, {required bool deleteExisting}) async {
-    setState(() => _isSaving = true);
-
-    try {
-      final apiService = Provider.of<ApiService>(context, listen: false);
-      final authService = Provider.of<AuthService>(context, listen: false);
-
-      // Step 1: Call verify endpoint via Edge Function
-      final verified = await apiService.verifyDriveFolder(folderId);
-
-      if (verified) {
-        final userId = authService.currentUser?.id;
-        if (userId == null) return;
-
-        // Step 2: If changing folders, delete old records
-        if (deleteExisting) {
-          await _client.from('shared_files').delete().eq('user_id', userId);
-        }
-
-        // Step 3: Save to Supabase table
-        await _client.from('user_profiles').update({
-          'drive_folder_id': folderId,
-          'is_folder_verified': true,
-        }).eq('id', userId);
-
-        await authService.loadProfile(authService.currentUser!);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Google Drive folder verified and saved successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        throw Exception('Folder validation returned false. Verify permissions.');
       }
     } catch (e) {
       String msg = e.toString();
@@ -490,32 +337,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  const Center(
-                    child: Text(
-                      '— OR MANUALLY CONNECT VIA ID —',
-                      style: TextStyle(color: Colors.white38, fontSize: 10, letterSpacing: 0.8),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _folderIdController,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: 'Paste Google Drive Folder ID here...',
-                      hintStyle: const TextStyle(color: Colors.white24, fontSize: 12.5),
-                      filled: true,
-                      fillColor: const Color(0xFF080D1A).withOpacity(0.8),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
-                      ),
-                    ),
-                  ),
                   if (_validationError != null) ...[
                     const SizedBox(height: 12),
                     Container(
@@ -544,25 +365,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _isSaving ? null : _handleVerifyAndSave,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.indigo.shade600,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text('Verify & Save Folder', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                  ),
                 ],
               ),
             ),

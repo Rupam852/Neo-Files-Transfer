@@ -7,22 +7,19 @@ import {
   User, FolderInput, Shield, LogOut, Check, AlertTriangle, 
   Sparkles, RefreshCw, CheckCircle2
 } from 'lucide-react'
-import { extractFolderId, formatErrorMessage } from '../utils/helpers'
+import { formatErrorMessage } from '../utils/helpers'
 
 export default function SettingsPage() {
   const { profile, signOut, refreshProfile, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
   const [displayName, setDisplayName] = useState(profile?.name || '')
-  const [folderUrl, setFolderUrl] = useState('')
   const [saving, setSaving] = useState(false)
-  const [verifying, setVerifying] = useState(false)
   const [autoCreating, setAutoCreating] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [showRecreateConfirm, setShowRecreateConfirm] = useState(false)
   const [validationError, setValidationError] = useState(null)
   const [existingFilesCount, setExistingFilesCount] = useState(0)
-  const [showManualPaste, setShowManualPaste] = useState(false)
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
@@ -129,62 +126,6 @@ export default function SettingsPage() {
       toast.error(errMsg)
     } finally {
       setAutoCreating(false)
-    }
-  }
-
-  // Manual folder verification (Fallback)
-  async function verifyAndSaveFolder() {
-    setValidationError(null)
-    if (!folderUrl.trim()) {
-      setValidationError('Please enter a Google Drive folder link')
-      return
-    }
-
-    const folderId = extractFolderId(folderUrl)
-    if (!folderId) {
-      setValidationError('Invalid Google Drive folder URL')
-      return
-    }
-
-    setVerifying(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/validate-folder`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ folder_id: folderId }),
-        }
-      )
-
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || 'Folder validation failed')
-
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({
-          drive_folder_id: folderId,
-          is_folder_verified: true,
-        })
-        .eq('id', profile.id)
-
-      if (error) throw error
-
-      toast.success('Folder connected successfully!')
-      refreshProfile()
-    } catch (err) {
-      console.error(err)
-      const errMsg = formatErrorMessage(err)
-      setValidationError(errMsg)
-      toast.error(errMsg)
-    } finally {
-      setVerifying(false)
     }
   }
 
@@ -369,46 +310,6 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {/* Advanced Manual Paste Accordion */}
-          <div className="pt-4 border-t border-dark-400">
-            <button
-              type="button"
-              onClick={() => setShowManualPaste(!showManualPaste)}
-              className="text-xs text-gray-400 hover:text-indigo-400 flex items-center justify-between w-full py-1 transition-colors"
-            >
-              <span>Advanced: Manually Connect Folder by URL</span>
-              <span className="text-[10px] font-mono">{showManualPaste ? '▲ Hide' : '▼ Show'}</span>
-            </button>
-
-            {showManualPaste && (
-              <div className="mt-3 space-y-3 bg-dark-500/40 p-3.5 rounded-xl border border-dark-300">
-                <div>
-                  <label className="block text-xs font-medium text-gray-300 mb-1">
-                    Google Drive Folder Link
-                  </label>
-                  <input
-                    type="url"
-                    className="input-field text-xs"
-                    placeholder="https://drive.google.com/drive/folders/xxxxxxxx"
-                    value={folderUrl}
-                    onChange={e => setFolderUrl(e.target.value)}
-                  />
-                  <p className="text-[11px] text-gray-500 mt-1">
-                    Folder must be created by this app under <code>drive.file</code> scope.
-                  </p>
-                </div>
-
-                <button
-                  onClick={verifyAndSaveFolder}
-                  disabled={verifying}
-                  className="btn-secondary text-xs w-full py-2"
-                >
-                  {verifying ? 'Verifying...' : 'Verify & Save Link'}
-                </button>
-              </div>
-            )}
-          </div>
-
           {validationError && (
             <div className="bg-red-900/30 border border-red-600/30 rounded-xl p-3.5 flex items-start gap-2.5 text-red-200 text-xs">
               <AlertTriangle size={16} className="text-red-400 mt-0.5 flex-shrink-0" />
@@ -416,7 +317,7 @@ export default function SettingsPage() {
                 <p className="font-semibold text-red-300">Notice:</p>
                 <p className="text-red-400/90 mt-0.5 leading-relaxed">{validationError}</p>
                 <p className="text-indigo-300 mt-2 font-medium">
-                  👉 Recommended: Click the <strong>"Auto-Create & Connect"</strong> button above to let the app create the folder automatically.
+                  👉 Click the <strong>"Auto-Create & Connect"</strong> button above to create a fresh secure folder.
                 </p>
               </div>
             </div>
