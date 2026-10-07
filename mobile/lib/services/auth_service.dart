@@ -234,17 +234,16 @@ class AuthService extends ChangeNotifier {
             email: authUser.email ?? '',
             name: (insertPayload['name'] as String?) ?? '',
             avatarUrl: insertPayload['avatar_url'] as String?,
+            isFolderVerified: false,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
           );
         }
       } else {
         profileData = UserProfile.fromJson(response);
 
-        // Update tokens in DB if present in session
+        // Update refresh token in DB if present in session
         final updates = <String, dynamic>{};
-        if (sessionTokens?['google_access_token'] != null &&
-            profileData.googleAccessToken != sessionTokens!['google_access_token']) {
-          updates['google_access_token'] = sessionTokens['google_access_token'];
-        }
         if (sessionTokens?['google_refresh_token'] != null &&
             profileData.googleRefreshToken != sessionTokens!['google_refresh_token']) {
           updates['google_refresh_token'] = sessionTokens['google_refresh_token'];
