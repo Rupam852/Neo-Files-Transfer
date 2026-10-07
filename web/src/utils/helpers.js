@@ -43,21 +43,28 @@ export function generateShareUrl(hash) {
 }
 
 export function generateDirectDownloadUrl(hash, isFolder, fileSize, skipIncrement = false) {
-  const proxyUrl = import.meta.env.VITE_PROXY_URL
   const cfWorkerUrl = import.meta.env.VITE_CF_WORKER_URL
+  const proxyUrl = import.meta.env.VITE_PROXY_URL
   
   const incrementParam = skipIncrement ? '&skip_increment=true' : ''
+  const isCustomLink = typeof hash === 'string' && hash.startsWith('sec_')
 
-  // 1. Primary: Route via Render Proxy (handles file streams, ZIP folders, PIN, Limits & instant Owner Notifications)
-  if (proxyUrl) {
+  // Folders and PIN-protected custom links route through Render Proxy
+  if ((isCustomLink || isFolder) && proxyUrl) {
     const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
     return `${cleanProxy}/download-file?hash=${hash}${incrementParam}`
   }
 
-  // 2. Secondary: Route through Cloudflare Worker
+  // 1. Standard single files route through ultra high-speed Cloudflare Worker
   if (cfWorkerUrl) {
     const cleanWorker = cfWorkerUrl.endsWith('/') ? cfWorkerUrl.slice(0, -1) : cfWorkerUrl
     return `${cleanWorker}?hash=${hash}${incrementParam}`
+  }
+
+  // 2. Fallback to Render Proxy
+  if (proxyUrl) {
+    const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
+    return `${cleanProxy}/download-file?hash=${hash}${incrementParam}`
   }
 
   // 3. Fallback: Supabase regional Deno Edge Function
