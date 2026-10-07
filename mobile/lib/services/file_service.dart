@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/shared_file.dart';
+import '../models/custom_share_link.dart';
 import 'auth_service.dart';
 import 'api_service.dart';
 
@@ -16,10 +17,12 @@ class FileService extends ChangeNotifier {
 
   List<SharedFile> _files = [];
   List<SharedFile> _sharedFiles = [];
+  List<SharedFile> _trashFiles = [];
   bool _isLoading = false;
 
   List<SharedFile> get files => _files;
   List<SharedFile> get sharedFiles => _sharedFiles;
+  List<SharedFile> get trashFiles => _trashFiles;
   bool get isLoading => _isLoading;
 
   FileService(this._authService, this._apiService);
@@ -38,7 +41,10 @@ class FileService extends ChangeNotifier {
       final userId = _authService.currentUser?.id;
       if (userId == null) return;
 
-      var query = _client.from('shared_files').select('*, file_versions(*)').eq('user_id', userId);
+      var query = _client.from('shared_files')
+          .select('*, file_versions(*)')
+          .eq('user_id', userId)
+          .filter('deleted_at', 'is', null);
 
       if (parentFolderId != null) {
         query = query.eq('parent_folder_id', parentFolderId);
@@ -69,12 +75,37 @@ class FileService extends ChangeNotifier {
           .from('shared_files')
           .select('*, file_versions(*)')
           .eq('user_id', userId)
+          .filter('deleted_at', 'is', null)
           .not('unique_share_hash', 'is', null)
           .order('file_name', ascending: true);
 
       _sharedFiles = (response as List).map((json) => SharedFile.fromJson(json)).toList();
     } catch (e) {
       debugPrint('Error loading shared files: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadTrashFiles() async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      final userId = _authService.currentUser?.id;
+      if (userId == null) return;
+
+      final response = await _client
+          .from('shared_files')
+          .select('*, file_versions(*)')
+          .eq('user_id', userId)
+          .not('deleted_at', 'is', null)
+          .order('deleted_at', ascending: false);
+
+      _trashFiles = (response as List).map((json) => SharedFile.fromJson(json)).toList();
+    } catch (e) {
+      debugPrint('Error loading trash files: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -589,38 +620,9 @@ class FileService extends ChangeNotifier {
   }
 
 
-  // Delete Single File / Folder
+  // Delete Single File / Folder (Moves to Recycle Bin)
   Future<void> deleteFile(SharedFile file) async {
-    final userId = _authService.currentUser?.id;
-    if (userId == null) return;
-
-    if (!file.isFolder) {
-      try {
-        await _apiService.deleteDriveFile(file.googleDriveFileId);
-      } catch (e) {
-        debugPrint('Failed to delete file from Google Drive: $e');
-      }
-      await _client.from('file_versions').delete().eq('file_id', file.id);
-    } else {
-      // Recursively delete children files
-      final children = await _client
-          .from('shared_files')
-          .select()
-          .eq('parent_folder_id', file.id);
-      
-      for (final childJson in (children as List)) {
-        final child = SharedFile.fromJson(childJson);
-        await deleteFile(child);
-      }
-    }
-
-    await _client.from('shared_files').delete().eq('id', file.id);
-
-    await _client.from('activity_logs').insert({
-      'user_id': userId,
-      'action': 'delete',
-      'details': 'Deleted item: ${file.fileName}',
-    });
+    await moveToTrash(file);
   }
 
   // Rename File / Folder
@@ -748,5 +750,121 @@ class FileService extends ChangeNotifier {
       'action': 'bulk_move',
       'details': 'Moved ${fileIds.length} items',
     });
+  }
+
+  // Move a file to Recycle Bin / Trash
+  Future<void> moveToTrash(SharedFile file) async {
+    final userId = _authService.currentUser?.id;
+    if (userId == null) return;
+
+    await _client
+        .from('shared_files')
+        .update({'deleted_at': DateTime.now().toIso8601String()})
+        .eq('id', file.id);
+
+    await _client.from('activity_logs').insert({
+      'user_id': userId,
+      'action': 'trash_file',
+      'details': 'Moved to Trash: ${file.fileName}',
+    });
+
+    _files.removeWhere((f) => f.id == file.id);
+    _sharedFiles.removeWhere((f) => f.id == file.id);
+    notifyListeners();
+  }
+
+  // Restore a file from Recycle Bin
+  Future<void> restoreFromTrash(SharedFile file) async {
+    final userId = _authService.currentUser?.id;
+    if (userId == null) return;
+
+    await _client
+        .from('shared_files')
+        .update({'deleted_at': null})
+        .eq('id', file.id);
+
+    await _client.from('activity_logs').insert({
+      'user_id': userId,
+      'action': 'restore_file',
+      'details': 'Restored file: ${file.fileName}',
+    });
+
+    _trashFiles.removeWhere((f) => f.id == file.id);
+    notifyListeners();
+  }
+
+  // Permanently delete a file (Google Drive + DB records)
+  Future<void> deletePermanently(SharedFile file) async {
+    final userId = _authService.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      await _apiService.deleteDriveFile(file.googleDriveFileId);
+    } catch (e) {
+      debugPrint('Warning: Google Drive delete failed: $e');
+    }
+
+    await _client.from('file_versions').delete().eq('file_id', file.id);
+    await _client.from('custom_share_links').delete().eq('file_id', file.id);
+    await _client.from('file_download_logs').delete().eq('file_id', file.id);
+    await _client.from('shared_files').delete().eq('id', file.id);
+
+    await _client.from('activity_logs').insert({
+      'user_id': userId,
+      'action': 'delete_permanently',
+      'details': 'Permanently deleted: ${file.fileName}',
+    });
+
+    _trashFiles.removeWhere((f) => f.id == file.id);
+    _files.removeWhere((f) => f.id == file.id);
+    _sharedFiles.removeWhere((f) => f.id == file.id);
+    notifyListeners();
+  }
+
+  // Load custom share links for a file
+  Future<List<CustomShareLink>> loadCustomShareLinks(String fileId) async {
+    final response = await _client
+        .from('custom_share_links')
+        .select()
+        .eq('file_id', fileId)
+        .order('created_at', ascending: false);
+
+    return (response as List).map((json) => CustomShareLink.fromJson(json)).toList();
+  }
+
+  // Create a new custom protected share link
+  Future<CustomShareLink> createCustomShareLink({
+    required String fileId,
+    String? pinCode,
+    DateTime? expiresAt,
+    int? maxDownloads,
+    bool isOneTime = false,
+    String? label,
+  }) async {
+    final userId = _authService.currentUser?.id;
+    if (userId == null) throw Exception('User not authenticated');
+
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final rnd = Random.secure();
+    final customHash = 'sec_' + List.generate(14, (index) => chars[rnd.nextInt(chars.length)]).join();
+
+    final response = await _client.from('custom_share_links').insert({
+      'file_id': fileId,
+      'user_id': userId,
+      'custom_share_hash': customHash,
+      'pin_code': pinCode != null && pinCode.trim().isNotEmpty ? pinCode.trim() : null,
+      'expires_at': expiresAt?.toIso8601String(),
+      'max_downloads': maxDownloads,
+      'is_one_time': isOneTime,
+      'label': label != null && label.trim().isNotEmpty ? label.trim() : null,
+      'is_active': true,
+    }).select().single();
+
+    return CustomShareLink.fromJson(response);
+  }
+
+  // Delete a custom share link
+  Future<void> deleteCustomShareLink(String linkId) async {
+    await _client.from('custom_share_links').delete().eq('id', linkId);
   }
 }

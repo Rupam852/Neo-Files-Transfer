@@ -81,8 +81,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final fileService = Provider.of<FileService>(context, listen: false);
     if (_currentTab == 0) {
       await fileService.loadFiles(_currentFolder?.id);
-    } else {
+    } else if (_currentTab == 1) {
       await fileService.loadSharedFiles();
+    } else if (_currentTab == 2) {
+      await fileService.loadTrashFiles();
     }
   }
 
@@ -1172,6 +1174,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 icon: Icon(LucideIcons.share2),
                 label: 'Shared Links',
               ),
+              BottomNavigationBarItem(
+                icon: Icon(LucideIcons.trash2),
+                label: 'Recycle Bin',
+              ),
             ],
           ),
         ],
@@ -1398,7 +1404,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ],
                   )
-                : _buildSharedFilesTab(),
+                : _currentTab == 1
+                    ? _buildSharedFilesTab()
+                    : _buildTrashTab(),
           ),
         ),
       ),
@@ -1741,6 +1749,153 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTrashTab() {
+    final fileService = Provider.of<FileService>(context);
+    final trashFiles = fileService.trashFiles;
+
+    if (fileService.isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Colors.indigoAccent));
+    }
+
+    if (trashFiles.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(LucideIcons.trash2, size: 48, color: Colors.white24),
+            const SizedBox(height: 16),
+            Text(
+              'Recycle Bin is Empty',
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Deleted files are stored safely until permanently removed.',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+      itemCount: trashFiles.length,
+      itemBuilder: (context, index) {
+        final file = trashFiles[index];
+        final deletedDate = file.deletedAt != null
+            ? DateFormat('MMM dd, yyyy').format(file.deletedAt!)
+            : 'Recently';
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12.0),
+          padding: const EdgeInsets.all(14.0),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0B1329).withOpacity(0.5),
+            borderRadius: BorderRadius.circular(16.0),
+            border: Border.all(
+              color: Colors.redAccent.withOpacity(0.12),
+              width: 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                child: Icon(
+                  file.isFolder ? LucideIcons.folder : LucideIcons.file,
+                  color: Colors.redAccent,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      file.fileName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14.0,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Deleted: $deletedDate',
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 11.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Restore File',
+                icon: const Icon(LucideIcons.rotateCcw, color: Color(0xFF34D399), size: 18),
+                onPressed: () async {
+                  setState(() => _isActionLoading = true);
+                  try {
+                    await fileService.restoreFromTrash(file);
+                    if (mounted) _showSuccessSnackBar('Restored "${file.fileName}"');
+                  } catch (e) {
+                    if (mounted) _showErrorSnackBar('Restore failed: $e');
+                  } finally {
+                    if (mounted) setState(() => _isActionLoading = false);
+                  }
+                },
+              ),
+              IconButton(
+                tooltip: 'Delete Permanently',
+                icon: const Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: const Color(0xFF0F172A),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      title: const Text('Delete Permanently?', style: TextStyle(color: Colors.white)),
+                      content: Text('Permanently delete "${file.fileName}" from Google Drive and DB? This cannot be undone.', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.white60))),
+                        ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            setState(() => _isActionLoading = true);
+                            try {
+                              await fileService.deletePermanently(file);
+                              if (mounted) _showSuccessSnackBar('Permanently deleted "${file.fileName}"');
+                            } catch (e) {
+                              if (mounted) _showErrorSnackBar('Delete failed: $e');
+                            } finally {
+                              if (mounted) setState(() => _isActionLoading = false);
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                          child: const Text('Delete Forever', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ],
           ),

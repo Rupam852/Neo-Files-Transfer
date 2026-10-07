@@ -2,15 +2,20 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
+import JSZip from 'jszip'
 import {
   Search, Upload, MoreVertical, Download, Pencil, Trash2,
   Share2, History, FileText, Image, Video, Archive, Table,
   Presentation, File, SortAsc, Plus, Folder, ChevronRight,
-  CheckSquare, Square, FolderInput, X, Code2,
+  CheckSquare, Square, FolderInput, X, Code2, BarChart2, Eye,
+  RotateCcw, Trash, ShieldCheck,
 } from 'lucide-react'
 import { formatFileSize, formatDate, getExtension, generateShareUrl, generateDirectDownloadUrl, formatErrorMessage } from '../utils/helpers'
 import { useNavigate } from 'react-router-dom'
 import VersionApiModal from '../components/VersionApiModal'
+import ShareModal from '../components/ShareModal'
+import FileAnalyticsModal from '../components/FileAnalyticsModal'
+import MediaPreviewModal from '../components/MediaPreviewModal'
 
 const ALLOWED_TYPES = [
   'application/pdf',
@@ -82,6 +87,9 @@ export default function FilesPage({ onViewVersions }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [newName, setNewName] = useState('')
   const [versionApiModalFile, setVersionApiModalFile] = useState(null)
+  const [previewModalFile, setPreviewModalFile] = useState(null)
+  const [analyticsModalFile, setAnalyticsModalFile] = useState(null)
+  const [viewMode, setViewMode] = useState('files') // 'files' | 'trash'
   const menuRef = useRef(null)
 
   // Folders and batching states
@@ -157,44 +165,148 @@ export default function FilesPage({ onViewVersions }) {
     }
   }
 
-  async function handleBulkDelete() {
-    setProcessingText(`Deleting ${selectedIds.size} item(s)...`)
-    setBulkDeleteConfirm(false)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-      const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
-      const itemsToDelete = files.filter(f => selectedIds.has(f.id))
+  async function handleBatchZipDownload() {
+    const selectedFiles = files.filter(f => selectedIds.has(f.id) && !f.is_folder)
+    if (selectedFiles.length === 0) {
+      toast.error('Please select valid files to package into a ZIP archive')
+      return
+    }
 
-      for (const item of itemsToDelete) {
-        try {
-          const res = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-file`,
-            {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ file_id: item.google_drive_file_id, provider_token: googleToken }),
-            }
-          )
-          if (!res.ok) {
-            const r = await res.json().catch(() => ({}))
-            console.warn(`Drive delete failed for ${item.file_name}:`, r.error)
-          }
-        } catch (e) {
-          console.warn(`Drive delete error for ${item.file_name}:`, e)
-        }
-        // Always remove from DB even if Drive delete partially failed
-        await supabase.from('file_versions').delete().eq('file_id', item.id)
-        await supabase.from('shared_files').delete().eq('id', item.id)
+    setProcessingText(`Packaging ${selectedFiles.length} file(s) into .ZIP...`)
+    try {
+      const zip = new JSZip()
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const sf = selectedFiles[i]
+        setProcessingText(`Fetching file ${i + 1}/${selectedFiles.length}: ${sf.file_name}...`)
+        const directUrl = generateDirectDownloadUrl(sf.unique_share_hash, sf.is_folder, sf.file_size, true)
+        const res = await fetch(directUrl)
+        if (!res.ok) throw new Error(`Could not fetch ${sf.file_name}`)
+        const blob = await res.blob()
+        zip.file(sf.file_name, blob)
       }
+
+      setProcessingText('Building final ZIP compression...')
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      const url = window.URL.createObjectURL(zipBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `neo_batch_${Date.now()}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+      toast.success('Batch ZIP download started!')
+    } catch (err) {
+      toast.error('ZIP packaging failed: ' + err.message)
+    } finally {
+      setProcessingText(null)
+    }
+  }
+
+  async function handleRestore(fileToRestore) {
+    setProcessingText('Restoring item...')
+    try {
+      const { error } = await supabase
+        .from('shared_files')
+        .update({ deleted_at: null })
+        .eq('id', fileToRestore.id)
+
+      if (error) throw error
 
       await supabase.from('activity_logs').insert({
         user_id: user.id,
-        action: 'bulk_delete',
-        details: `Deleted ${itemsToDelete.length} item(s)`,
+        action: 'restore_file',
+        details: `Restored: ${fileToRestore.file_name}`,
       })
 
-      toast.success(`${itemsToDelete.length} item(s) deleted`)
+      toast.success('Restored to My Files')
+      loadFiles()
+    } catch (err) {
+      toast.error(formatErrorMessage(err))
+    } finally {
+      setProcessingText(null)
+    }
+  }
+
+  async function handleBulkRestore() {
+    setProcessingText(`Restoring ${selectedIds.size} item(s)...`)
+    try {
+      const { error } = await supabase
+        .from('shared_files')
+        .update({ deleted_at: null })
+        .in('id', Array.from(selectedIds))
+
+      if (error) throw error
+
+      await supabase.from('activity_logs').insert({
+        user_id: user.id,
+        action: 'bulk_restore',
+        details: `Restored ${selectedIds.size} item(s)`,
+      })
+
+      toast.success(`${selectedIds.size} item(s) restored!`)
+      setSelectedIds(new Set())
+      loadFiles()
+    } catch (err) {
+      toast.error(formatErrorMessage(err))
+    } finally {
+      setProcessingText(null)
+    }
+  }
+
+  async function handleBulkDelete() {
+    setProcessingText(viewMode === 'files' ? `Moving ${selectedIds.size} item(s) to Recycle Bin...` : `Permanently deleting ${selectedIds.size} item(s)...`)
+    setBulkDeleteConfirm(false)
+    try {
+      if (viewMode === 'files') {
+        const { error } = await supabase
+          .from('shared_files')
+          .update({ deleted_at: new Date().toISOString() })
+          .in('id', Array.from(selectedIds))
+
+        if (error) throw error
+
+        await supabase.from('activity_logs').insert({
+          user_id: user.id,
+          action: 'bulk_trash',
+          details: `Moved ${selectedIds.size} item(s) to Recycle Bin`,
+        })
+
+        toast.success(`${selectedIds.size} item(s) moved to Recycle Bin`)
+      } else {
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token
+        const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
+        const itemsToDelete = files.filter(f => selectedIds.has(f.id))
+
+        for (const item of itemsToDelete) {
+          try {
+            await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-file`,
+              {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_id: item.google_drive_file_id, provider_token: googleToken }),
+              }
+            )
+          } catch (e) {
+            console.warn(`Drive delete error for ${item.file_name}:`, e)
+          }
+          await supabase.from('file_versions').delete().eq('file_id', item.id)
+          await supabase.from('custom_share_links').delete().eq('file_id', item.id)
+          await supabase.from('file_download_logs').delete().eq('file_id', item.id)
+          await supabase.from('shared_files').delete().eq('id', item.id)
+        }
+
+        await supabase.from('activity_logs').insert({
+          user_id: user.id,
+          action: 'bulk_permanent_delete',
+          details: `Permanently deleted ${itemsToDelete.length} item(s)`,
+        })
+
+        toast.success(`${itemsToDelete.length} item(s) permanently deleted`)
+      }
+
       setSelectedIds(new Set())
       loadFiles()
     } catch (err) {
@@ -233,7 +345,7 @@ export default function FilesPage({ onViewVersions }) {
 
   useEffect(() => {
     loadFiles()
-  }, [currentFolder, sortBy, sortDir])
+  }, [currentFolder, sortBy, sortDir, viewMode])
 
   useEffect(() => {
     window.addEventListener('trigger-upload', () => fileInputRef.current?.click())
@@ -258,10 +370,15 @@ export default function FilesPage({ onViewVersions }) {
         .select('*, file_versions(*)')
         .eq('user_id', user.id)
 
-      if (currentFolder) {
-        query = query.eq('parent_folder_id', currentFolder.id)
+      if (viewMode === 'trash') {
+        query = query.not('deleted_at', 'is', null)
       } else {
-        query = query.is('parent_folder_id', null)
+        query = query.is('deleted_at', null)
+        if (currentFolder) {
+          query = query.eq('parent_folder_id', currentFolder.id)
+        } else {
+          query = query.is('parent_folder_id', null)
+        }
       }
 
       const { data, error } = await query.order(sortBy, { ascending: sortDir === 'asc' })
@@ -898,51 +1015,80 @@ export default function FilesPage({ onViewVersions }) {
   }
 
   async function handleDelete() {
-    setProcessingText('Deleting file...')
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-      const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
+    if (viewMode === 'files') {
+      setProcessingText('Moving to Recycle Bin...')
+      try {
+        const { error } = await supabase
+          .from('shared_files')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', deleteConfirm.id)
 
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-file`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            file_id: deleteConfirm.google_drive_file_id,
-            provider_token: googleToken,
-          }),
-        }
-      )
+        if (error) throw error
 
-      if (!res.ok) {
-        const result = await res.json().catch(() => ({}))
-        throw new Error(result.error || 'Failed to delete file from Google Drive')
+        await supabase.from('activity_logs').insert({
+          user_id: user.id,
+          action: 'trash_file',
+          details: `Moved to Recycle Bin: ${deleteConfirm.file_name}`,
+        })
+
+        toast.success('Moved to Recycle Bin')
+        setDeleteConfirm(null)
+        loadFiles()
+      } catch (err) {
+        toast.error(formatErrorMessage(err))
+      } finally {
+        setProcessingText(null)
       }
+    } else {
+      setProcessingText('Permanently deleting...')
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token
+        const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
 
-      // Delete versions first
-      await supabase.from('file_versions').delete().eq('file_id', deleteConfirm.id)
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-file`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              file_id: deleteConfirm.google_drive_file_id,
+              provider_token: googleToken,
+            }),
+          }
+        )
 
-      // Delete file record
-      await supabase.from('shared_files').delete().eq('id', deleteConfirm.id)
+        if (!res.ok) {
+          const result = await res.json().catch(() => ({}))
+          console.warn('Drive delete warning:', result.error)
+        }
 
-      await supabase.from('activity_logs').insert({
-        user_id: user.id,
-        action: 'delete',
-        details: `Deleted file: ${deleteConfirm.file_name}`,
-      })
+        // Delete versions first
+        await supabase.from('file_versions').delete().eq('file_id', deleteConfirm.id)
+        // Delete custom links
+        await supabase.from('custom_share_links').delete().eq('file_id', deleteConfirm.id)
+        // Delete logs
+        await supabase.from('file_download_logs').delete().eq('file_id', deleteConfirm.id)
+        // Delete file record
+        await supabase.from('shared_files').delete().eq('id', deleteConfirm.id)
 
-      toast.success('File deleted successfully')
-      setDeleteConfirm(null)
-      loadFiles()
-    } catch (err) {
-      toast.error(formatErrorMessage(err))
-    } finally {
-      setProcessingText(null)
+        await supabase.from('activity_logs').insert({
+          user_id: user.id,
+          action: 'delete_permanently',
+          details: `Permanently deleted: ${deleteConfirm.file_name}`,
+        })
+
+        toast.success('File deleted permanently')
+        setDeleteConfirm(null)
+        loadFiles()
+      } catch (err) {
+        toast.error(formatErrorMessage(err))
+      } finally {
+        setProcessingText(null)
+      }
     }
   }
 
@@ -999,7 +1145,7 @@ export default function FilesPage({ onViewVersions }) {
       onDrop={handleDrop}
       className="space-y-4 flex flex-col min-h-[calc(100vh-150px)] lg:min-h-[calc(100vh-180px)] relative"
     >
-      {isDragging && (
+      {isDragging && viewMode === 'files' && (
         <div className="absolute inset-0 bg-[#030712]/80 backdrop-blur-md border-2 border-dashed border-primary-500/50 rounded-3xl z-50 flex flex-col items-center justify-center pointer-events-none transition-all duration-300">
           <div className="p-6 bg-primary-500/10 border border-primary-500/25 rounded-2xl flex items-center justify-center text-primary-400 mb-4 animate-bounce">
             <Upload size={48} />
@@ -1012,81 +1158,141 @@ export default function FilesPage({ onViewVersions }) {
           </p>
         </div>
       )}
-      {/* Header */}
+
+      {/* View Mode & Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         {/* Title / Breadcrumb navigation */}
-        <div className="flex flex-wrap items-center gap-2 text-xl md:text-2xl font-bold text-gray-50">
-          <button
-            onClick={() => {
-              setCurrentFolder(null)
-              setFolderPath([])
-            }}
-            className="hover:text-primary-400 transition-colors duration-200 text-left"
-          >
-            My Files
-          </button>
-          {folderPath.map((folder, index) => (
-            <span key={folder.id} className="flex items-center gap-2">
-              <ChevronRight size={18} className="text-gray-500" />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1 bg-dark-700/80 p-1 rounded-xl border border-dark-400">
+            <button
+              onClick={() => {
+                setViewMode('files')
+                setCurrentFolder(null)
+                setFolderPath([])
+                setSelectedIds(new Set())
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                viewMode === 'files'
+                  ? 'bg-primary-500 text-white shadow-md shadow-primary-500/20'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <Folder size={14} /> My Files
+            </button>
+            <button
+              onClick={() => {
+                setViewMode('trash')
+                setCurrentFolder(null)
+                setFolderPath([])
+                setSelectedIds(new Set())
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                viewMode === 'trash'
+                  ? 'bg-red-500 text-white shadow-md shadow-red-500/20'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <Trash size={14} /> Recycle Bin
+            </button>
+          </div>
+
+          {viewMode === 'files' && (
+            <div className="flex flex-wrap items-center gap-2 text-base md:text-lg font-bold text-gray-100 ml-1">
               <button
                 onClick={() => {
-                  setCurrentFolder(folder)
-                  setFolderPath(folderPath.slice(0, index + 1))
+                  setCurrentFolder(null)
+                  setFolderPath([])
                 }}
                 className="hover:text-primary-400 transition-colors duration-200 text-left"
               >
-                {folder.file_name}
+                Root
               </button>
+              {folderPath.map((folder, index) => (
+                <span key={folder.id} className="flex items-center gap-1.5">
+                  <ChevronRight size={16} className="text-gray-500" />
+                  <button
+                    onClick={() => {
+                      setCurrentFolder(folder)
+                      setFolderPath(folderPath.slice(0, index + 1))
+                    }}
+                    className="hover:text-primary-400 transition-colors duration-200 text-left"
+                  >
+                    {folder.file_name}
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {viewMode === 'trash' && (
+            <span className="text-xs text-amber-400/90 font-medium">
+              (Items in Recycle Bin are stored safely until permanently removed)
             </span>
-          ))}
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            multiple
-            accept=".pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.gif,.webp,.svg,.mp4,.mkv,.mov,.avi,.zip,.rar,.tar,.gz,.7z,.apk,.xapk,.txt"
-            onChange={handleUpload}
-          />
-          <input
-            ref={folderInputRef}
-            type="file"
-            className="hidden"
-            webkitdirectory="true"
-            directory="true"
-            multiple
-            onChange={handleFolderUpload}
-          />
+        {viewMode === 'files' ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              multiple
+              accept=".pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.gif,.webp,.svg,.mp4,.mkv,.mov,.avi,.zip,.rar,.tar,.gz,.7z,.apk,.xapk,.txt"
+              onChange={handleUpload}
+            />
+            <input
+              ref={folderInputRef}
+              type="file"
+              className="hidden"
+              webkitdirectory="true"
+              directory="true"
+              multiple
+              onChange={handleFolderUpload}
+            />
 
-          <button
-            onClick={() => setFolderCreateModal(true)}
-            disabled={uploading}
-            className="btn-secondary flex items-center gap-2 text-sm"
-          >
-            <Plus size={16} />
-            New Folder
-          </button>
+            <button
+              onClick={() => setFolderCreateModal(true)}
+              disabled={uploading}
+              className="btn-secondary flex items-center gap-2 text-sm"
+            >
+              <Plus size={16} />
+              New Folder
+            </button>
 
-          <button
-            onClick={() => folderInputRef.current?.click()}
-            disabled={uploading}
-            className="btn-secondary flex items-center gap-2 text-sm"
-          >
-            <Folder size={16} />
-            Upload Folder
-          </button>
+            <button
+              onClick={() => folderInputRef.current?.click()}
+              disabled={uploading}
+              className="btn-secondary flex items-center gap-2 text-sm"
+            >
+              <Folder size={16} />
+              Upload Folder
+            </button>
 
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="btn-primary flex items-center gap-2 text-sm"
-          >
-            <Upload size={16} />
-            {uploading ? 'Uploading...' : 'Upload Files'}
-          </button>
-        </div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="btn-primary flex items-center gap-2 text-sm"
+            >
+              <Upload size={16} />
+              {uploading ? 'Uploading...' : 'Upload Files'}
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            {files.length > 0 && (
+              <button
+                onClick={() => {
+                  setSelectedIds(new Set(files.map(f => f.id)))
+                  setBulkDeleteConfirm(true)
+                }}
+                className="btn-danger flex items-center gap-2 text-xs py-2 px-3"
+              >
+                <Trash2 size={14} /> Empty Recycle Bin
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Search & Sort */}
@@ -1143,18 +1349,43 @@ export default function FilesPage({ onViewVersions }) {
                 {selectedIds.size} selected
               </span>
               <div className="flex items-center gap-2 ml-auto">
-                <button
-                  onClick={() => { loadAllFolders(); setMoveModal(true) }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/20 text-xs font-semibold hover:bg-indigo-500/25 transition-all"
-                >
-                  <FolderInput size={13} /> Move
-                </button>
-                <button
-                  onClick={() => setBulkDeleteConfirm(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-semibold hover:bg-red-500/20 transition-all"
-                >
-                  <Trash2 size={13} /> Delete
-                </button>
+                {viewMode === 'files' ? (
+                  <>
+                    <button
+                      onClick={handleBatchZipDownload}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-500/20 text-primary-300 border border-primary-500/30 text-xs font-semibold hover:bg-primary-500/30 transition-all"
+                    >
+                      <Archive size={13} /> Download as .ZIP
+                    </button>
+                    <button
+                      onClick={() => { loadAllFolders(); setMoveModal(true) }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/20 text-xs font-semibold hover:bg-indigo-500/25 transition-all"
+                    >
+                      <FolderInput size={13} /> Move
+                    </button>
+                    <button
+                      onClick={() => setBulkDeleteConfirm(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-semibold hover:bg-red-500/20 transition-all"
+                    >
+                      <Trash2 size={13} /> Move to Trash
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleBulkRestore}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold hover:bg-emerald-500/30 transition-all"
+                    >
+                      <RotateCcw size={13} /> Restore Selected
+                    </button>
+                    <button
+                      onClick={() => setBulkDeleteConfirm(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold hover:bg-red-500/30 transition-all"
+                    >
+                      <Trash2 size={13} /> Delete Permanently
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => setSelectedIds(new Set())}
                   className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-dark-400 transition-all"
@@ -1198,7 +1429,11 @@ export default function FilesPage({ onViewVersions }) {
                       className={`transition-colors duration-100 ${isSelected ? 'bg-primary-500/8 hover:bg-primary-500/12' : 'hover:bg-dark-500'
                         }`}
                       onDoubleClick={() => {
-                        if (file.is_folder) handleOpenFolder(file)
+                        if (file.is_folder) {
+                          handleOpenFolder(file)
+                        } else if (file.unique_share_hash && viewMode === 'files') {
+                          setPreviewModalFile(file)
+                        }
                       }}
                     >
                       {/* Checkbox */}
@@ -1227,7 +1462,12 @@ export default function FilesPage({ onViewVersions }) {
                                 {file.file_name}
                               </button>
                             ) : (
-                              <p className="text-sm font-medium text-gray-100 truncate">{file.file_name}</p>
+                              <button
+                                onClick={() => viewMode === 'files' && file.unique_share_hash && setPreviewModalFile(file)}
+                                className="text-sm font-medium text-gray-100 hover:text-primary-400 text-left truncate block w-full"
+                              >
+                                {file.file_name}
+                              </button>
                             )}
                             <p className="text-xs text-gray-400">
                               {file.is_folder ? 'Folder' : getExtension(file.file_name)}
@@ -1242,14 +1482,20 @@ export default function FilesPage({ onViewVersions }) {
                         {file.is_folder ? '—' : `v${file.current_version_num}`}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${file.sharing_status === 'public'
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                          }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${file.sharing_status === 'public' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                            }`} />
-                          {file.sharing_status}
-                        </span>
+                        {viewMode === 'files' ? (
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${file.sharing_status === 'public'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${file.sharing_status === 'public' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                              }`} />
+                            {file.sharing_status}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+                            In Trash
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-400 hidden lg:table-cell">
                         <div className="flex flex-col gap-0.5">
@@ -1284,102 +1530,146 @@ export default function FilesPage({ onViewVersions }) {
                             <div
                               ref={menuRef}
                               onClick={(e) => e.stopPropagation()}
-                              className={`absolute w-48 bg-dark-600 rounded-lg shadow-2xl border border-dark-400 py-1 z-50 ${
+                              className={`absolute w-52 bg-dark-600 rounded-lg shadow-2xl border border-dark-400 py-1 z-50 ${
                                 menuPosition.openUp
-                                  ? 'right-0 bottom-full mb-1 sm:right-full sm:bottom-0 sm:mr-2 sm:mb-0 origin-bottom-right'
-                                  : 'right-0 top-full mt-1 sm:right-full sm:top-0 sm:mr-2 sm:mt-0 origin-top-right'
+                                    ? 'right-0 bottom-full mb-1 sm:right-full sm:bottom-0 sm:mr-2 sm:mb-0 origin-bottom-right'
+                                    : 'right-0 top-full mt-1 sm:right-full sm:top-0 sm:mr-2 sm:mt-0 origin-top-right'
                               }`}
                             >
-                              <button
-                                onClick={() => { toggleSharing(file); setActiveMenu(null) }}
-                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
-                              >
-                                <Share2 size={16} />
-                                {file.sharing_status === 'public' ? 'Make Private' : 'Make Public'}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setShareModal(file)
-                                  setActiveMenu(null)
-                                }}
-                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
-                              >
-                                <Share2 size={16} />
-                                {file.is_folder ? 'Share Folder' : 'Share File'}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setRenameModal(file)
-                                  setNewName(file.file_name.replace(/\.[^/.]+$/, ''))
-                                  setActiveMenu(null)
-                                }}
-                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
-                              >
-                                <Pencil size={16} />
-                                Rename
-                              </button>
-                              {!file.is_folder && (
-                                <button
-                                  onClick={() => {
-                                    if (onViewVersions) {
-                                      onViewVersions(file.id)
-                                    } else {
-                                      navigate(`/dashboard/files/${file.id}/versions`)
-                                    }
-                                    setActiveMenu(null)
-                                  }}
-                                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
-                                >
-                                  <History size={16} />
-                                  Manage Versions
-                                </button>
-                              )}
-                              {!file.is_folder && (file.file_name?.toLowerCase().endsWith('.apk') || file.mime_type === 'application/vnd.android.package-archive') && (
-                                <button
-                                  onClick={async () => {
-                                    let targetFile = file
-                                    const updates = {}
-                                    if (!targetFile.version_api_key) {
-                                      updates.version_api_key = `apk_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`
-                                      updates.apk_version = targetFile.apk_version || 'v1.0.1'
-                                    }
-                                    if (!targetFile.unique_share_hash) {
-                                      updates.unique_share_hash = Date.now().toString(36) + Math.random().toString(36).substring(2, 8) + file.id.substring(0, 6)
-                                      updates.sharing_status = 'public'
-                                    }
+                              {viewMode === 'files' ? (
+                                <>
+                                  {!file.is_folder && (
+                                    <button
+                                      onClick={() => {
+                                        setPreviewModalFile(file)
+                                        setActiveMenu(null)
+                                      }}
+                                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
+                                    >
+                                      <Eye size={16} className="text-indigo-400" />
+                                      Preview File
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      setShareModal(file)
+                                      setActiveMenu(null)
+                                    }}
+                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
+                                  >
+                                    <Share2 size={16} className="text-primary-400" />
+                                    Share & Security Links
+                                  </button>
+                                  {!file.is_folder && (
+                                    <button
+                                      onClick={() => {
+                                        setAnalyticsModalFile(file)
+                                        setActiveMenu(null)
+                                      }}
+                                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
+                                    >
+                                      <BarChart2 size={16} className="text-emerald-400" />
+                                      View Analytics
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      setRenameModal(file)
+                                      setNewName(file.file_name.replace(/\.[^/.]+$/, ''))
+                                      setActiveMenu(null)
+                                    }}
+                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
+                                  >
+                                    <Pencil size={16} />
+                                    Rename
+                                  </button>
+                                  {!file.is_folder && (
+                                    <button
+                                      onClick={() => {
+                                        if (onViewVersions) {
+                                          onViewVersions(file.id)
+                                        } else {
+                                          navigate(`/dashboard/files/${file.id}/versions`)
+                                        }
+                                        setActiveMenu(null)
+                                      }}
+                                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
+                                    >
+                                      <History size={16} />
+                                      Manage Versions
+                                    </button>
+                                  )}
+                                  {!file.is_folder && (file.file_name?.toLowerCase().endsWith('.apk') || file.mime_type === 'application/vnd.android.package-archive') && (
+                                    <button
+                                      onClick={async () => {
+                                        let targetFile = file
+                                        const updates = {}
+                                        if (!targetFile.version_api_key) {
+                                          updates.version_api_key = `apk_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`
+                                          updates.apk_version = targetFile.apk_version || 'v1.0.1'
+                                        }
+                                        if (!targetFile.unique_share_hash) {
+                                          updates.unique_share_hash = Date.now().toString(36) + Math.random().toString(36).substring(2, 8) + file.id.substring(0, 6)
+                                          updates.sharing_status = 'public'
+                                        }
 
-                                    if (Object.keys(updates).length > 0) {
-                                      updates.modified_at = new Date().toISOString()
-                                      const { error } = await supabase
-                                        .from('shared_files')
-                                        .update(updates)
-                                        .eq('id', file.id)
+                                        if (Object.keys(updates).length > 0) {
+                                          updates.modified_at = new Date().toISOString()
+                                          const { error } = await supabase
+                                            .from('shared_files')
+                                            .update(updates)
+                                            .eq('id', file.id)
 
-                                      if (!error) {
-                                        targetFile = { ...file, ...updates }
-                                        setFiles(prev => prev.map(f => f.id === file.id ? targetFile : f))
-                                      }
-                                    }
-                                    setVersionApiModalFile(targetFile)
-                                    setActiveMenu(null)
-                                  }}
-                                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-emerald-400 font-medium hover:bg-dark-500"
-                                >
-                                  <Code2 size={16} />
-                                  Get Version API
-                                </button>
+                                          if (!error) {
+                                            targetFile = { ...file, ...updates }
+                                            setFiles(prev => prev.map(f => f.id === file.id ? targetFile : f))
+                                          }
+                                        }
+                                        setVersionApiModalFile(targetFile)
+                                        setActiveMenu(null)
+                                      }}
+                                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-emerald-400 font-medium hover:bg-dark-500"
+                                    >
+                                      <Code2 size={16} />
+                                      Get Version API
+                                    </button>
+                                  )}
+                                  <hr className="my-1 border-dark-400" />
+                                  <button
+                                    onClick={() => {
+                                      setDeleteConfirm(file)
+                                      setActiveMenu(null)
+                                    }}
+                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg"
+                                  >
+                                    <Trash2 size={16} />
+                                    Move to Trash
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      handleRestore(file)
+                                      setActiveMenu(null)
+                                    }}
+                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-emerald-400 hover:bg-emerald-500/10"
+                                  >
+                                    <RotateCcw size={16} />
+                                    Restore to My Files
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setDeleteConfirm(file)
+                                      setActiveMenu(null)
+                                    }}
+                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10"
+                                  >
+                                    <Trash2 size={16} />
+                                    Delete Permanently
+                                  </button>
+                                </>
                               )}
-                              <hr className="my-1 border-dark-400" />
-                              <button
-                                onClick={() => {
-                                  setDeleteConfirm(file)
-                                  setActiveMenu(null)
-                                }}
-                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg"
-                              >
-                                <Trash2 size={16} />
-                                Delete
-                              </button>
                             </div>
                           )}
                         </div>
@@ -1498,185 +1788,31 @@ export default function FilesPage({ onViewVersions }) {
 
       {/* Share Links Modal */}
       {shareModal && (
-        <Modal onClose={() => setShareModal(null)}>
-          <div className="space-y-5 font-sans">
-            <div>
-              <h3 className="font-semibold text-gray-100 text-lg font-['Space_Grotesk'] mb-1">
-                {shareModal.is_folder ? 'Share Folder' : 'Share File'}
-              </h3>
-              <p className="text-xs text-gray-400 truncate">{shareModal.file_name}</p>
-            </div>
+        <ShareModal
+          file={shareModal}
+          sharingEnabled={sharingEnabled}
+          onClose={() => setShareModal(null)}
+          onFileUpdated={(updated) => {
+            setFiles(prev => prev.map(f => f.id === updated.id ? updated : f))
+            setShareModal(updated)
+          }}
+        />
+      )}
 
-            {!shareModal.unique_share_hash ? (
-              /* No link generated yet — show generate button */
-              <div className="space-y-4">
-                <div className="bg-dark-500 border border-dark-400 rounded-xl p-4 text-center space-y-3">
-                  <div className="w-12 h-12 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center justify-center mx-auto text-indigo-400">
-                    <Share2 size={22} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-200">No share link yet</p>
-                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                      Generate a permanent share link for this {shareModal.is_folder ? 'folder' : 'file'}.
-                      The link will be stored and can be copied anytime from this menu.
-                    </p>
-                  </div>
-                </div>
-                {sharingEnabled ? (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const newHash = crypto.randomUUID().replace(/-/g, '').substring(0, 12)
-                        const { error } = await supabase
-                          .from('shared_files')
-                          .update({ unique_share_hash: newHash, sharing_status: 'public' })
-                          .eq('id', shareModal.id)
-                        if (error) throw error
-                        // Refresh local files list and update modal state with new hash
-                        setShareModal(prev => ({ ...prev, unique_share_hash: newHash, sharing_status: 'public' }))
-                        loadFiles()
-                        toast.success('Share links generated!')
-                      } catch (err) {
-                        toast.error('Failed to generate share link: ' + err.message)
-                      }
-                    }}
-                    className="w-full btn-primary py-3 flex items-center justify-center gap-2 font-semibold"
-                  >
-                    <Share2 size={16} /> Generate Share Links
-                  </button>
-                ) : (
-                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-4 text-xs font-medium text-center">
-                    Generating new sharing links has been disabled by the administrator.
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Links already generated */
-              <>
-                {/* Status row */}
-                <div className="flex items-center justify-between gap-3">
-                  {shareModal.sharing_status === 'public' ? (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-                      <p className="text-xs text-emerald-400 font-medium">Public — link is active</p>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg flex-1">
-                      <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
-                      <p className="text-xs text-amber-400 font-medium">Private — link is blocked</p>
-                    </div>
-                  )}
-                  {/* Inline toggle button */}
-                  <button
-                    disabled={!sharingEnabled && shareModal.sharing_status === 'private'}
-                    onClick={async () => {
-                      if (!sharingEnabled && shareModal.sharing_status === 'private') {
-                        toast.error('Sharing has been disabled by the administrator.')
-                        return
-                      }
-                      const newStatus = shareModal.sharing_status === 'public' ? 'private' : 'public'
-                      try {
-                        const { error } = await supabase
-                          .from('shared_files')
-                          .update({ sharing_status: newStatus })
-                          .eq('id', shareModal.id)
-                        if (error) throw error
-                        setShareModal(prev => ({ ...prev, sharing_status: newStatus }))
-                        loadFiles()
-                        toast.success(`Link is now ${newStatus}`)
-                      } catch (err) {
-                        toast.error('Failed to update: ' + err.message)
-                      }
-                    }}
-                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      !sharingEnabled && shareModal.sharing_status === 'private'
-                        ? 'bg-dark-500 text-gray-500 border-dark-400 cursor-not-allowed opacity-50'
-                        : shareModal.sharing_status === 'public'
-                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
-                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                    }`}
-                  >
-                    {shareModal.sharing_status === 'public' ? '🔒 Make Private' : '🌐 Make Public'}
-                  </button>
-                </div>
+      {/* File Analytics Modal */}
+      {analyticsModalFile && (
+        <FileAnalyticsModal
+          file={analyticsModalFile}
+          onClose={() => setAnalyticsModalFile(null)}
+        />
+      )}
 
-                {/* Sharing Disabled Warning */}
-                {!sharingEnabled && (
-                  <div className="bg-red-500/5 border border-red-500/15 rounded-lg px-3 py-2 text-xs text-red-400 font-semibold leading-relaxed">
-                    ⚠️ Sharing features are temporarily disabled by the administrator. You cannot generate new links or activate private links.
-                  </div>
-                )}
-
-                {/* Private warning */}
-                {shareModal.sharing_status === 'private' && sharingEnabled && (
-                  <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg px-3 py-2 text-xs text-amber-300/80 leading-relaxed">
-                    ⚠️ Link is currently <strong>blocked</strong>. Anyone visiting this link will see an "Access Denied" page. Click <strong>Make Public</strong> above to re-enable it. The link URL will not change.
-                  </div>
-                )}
-
-                {/* Option A: Web Share Link */}
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
-                    Option A: Web Download Page Link
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      className={`input-field text-xs bg-dark-500 py-2 border-dark-400 select-all transition-opacity ${shareModal.sharing_status === 'private' ? 'opacity-50' : ''}`}
-                      value={generateShareUrl(shareModal.unique_share_hash)}
-                    />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(generateShareUrl(shareModal.unique_share_hash))
-                        toast.success('Web download link copied!')
-                      }}
-                      className="btn-primary py-2 px-4 text-xs font-semibold shrink-0"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-gray-400 leading-normal">
-                    Opens the beautiful download page with real-time progress bar.
-                  </p>
-                </div>
-
-                {/* Option B: Direct API Download Link */}
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold text-pink-400 uppercase tracking-wider">
-                    Option B: Direct Download Link
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      className={`input-field text-xs bg-dark-500 py-2 border-dark-400 select-all transition-opacity ${shareModal.sharing_status === 'private' ? 'opacity-50' : ''}`}
-                      value={generateDirectDownloadUrl(shareModal.unique_share_hash, shareModal.is_folder, shareModal.file_size)}
-                    />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(generateDirectDownloadUrl(shareModal.unique_share_hash, shareModal.is_folder, shareModal.file_size))
-                        toast.success('Direct download link copied!')
-                      }}
-                      className="btn-primary py-2 px-4 text-xs font-semibold shrink-0"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-gray-400 leading-normal">
-                    Direct stream connection. Clicking this link starts downloading instantly.
-                  </p>
-                </div>
-              </>
-            )}
-
-            <div className="flex justify-end pt-2">
-              <button className="btn-secondary text-xs py-2 px-4" onClick={() => setShareModal(null)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </Modal>
+      {/* In-App Media Player & Document Preview Modal */}
+      {previewModalFile && (
+        <MediaPreviewModal
+          file={previewModalFile}
+          onClose={() => setPreviewModalFile(null)}
+        />
       )}
 
       {/* Create Folder Modal */}

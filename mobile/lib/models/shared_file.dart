@@ -16,6 +16,7 @@ class SharedFile {
   final String? apkVersion;
   final String? versionApiKey;
   final String? apkDescription;
+  final DateTime? deletedAt;
 
   SharedFile({
     required this.id,
@@ -35,6 +36,7 @@ class SharedFile {
     this.apkVersion,
     this.versionApiKey,
     this.apkDescription,
+    this.deletedAt,
   });
 
   factory SharedFile.fromJson(Map<String, dynamic> json) {
@@ -56,6 +58,7 @@ class SharedFile {
       apkVersion: json['apk_version'] as String?,
       versionApiKey: json['version_api_key'] as String?,
       apkDescription: json['apk_description'] as String?,
+      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at'] as String) : null,
     );
   }
 
@@ -78,6 +81,7 @@ class SharedFile {
       'apk_version': apkVersion,
       'version_api_key': versionApiKey,
       'apk_description': apkDescription,
+      'deleted_at': deletedAt?.toIso8601String(),
     };
   }
 
@@ -99,6 +103,7 @@ class SharedFile {
     String? apkVersion,
     String? versionApiKey,
     String? apkDescription,
+    DateTime? deletedAt,
   }) {
     return SharedFile(
       id: id ?? this.id,
@@ -118,6 +123,7 @@ class SharedFile {
       apkVersion: apkVersion ?? this.apkVersion,
       versionApiKey: versionApiKey ?? this.versionApiKey,
       apkDescription: apkDescription ?? this.apkDescription,
+      deletedAt: deletedAt ?? this.deletedAt,
     );
   }
 }

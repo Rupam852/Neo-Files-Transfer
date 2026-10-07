@@ -46,14 +46,44 @@ const destroyStream = (stream) => {
   }
 }
 
-const fetchMediaFromDriveNode = (driveId, token) => {
+const parseUserAgent = (ua = '') => {
+  let deviceType = 'Desktop'
+  if (/mobile|android|iphone|ipad|ipod/i.test(ua)) {
+    deviceType = 'Mobile'
+  } else if (/tablet|ipad/i.test(ua)) {
+    deviceType = 'Tablet'
+  }
+
+  let browser = 'Browser'
+  if (/chrome|crios/i.test(ua) && !/edg|edge/i.test(ua)) browser = 'Chrome'
+  else if (/firefox|fxios/i.test(ua)) browser = 'Firefox'
+  else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = 'Safari'
+  else if (/edg|edge/i.test(ua)) browser = 'Edge'
+  else if (/opera|opr/i.test(ua)) browser = 'Opera'
+
+  let os = 'OS'
+  if (/windows/i.test(ua)) os = 'Windows'
+  else if (/android/i.test(ua)) os = 'Android'
+  else if (/iphone|ipad|ipod/i.test(ua)) os = 'iOS'
+  else if (/macintosh|mac os x/i.test(ua)) os = 'macOS'
+  else if (/linux/i.test(ua)) os = 'Linux'
+
+  return { deviceType, browser, os }
+}
+
+const fetchMediaFromDriveNode = (driveId, token, rangeHeader = null) => {
   return new Promise((resolve, reject) => {
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    }
+    if (rangeHeader) {
+      headers['Range'] = rangeHeader
+    }
+
     const req = https.get(
       `https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`,
       {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
         agent: keepAliveAgent,
         timeout: 60000 // 60s inactivity timeout
       },
@@ -173,6 +203,7 @@ app.get('/download-file', async (req, res) => {
   const hash = req.query.hash
   const isStream = req.query.stream === 'true'
   const skipIncrement = req.query.skip_increment === 'true'
+  const pin = req.query.pin || req.headers['x-share-pin']
 
   if (!hash) {
     return res.status(400).json({ error: 'File Hash Required' })
@@ -181,19 +212,57 @@ app.get('/download-file', async (req, res) => {
   try {
     const supabaseAdmin = getSupabaseAdmin()
 
-    // 1. Resolve file metadata by share hash
-    const { data: file, error: fileError } = await supabaseAdmin
+    let file = null
+    let customLink = null
+
+    // 1. Check standard shared_files (Permanent main link - 100% untouched)
+    const { data: standardFile } = await supabaseAdmin
       .from('shared_files')
       .select('id, file_name, mime_type, sharing_status, current_version_num, google_drive_file_id, is_folder, user_id, file_size')
       .eq('unique_share_hash', hash)
       .maybeSingle()
 
-    if (fileError || !file) {
+    if (standardFile) {
+      file = standardFile
+    } else {
+      // 2. Check custom protected share links
+      const { data: linkRecord } = await supabaseAdmin
+        .from('custom_share_links')
+        .select('*')
+        .eq('custom_share_hash', hash)
+        .maybeSingle()
+
+      if (linkRecord) {
+        if (linkRecord.expires_at && new Date(linkRecord.expires_at) < new Date()) {
+          return res.status(410).json({ error: 'This share link has expired and is no longer accessible.' })
+        }
+        if (linkRecord.max_downloads && linkRecord.download_count >= linkRecord.max_downloads) {
+          return res.status(410).json({ error: 'This share link has reached its maximum allowed downloads.' })
+        }
+        if (linkRecord.pin_code && linkRecord.pin_code !== pin) {
+          return res.status(401).json({ error: 'PIN protection required to download this file.', requires_pin: true })
+        }
+
+        customLink = linkRecord
+
+        const { data: linkedFile } = await supabaseAdmin
+          .from('shared_files')
+          .select('id, file_name, mime_type, sharing_status, current_version_num, google_drive_file_id, is_folder, user_id, file_size')
+          .eq('id', linkRecord.file_id)
+          .maybeSingle()
+
+        if (linkedFile) {
+          file = linkedFile
+        }
+      }
+    }
+
+    if (!file) {
       return res.status(404).json({ error: 'The requested file does not exist or has been removed.' })
     }
 
-    // 2. Check sharing status
-    if (file.sharing_status === 'private') {
+    // 2. Check sharing status (only if standard link)
+    if (!customLink && file.sharing_status === 'private') {
       return res.status(403).json({ error: 'This file is private and cannot be downloaded.' })
     }
 
@@ -437,20 +506,21 @@ app.get('/download-file', async (req, res) => {
       return
     }
 
-    // --- CASE B: SINGLE FILE STREAMING ---
-    let driveResponse = await fetchMediaFromDriveNode(driveFileId, accessToken)
+    // --- CASE B: SINGLE FILE STREAMING (WITH RANGE SEEK SUPPORT) ---
+    const clientRange = req.headers.range || null
+    let driveResponse = await fetchMediaFromDriveNode(driveFileId, accessToken, clientRange)
 
     if (driveResponse.statusCode === 401 && refreshToken) {
       try {
         destroyStream(driveResponse)
         accessToken = await refreshGoogleToken(file.user_id, refreshToken, supabaseAdmin)
-        driveResponse = await fetchMediaFromDriveNode(driveFileId, accessToken)
+        driveResponse = await fetchMediaFromDriveNode(driveFileId, accessToken, clientRange)
       } catch (refreshErr) {
         console.error('Token refresh failed during download retry:', refreshErr)
       }
     }
 
-    if (driveResponse.statusCode !== 200) {
+    if (driveResponse.statusCode !== 200 && driveResponse.statusCode !== 206) {
       console.error('Google Drive alt=media fetch failed with status:', driveResponse.statusCode)
       destroyStream(driveResponse)
       const downloadUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}`
@@ -463,7 +533,18 @@ app.get('/download-file', async (req, res) => {
       return res.redirect(downloadUrl)
     }
 
-    // Set correct headers
+    // Handle 206 Partial Content for video/audio seeking or 200 OK
+    if (driveResponse.statusCode === 206) {
+      res.status(206)
+      if (driveResponse.headers['content-range']) {
+        res.setHeader('Content-Range', driveResponse.headers['content-range'])
+      }
+    } else {
+      res.status(200)
+    }
+
+    res.setHeader('Accept-Ranges', 'bytes')
+
     const contentType = file.mime_type || driveResponse.headers['content-type'] || 'application/octet-stream'
     res.setHeader('Content-Type', contentType)
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.file_name)}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`)
@@ -472,30 +553,44 @@ app.get('/download-file', async (req, res) => {
     const gDriveContentLength = driveResponse.headers['content-length']
     if (gDriveContentLength) {
       res.setHeader('Content-Length', gDriveContentLength)
-    } else if (file.file_size) {
+    } else if (file.file_size && driveResponse.statusCode !== 206) {
       res.setHeader('Content-Length', file.file_size)
     }
 
-    // Increment download count in database asynchronously if not skipped
-    if (!skipIncrement) {
+    // Increment download count and record analytics log asynchronously
+    if (!skipIncrement && driveResponse.statusCode !== 206) {
       (async () => {
         try {
           await supabaseAdmin.rpc('increment_download_count', { file_id: file.id })
+          if (customLink) {
+            await supabaseAdmin.rpc('increment_custom_share_download_count', { link_id: customLink.id })
+            if (customLink.is_one_time) {
+              await supabaseAdmin
+                .from('custom_share_links')
+                .update({ expires_at: new Date().toISOString() })
+                .eq('id', customLink.id)
+            }
+          }
+          const { deviceType, browser, os } = parseUserAgent(req.headers['user-agent'] || '')
+          await supabaseAdmin.from('file_download_logs').insert({
+            file_id: file.id,
+            owner_id: file.user_id,
+            custom_link_id: customLink ? customLink.id : null,
+            device_type: deviceType,
+            browser: browser,
+            os: os,
+          })
         } catch (err) {
-          // Ignore if user cancels download early (aborted stream)
           if (err.message && err.message.includes('aborted')) return
-          console.error('Failed to increment download count:', err)
+          console.error('Failed to log download analytics:', err)
         }
       })()
     }
 
-    // Listen for client abort to clean up stream and prevent socket leak
     res.on('close', () => {
-      console.log('Client aborted single file download. Destroying Drive response stream.')
       destroyStream(driveResponse)
     })
 
-    // Stream directly from Drive to Client
     driveResponse.pipe(res)
 
   } catch (error) {
