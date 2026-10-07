@@ -573,7 +573,8 @@ class FileService extends ChangeNotifier {
       'details': 'Uploaded version $nextVersionNum for: ${fileRecord.fileName}',
     });
 
-    await fetchFiles();
+    await loadFiles(fileRecord.parentFolderId);
+    notifyListeners();
   }
 
 
