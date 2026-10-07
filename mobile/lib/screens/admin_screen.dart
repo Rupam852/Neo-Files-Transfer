@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../config.dart';
 import '../services/auth_service.dart';
 import '../services/update_service.dart';
+import '../widgets/notification_bell.dart';
 import 'update_screen.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -992,6 +993,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
             actions: [
+              const NotificationBellButton(),
               Consumer<UpdateService>(
                 builder: (context, updateService, _) {
                   return IconButton(

@@ -4,12 +4,14 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 class UploadProgressWidget extends StatelessWidget {
   final String fileName;
   final double progress;
+  final String? speed;
   final VoidCallback onCancel;
 
   const UploadProgressWidget({
     Key? key,
     required this.fileName,
     required this.progress,
+    this.speed,
     required this.onCancel,
   }) : super(key: key);
 
@@ -18,7 +20,7 @@ class UploadProgressWidget extends StatelessWidget {
     final percentage = (progress * 100).round();
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0),
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
         border: Border(
@@ -73,6 +75,28 @@ class UploadProgressWidget extends StatelessWidget {
                       minHeight: 6,
                     ),
                   ),
+                  if (speed != null && speed!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4F46E5).withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF818CF8).withOpacity(0.25)),
+                        ),
+                        child: Text(
+                          '⚡ $speed',
+                          style: const TextStyle(
+                            color: Color(0xFF818CF8),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -17,6 +17,7 @@ import 'package:intl/intl.dart';
 import '../models/shared_file.dart';
 import '../services/auth_service.dart';
 import '../services/file_service.dart';
+import '../services/notification_service.dart';
 import '../config.dart';
 import 'settings_screen.dart';
 import '../services/update_service.dart';
@@ -25,6 +26,7 @@ import '../widgets/upload_progress.dart';
 import '../widgets/version_api_dialog.dart';
 import '../widgets/manage_versions_dialog.dart';
 import '../widgets/share_file_dialog.dart';
+import '../widgets/notification_bell.dart';
 
 
 class DashboardScreen extends StatefulWidget {
@@ -50,6 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isUploading = false;
   String _uploadingFileName = '';
   double _uploadProgress = 0.0;
+  String _uploadSpeed = '';
   CancelToken? _uploadCancelToken;
   DateTime? _lastUploadProgressUpdate;
 
@@ -65,6 +68,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshFiles();
+      try {
+        final notifService = Provider.of<NotificationService>(context, listen: false);
+        notifService.onNewNotification = (notif) {
+          if (mounted) {
+            _showCustomSnackBar(
+              message: '${notif.title}: ${notif.message}',
+              backgroundColor: const Color(0xFF4F46E5),
+              icon: LucideIcons.bellRing,
+            );
+          }
+        };
+      } catch (e) {
+        debugPrint('[DashboardScreen] Could not bind NotificationService: $e');
+      }
     });
   }
 
@@ -171,6 +188,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() {
           _uploadingFileName = 'Uploading ${i + 1} of ${result.files.length}: ${picked.name}';
           _uploadProgress = 0.0;
+          _uploadSpeed = '';
         });
 
         _lastUploadProgressUpdate = null;
@@ -180,7 +198,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           parentDbFolderId: _currentFolder?.id,
           parentDriveFolderId: _currentFolder?.googleDriveFileId,
           cancelToken: _uploadCancelToken!,
-          onProgress: (pct) {
+          onProgress: (pct, [speed]) {
             final now = DateTime.now();
             if (_lastUploadProgressUpdate == null ||
                 now.difference(_lastUploadProgressUpdate!).inMilliseconds > 100 ||
@@ -188,6 +206,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _lastUploadProgressUpdate = now;
               setState(() {
                 _uploadProgress = pct;
+                if (speed != null) _uploadSpeed = speed;
               });
             }
           },
@@ -383,6 +402,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() {
           _uploadingFileName = 'Uploading file ${i + 1} of ${filesToUpload.length}: $fileName';
           _uploadProgress = 0.0;
+          _uploadSpeed = '';
         });
 
         _lastUploadProgressUpdate = null;
@@ -392,7 +412,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           parentDbFolderId: parentDbId,
           parentDriveFolderId: parentDriveId,
           cancelToken: _uploadCancelToken!,
-          onProgress: (pct) {
+          onProgress: (pct, [speed]) {
             final now = DateTime.now();
             if (_lastUploadProgressUpdate == null ||
                 now.difference(_lastUploadProgressUpdate!).inMilliseconds > 100 ||
@@ -400,6 +420,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _lastUploadProgressUpdate = now;
               setState(() {
                 _uploadProgress = pct;
+                if (speed != null) _uploadSpeed = speed;
               });
             }
           },
@@ -1114,6 +1135,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
+          const NotificationBellButton(),
           Consumer<UpdateService>(
             builder: (context, updateService, _) {
               return IconButton(
@@ -1154,6 +1176,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             UploadProgressWidget(
               fileName: _uploadingFileName,
               progress: _uploadProgress,
+              speed: _uploadSpeed,
               onCancel: _handleCancelUpload,
             ),
           BottomNavigationBar(

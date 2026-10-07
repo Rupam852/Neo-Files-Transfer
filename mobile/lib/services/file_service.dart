@@ -189,13 +189,23 @@ class FileService extends ChangeNotifier {
     };
   }
 
+  String _formatSpeed(double bytesPerSec) {
+    if (bytesPerSec <= 0) return '';
+    if (bytesPerSec >= 1024 * 1024) {
+      return '${(bytesPerSec / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+    } else if (bytesPerSec >= 1024) {
+      return '${(bytesPerSec / 1024).toStringAsFixed(1)} KB/s';
+    }
+    return '${bytesPerSec.toStringAsFixed(0)} B/s';
+  }
+
   // Upload file (resumable connection with progress callback)
   Future<void> uploadFile({
     required File file,
     required String fileName,
     required String? parentDbFolderId,
     required String? parentDriveFolderId,
-    required Function(double) onProgress,
+    required Function(double progress, [String speed]) onProgress,
     required CancelToken cancelToken,
   }) async {
     final userId = _authService.currentUser?.id;
@@ -285,6 +295,10 @@ class FileService extends ChangeNotifier {
 
     // Step 2: Upload raw file stream via PUT request
     final len = await file.length();
+    int lastSent = 0;
+    int lastTime = DateTime.now().millisecondsSinceEpoch;
+    String currentSpeed = '';
+
     final response = await dio.put(
       uploadUrl,
       data: file.openRead(),
@@ -295,8 +309,19 @@ class FileService extends ChangeNotifier {
         },
       ),
       onSendProgress: (sent, total) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final timeDiff = (now - lastTime) / 1000.0;
+        if (timeDiff >= 0.25 || sent == total) {
+          final bytesDiff = sent - lastSent;
+          if (timeDiff > 0 && bytesDiff > 0) {
+            final speedBps = bytesDiff / timeDiff;
+            currentSpeed = _formatSpeed(speedBps);
+          }
+          lastSent = sent;
+          lastTime = now;
+        }
         if (total > 0) {
-          onProgress(sent / total);
+          onProgress(sent / total, currentSpeed);
         }
       },
     );
@@ -475,7 +500,7 @@ class FileService extends ChangeNotifier {
     required SharedFile fileRecord,
     required File newFile,
     required String fileName,
-    required Function(double) onProgress,
+    required Function(double progress, [String speed]) onProgress,
     required CancelToken cancelToken,
   }) async {
     final userId = _authService.currentUser?.id;
@@ -548,6 +573,10 @@ class FileService extends ChangeNotifier {
 
     // Step 2: Upload raw file stream via PUT request
     final len = await newFile.length();
+    int lastSent = 0;
+    int lastTime = DateTime.now().millisecondsSinceEpoch;
+    String currentSpeed = '';
+
     final response = await dio.put(
       uploadUrl,
       data: newFile.openRead(),
@@ -558,8 +587,19 @@ class FileService extends ChangeNotifier {
         },
       ),
       onSendProgress: (sent, total) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final timeDiff = (now - lastTime) / 1000.0;
+        if (timeDiff >= 0.25 || sent == total) {
+          final bytesDiff = sent - lastSent;
+          if (timeDiff > 0 && bytesDiff > 0) {
+            final speedBps = bytesDiff / timeDiff;
+            currentSpeed = _formatSpeed(speedBps);
+          }
+          lastSent = sent;
+          lastTime = now;
+        }
         if (total > 0) {
-          onProgress(sent / total);
+          onProgress(sent / total, currentSpeed);
         }
       },
     );

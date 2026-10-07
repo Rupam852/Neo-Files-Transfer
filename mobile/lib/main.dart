@@ -8,6 +8,7 @@ import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'services/file_service.dart';
 import 'services/update_service.dart';
+import 'services/notification_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/pending_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -50,6 +51,18 @@ class MyApp extends StatelessWidget {
             }
             fileService.update(auth, api);
             return fileService;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthService, NotificationService>(
+          create: (context) => NotificationService(
+            Provider.of<AuthService>(context, listen: false),
+          ),
+          update: (_, auth, notifService) {
+            if (notifService == null) {
+              return NotificationService(auth);
+            }
+            notifService.update(auth);
+            return notifService;
           },
         ),
         ChangeNotifierProvider<UpdateService>(
