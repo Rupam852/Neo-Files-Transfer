@@ -20,87 +20,80 @@ export default function NotificationBell() {
 
     loadNotifications()
 
-    // Real-time listener for new incoming notifications
+    // Real-time listener for incoming notifications
     const channel = supabase
       .channel(`user_notifications_${user.id}`)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          const newNotif = payload.new
-          setNotifications(prev => [newNotif, ...prev.filter(n => n.id !== newNotif.id)])
-          setUnreadCount(prev => prev + 1)
+          if (payload.eventType === 'INSERT') {
+            const newNotif = payload.new
+            if (newNotif && newNotif.user_id === user.id) {
+              setNotifications(prev => {
+                if (prev.some(n => n.id === newNotif.id)) return prev
+                return [newNotif, ...prev]
+              })
+              setUnreadCount(prev => prev + 1)
 
-          // Instant high-visibility in-app toast notification
-          toast(
-            (t) => (
-              <div className="flex items-start gap-3 py-0.5">
-                <div className="w-8 h-8 rounded-full bg-primary-500/20 text-primary-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Bell size={16} className="animate-bounce" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-gray-100">{newNotif.title || 'Notification'}</p>
-                  <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">{newNotif.message}</p>
-                </div>
-                <button
-                  onClick={() => toast.dismiss(t.id)}
-                  className="text-gray-500 hover:text-gray-300 p-1"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ),
-            {
-              duration: 5000,
-              position: 'top-right',
-              style: {
-                background: '#1e293b',
-                color: '#fff',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
-                borderRadius: '1rem',
-                padding: '12px 16px',
-              }
+              // Instant high-visibility in-app toast notification
+              toast(
+                (t) => (
+                  <div className="flex items-start gap-3 py-0.5">
+                    <div className="w-8 h-8 rounded-full bg-primary-500/20 text-primary-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Bell size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-100">{newNotif.title || 'Notification'}</p>
+                      <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">{newNotif.message}</p>
+                    </div>
+                    <button
+                      onClick={() => toast.dismiss(t.id)}
+                      className="text-gray-500 hover:text-gray-300 p-1"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ),
+                {
+                  duration: 5000,
+                  position: 'top-right',
+                  style: {
+                    background: '#0f172a',
+                    color: '#fff',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+                    borderRadius: '1rem',
+                    padding: '12px 16px',
+                  }
+                }
+              )
             }
-          )
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          const updated = payload.new
-          setNotifications(prev => prev.map(n => n.id === updated.id ? updated : n))
-          recalcUnread()
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          const deletedId = payload.old?.id
-          if (deletedId) {
-            setNotifications(prev => prev.filter(n => n.id !== deletedId))
-            recalcUnread()
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new
+            if (updated && updated.user_id === user.id) {
+              setNotifications(prev => prev.map(n => n.id === updated.id ? updated : n))
+              recalcUnread()
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = payload.old?.id
+            if (deletedId) {
+              setNotifications(prev => prev.filter(n => n.id !== deletedId))
+              recalcUnread()
+            }
           }
         }
       )
       .subscribe()
+
+    // Background sync polling fallback (every 8 seconds)
+    const pollInterval = setInterval(() => {
+      loadNotifications(true)
+    }, 8000)
 
     // Close on outside click
     function handleOutsideClick(e) {
@@ -111,14 +104,15 @@ export default function NotificationBell() {
     document.addEventListener('mousedown', handleOutsideClick)
 
     return () => {
+      clearInterval(pollInterval)
       supabase.removeChannel(channel)
       document.removeEventListener('mousedown', handleOutsideClick)
     }
   }, [user?.id])
 
-  async function loadNotifications() {
+  async function loadNotifications(isBackground = false) {
     if (!user?.id) return
-    setLoading(true)
+    if (!isBackground) setLoading(true)
     try {
       const { data, error } = await supabase
         .from('notifications')
@@ -132,9 +126,9 @@ export default function NotificationBell() {
       setNotifications(items)
       setUnreadCount(items.filter(n => !n.is_read).length)
     } catch (err) {
-      console.error('Failed to load notifications:', err)
+      if (!isBackground) console.error('Failed to load notifications:', err)
     } finally {
-      setLoading(false)
+      if (!isBackground) setLoading(false)
     }
   }
 
