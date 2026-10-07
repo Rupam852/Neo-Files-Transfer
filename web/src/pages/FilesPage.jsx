@@ -98,8 +98,30 @@ export default function FilesPage({ onViewVersions }) {
   const menuRef = useRef(null)
 
   // Folders and batching states
-  const [currentFolder, setCurrentFolder] = useState(null)
-  const [folderPath, setFolderPath] = useState([])
+  const [currentFolder, setCurrentFolder] = useState(() => {
+    try {
+      const savedPath = localStorage.getItem('activeFolderPath')
+      if (savedPath) {
+        const parsed = JSON.parse(savedPath)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed[parsed.length - 1]
+        }
+      }
+    } catch (e) {}
+    return null
+  })
+
+  const [folderPath, setFolderPath] = useState(() => {
+    try {
+      const savedPath = localStorage.getItem('activeFolderPath')
+      if (savedPath) {
+        const parsed = JSON.parse(savedPath)
+        if (Array.isArray(parsed)) return parsed
+      }
+    } catch (e) {}
+    return []
+  })
+
   const [uploadQueue, setUploadQueue] = useState([])
   const [folderCreateModal, setFolderCreateModal] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -129,9 +151,35 @@ export default function FilesPage({ onViewVersions }) {
   }
 
   function handleOpenFolder(folder) {
+    const newPath = [...folderPath, folder]
     setCurrentFolder(folder)
-    setFolderPath(prev => [...prev, folder])
+    setFolderPath(newPath)
     setSelectedIds(new Set())
+    try {
+      localStorage.setItem('activeFolderId', folder.id)
+      localStorage.setItem('activeFolderPath', JSON.stringify(newPath))
+    } catch (e) {}
+  }
+
+  function handleNavigateRoot() {
+    setCurrentFolder(null)
+    setFolderPath([])
+    setSelectedIds(new Set())
+    try {
+      localStorage.removeItem('activeFolderId')
+      localStorage.removeItem('activeFolderPath')
+    } catch (e) {}
+  }
+
+  function handleNavigateBreadcrumb(folder, index) {
+    const newPath = folderPath.slice(0, index + 1)
+    setCurrentFolder(folder)
+    setFolderPath(newPath)
+    setSelectedIds(new Set())
+    try {
+      localStorage.setItem('activeFolderId', folder.id)
+      localStorage.setItem('activeFolderPath', JSON.stringify(newPath))
+    } catch (e) {}
   }
 
   async function loadAllFolders() {
@@ -372,6 +420,26 @@ export default function FilesPage({ onViewVersions }) {
   async function loadFiles() {
     setLoading(true)
     try {
+      if (currentFolder?.id && viewMode !== 'trash') {
+        const { data: folderRecord } = await supabase
+          .from('shared_files')
+          .select('id, file_name')
+          .eq('id', currentFolder.id)
+          .eq('user_id', user.id)
+          .is('deleted_at', null)
+          .maybeSingle()
+
+        if (!folderRecord) {
+          setCurrentFolder(null)
+          setFolderPath([])
+          try {
+            localStorage.removeItem('activeFolderId')
+            localStorage.removeItem('activeFolderPath')
+          } catch (e) {}
+          return
+        }
+      }
+
       let query = supabase
         .from('shared_files')
         .select('*, file_versions(*)')
@@ -1210,10 +1278,7 @@ export default function FilesPage({ onViewVersions }) {
           {viewMode === 'files' && (
             <div className="flex flex-wrap items-center gap-2 text-base md:text-lg font-bold text-gray-100 ml-1">
               <button
-                onClick={() => {
-                  setCurrentFolder(null)
-                  setFolderPath([])
-                }}
+                onClick={handleNavigateRoot}
                 className="hover:text-primary-400 transition-colors duration-200 text-left"
               >
                 Root
@@ -1222,10 +1287,7 @@ export default function FilesPage({ onViewVersions }) {
                 <span key={folder.id} className="flex items-center gap-1.5">
                   <ChevronRight size={16} className="text-gray-500" />
                   <button
-                    onClick={() => {
-                      setCurrentFolder(folder)
-                      setFolderPath(folderPath.slice(0, index + 1))
-                    }}
+                    onClick={() => handleNavigateBreadcrumb(folder, index)}
                     className="hover:text-primary-400 transition-colors duration-200 text-left"
                   >
                     {folder.file_name}
