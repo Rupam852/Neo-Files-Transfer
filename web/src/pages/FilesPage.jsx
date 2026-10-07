@@ -80,6 +80,8 @@ export default function FilesPage({ onViewVersions }) {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [processingText, setProcessingText] = useState(null)
+  const [uploadProgress, setUploadProgress] = useState(null)
+  const [uploadInfo, setUploadInfo] = useState(null)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('file_name')
   const [sortDir, setSortDir] = useState('asc')
@@ -121,6 +123,8 @@ export default function FilesPage({ onViewVersions }) {
     }
     setUploading(false)
     setProcessingText(null)
+    setUploadProgress(null)
+    setUploadInfo(null)
     setUploadQueue([])
   }
 
@@ -409,7 +413,9 @@ export default function FilesPage({ onViewVersions }) {
       const dbParentId = item.dbParentId !== undefined ? item.dbParentId : (currentFolder ? currentFolder.id : null)
       const driveParentId = item.driveParentId !== undefined ? item.driveParentId : (currentFolder ? currentFolder.google_drive_file_id : profile.drive_folder_id)
 
-      setProcessingText(`Uploading file ${i + 1} of ${batch.length}: ${file.name} (0%)...`)
+      setUploadInfo({ current: i + 1, total: batch.length, fileName: file.name })
+      setUploadProgress(0)
+      setProcessingText(`Uploading file ${i + 1} of ${batch.length}`)
 
       try {
         const uniqueName = getUniqueFileName(file.name, files)
@@ -489,7 +495,7 @@ export default function FilesPage({ onViewVersions }) {
             xhr.upload.addEventListener('progress', (e) => {
               if (e.lengthComputable) {
                 const pct = Math.round((e.loaded / e.total) * 100)
-                setProcessingText(`Uploading file ${i + 1} of ${batch.length}: ${file.name} (${pct}%)`)
+                setUploadProgress(pct)
               }
             })
 
@@ -533,7 +539,7 @@ export default function FilesPage({ onViewVersions }) {
             xhr.upload.addEventListener('progress', (e) => {
               if (e.lengthComputable) {
                 const pct = Math.round((e.loaded / e.total) * 100)
-                setProcessingText(`Uploading file ${i + 1} of ${batch.length}: ${file.name} (${pct}%)`)
+                setUploadProgress(pct)
               }
             })
 
@@ -626,6 +632,8 @@ export default function FilesPage({ onViewVersions }) {
 
     setUploading(false)
     setProcessingText(null)
+    setUploadProgress(null)
+    setUploadInfo(null)
     loadFiles()
   }
 
@@ -1891,9 +1899,9 @@ export default function FilesPage({ onViewVersions }) {
         />
       )}
 
-      {/* Global Processing Loader Spinner */}
+      {/* Global Processing Loader / Upload Progress Dialog */}
       {processingText && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-dark-600 border border-dark-400/80 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-scale-in text-center relative overflow-hidden">
             {uploading && (
               <button
@@ -1908,10 +1916,34 @@ export default function FilesPage({ onViewVersions }) {
             <div className="w-16 h-16 mx-auto flex items-center justify-center pt-1">
               <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
             </div>
-            <div className="space-y-1.5 px-2">
-              <p className="text-gray-100 text-sm font-semibold tracking-wide break-words break-all leading-relaxed">
-                {processingText}
-              </p>
+
+            <div className="space-y-2.5 px-2 text-center">
+              {uploadInfo ? (
+                <>
+                  <p className="text-primary-400 text-xs font-bold uppercase tracking-wider">
+                    Uploading file {uploadInfo.current} of {uploadInfo.total}
+                  </p>
+                  <p className="text-gray-100 text-sm font-semibold tracking-wide break-words max-h-16 overflow-hidden line-clamp-2 px-1" title={uploadInfo.fileName}>
+                    {uploadInfo.fileName}
+                  </p>
+                  <div className="pt-2 space-y-1.5">
+                    <div className="w-full bg-dark-500 h-2 rounded-full overflow-hidden border border-dark-400/50">
+                      <div
+                        className="bg-gradient-to-r from-primary-500 to-indigo-500 h-full rounded-full transition-all duration-150"
+                        style={{ width: `${uploadProgress ?? 0}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-gray-400 px-0.5 font-medium">
+                      <span>Progress</span>
+                      <span className="text-xs font-bold text-primary-400">{uploadProgress ?? 0}%</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-100 text-sm font-semibold tracking-wide break-words leading-relaxed">
+                  {processingText}
+                </p>
+              )}
             </div>
           </div>
         </div>
