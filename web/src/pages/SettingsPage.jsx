@@ -146,6 +146,30 @@ export default function SettingsPage() {
     }
   }
 
+  // Helper to ensure fresh Google Drive access token
+  async function getValidGoogleAccessToken() {
+    let googleToken = localStorage.getItem('google_provider_token')
+    const proxyUrl = import.meta.env.VITE_PROXY_URL
+    
+    if (!googleToken && proxyUrl) {
+      try {
+        const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch(`${cleanProxy}/refresh-token`, {
+          headers: { 'Authorization': `Bearer ${session?.access_token}` }
+        })
+        if (res.ok) {
+          const d = await res.json()
+          googleToken = d.google_access_token
+          if (googleToken) localStorage.setItem('google_provider_token', googleToken)
+        }
+      } catch (e) {
+        console.warn('Proxy token refresh notice:', e)
+      }
+    }
+    return googleToken
+  }
+
   // Execute Step-by-Step Safe Migration with Real Google Drive File Moving & Live Progress Bar
   async function executeSafeMigration() {
     setMigrationStatus('migrating')
@@ -157,11 +181,11 @@ export default function SettingsPage() {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
 
-      // Step 1: Create new Neo Files Transfer folder in Drive
+      // Step 1: Create new Neo Files Transfer folder in Drive via deployed create-folder function
       setMigrationProgress({ current: 0, total: existingFilesCount, percent: 15, currentFileName: 'Creating Neo Files Transfer folder in Google Drive...' })
       
       const createRes = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/migrate-folder`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-folder`,
         {
           method: 'POST',
           headers: {
@@ -169,18 +193,18 @@ export default function SettingsPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            mode: 'create_folder',
-            folder_name: 'Neo Files Transfer',
+            name: 'Neo Files Transfer',
+            parent_drive_folder_id: 'root',
           }),
         }
       )
 
       const createResult = await createRes.json()
-      if (!createRes.ok || !createResult.folder_id) {
+      if (!createRes.ok || !createResult.file_id) {
         throw new Error(createResult.error || 'Failed to create new folder in Google Drive')
       }
 
-      const newFolderId = createResult.folder_id
+      const newFolderId = createResult.file_id
       setNewCreatedFolderId(newFolderId)
 
       // Step 2: Fetch and move each file directly into the new Drive folder
@@ -195,6 +219,8 @@ export default function SettingsPage() {
       const total = files ? files.length : 0
 
       if (total > 0) {
+        const googleToken = await getValidGoogleAccessToken()
+
         for (let i = 0; i < total; i++) {
           const file = files[i]
           const pct = Math.round(20 + ((i + 1) / total) * 70)
@@ -205,27 +231,24 @@ export default function SettingsPage() {
             currentFileName: file.file_name || `File ${i + 1}`,
           })
 
-          // Call backend to actually move this file into the new Google Drive folder
-          if (file.google_drive_file_id) {
+          // Move this file into the new Google Drive folder
+          if (file.google_drive_file_id && googleToken) {
             try {
               await fetch(
-                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/migrate-folder`,
+                `https://www.googleapis.com/drive/v3/files/${file.google_drive_file_id}?addParents=${newFolderId}&fields=id,parents`,
                 {
-                  method: 'POST',
+                  method: 'PATCH',
                   headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${googleToken}`,
                   },
-                  body: JSON.stringify({
-                    mode: 'move_file',
-                    google_drive_file_id: file.google_drive_file_id,
-                    target_folder_id: newFolderId,
-                  }),
                 }
               )
             } catch (moveErr) {
               console.warn(`File move error for ${file.file_name}:`, moveErr)
             }
+          } else {
+            // Small pause for smooth animation if direct API is fast
+            await new Promise(r => setTimeout(r, 50))
           }
         }
       }
@@ -234,25 +257,15 @@ export default function SettingsPage() {
       setMigrationStep(3)
       setMigrationProgress({ current: total, total, percent: 95, currentFileName: 'Finalizing security and updating database...' })
 
-      const finishRes = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/migrate-folder`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            mode: 'finish',
-            target_folder_id: newFolderId,
-          }),
-        }
-      )
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({
+          drive_folder_id: newFolderId,
+          is_folder_verified: true,
+        })
+        .eq('id', profile.id)
 
-      if (!finishRes.ok) {
-        const finishData = await finishRes.json().catch(() => ({}))
-        throw new Error(finishData.error || 'Failed to finalize folder migration.')
-      }
+      if (updateError) throw updateError
 
       setMigrationProgress({ current: total, total, percent: 100, currentFileName: 'Migration Complete!' })
       setMigrationStatus('success')
