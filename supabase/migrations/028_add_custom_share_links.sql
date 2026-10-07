@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS custom_share_links (
   max_downloads INTEGER DEFAULT NULL,
   download_count INTEGER NOT NULL DEFAULT 0,
   is_one_time BOOLEAN NOT NULL DEFAULT FALSE,
+  label TEXT DEFAULT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
