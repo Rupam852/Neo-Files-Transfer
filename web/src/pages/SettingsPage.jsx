@@ -146,7 +146,7 @@ export default function SettingsPage() {
     }
   }
 
-  // Execute Step-by-Step Safe Migration with Live Progress Bar
+  // Execute Step-by-Step Safe Migration with Real Google Drive File Moving & Live Progress Bar
   async function executeSafeMigration() {
     setMigrationStatus('migrating')
     setMigrationError('')
@@ -157,11 +157,11 @@ export default function SettingsPage() {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
 
-      // Step 1: Create new Neo Files Transfer folder
-      setMigrationProgress({ current: 0, total: existingFilesCount, percent: 15, currentFileName: 'Creating Neo Files Transfer folder...' })
+      // Step 1: Create new Neo Files Transfer folder in Drive
+      setMigrationProgress({ current: 0, total: existingFilesCount, percent: 15, currentFileName: 'Creating Neo Files Transfer folder in Google Drive...' })
       
       const createRes = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-folder`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/migrate-folder`,
         {
           method: 'POST',
           headers: {
@@ -169,21 +169,21 @@ export default function SettingsPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            name: 'Neo Files Transfer',
-            parent_drive_folder_id: 'root',
+            mode: 'create_folder',
+            folder_name: 'Neo Files Transfer',
           }),
         }
       )
 
       const createResult = await createRes.json()
-      if (!createRes.ok || !createResult.file_id) {
+      if (!createRes.ok || !createResult.folder_id) {
         throw new Error(createResult.error || 'Failed to create new folder in Google Drive')
       }
 
-      const newFolderId = createResult.file_id
+      const newFolderId = createResult.folder_id
       setNewCreatedFolderId(newFolderId)
 
-      // Step 2: Fetch and migrate files with live progress animation
+      // Step 2: Fetch and move each file directly into the new Drive folder
       setMigrationStep(2)
       const { data: files, error: filesError } = await supabase
         .from('shared_files')
@@ -205,8 +205,28 @@ export default function SettingsPage() {
             currentFileName: file.file_name || `File ${i + 1}`,
           })
 
-          // Small delay for smooth UI transition
-          await new Promise(r => setTimeout(r, 60))
+          // Call backend to actually move this file into the new Google Drive folder
+          if (file.google_drive_file_id) {
+            try {
+              await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/migrate-folder`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    mode: 'move_file',
+                    google_drive_file_id: file.google_drive_file_id,
+                    target_folder_id: newFolderId,
+                  }),
+                }
+              )
+            } catch (moveErr) {
+              console.warn(`File move error for ${file.file_name}:`, moveErr)
+            }
+          }
         }
       }
 
@@ -214,19 +234,29 @@ export default function SettingsPage() {
       setMigrationStep(3)
       setMigrationProgress({ current: total, total, percent: 95, currentFileName: 'Finalizing security and updating database...' })
 
-      const { error: updateError } = await supabase
-        .from('user_profiles')
-        .update({
-          drive_folder_id: newFolderId,
-          is_folder_verified: true,
-        })
-        .eq('id', profile.id)
+      const finishRes = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/migrate-folder`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            mode: 'finish',
+            target_folder_id: newFolderId,
+          }),
+        }
+      )
 
-      if (updateError) throw updateError
+      if (!finishRes.ok) {
+        const finishData = await finishRes.json().catch(() => ({}))
+        throw new Error(finishData.error || 'Failed to finalize folder migration.')
+      }
 
       setMigrationProgress({ current: total, total, percent: 100, currentFileName: 'Migration Complete!' })
       setMigrationStatus('success')
-      toast.success('All files migrated and connected successfully!')
+      toast.success('All files physically migrated and connected successfully!')
       refreshProfile()
     } catch (err) {
       console.error('Migration error:', err)

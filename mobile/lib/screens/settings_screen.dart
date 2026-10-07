@@ -228,8 +228,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // Step 1: Create folder
                 final newFolderId = await apiService.createDriveFolder('Neo Files Transfer', 'root');
 
-                // Step 2: Migrate files progress
+                // Step 2: Move files physically in Google Drive
                 if (total > 0) {
+                  final token = _client.auth.currentSession?.accessToken;
+                  final dio = Dio();
+
                   for (int i = 0; i < total; i++) {
                     final f = files[i];
                     setDialogState(() {
@@ -237,7 +240,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       progress = 0.2 + ((i + 1) / total) * 0.7;
                       currentFileName = f['file_name'] ?? 'File ${i + 1}';
                     });
-                    await Future.delayed(const Duration(milliseconds: 60));
+
+                    final driveId = f['google_drive_file_id'];
+                    if (driveId != null && token != null) {
+                      try {
+                        await dio.post(
+                          '${AppConfig.supabaseUrl}/functions/v1/migrate-folder',
+                          data: {
+                            'mode': 'move_file',
+                            'google_drive_file_id': driveId,
+                            'target_folder_id': newFolderId,
+                          },
+                          options: Options(
+                            headers: {
+                              'Authorization': 'Bearer $token',
+                              'Content-Type': 'application/json',
+                            },
+                          ),
+                        );
+                      } catch (e) {
+                        debugPrint('Move file error: $e');
+                      }
+                    }
                   }
                 }
 

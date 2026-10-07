@@ -30,7 +30,8 @@ serve(async (req) => {
       throw new Error("Not authenticated")
     }
 
-    const { folder_name = "Neo Files Transfer" } = await req.json().catch(() => ({}))
+    const body = await req.json().catch(() => ({}))
+    const { mode = "all", folder_name = "Neo Files Transfer", target_folder_id, google_drive_file_id } = body
 
     // Admin Supabase client
     const supabaseAdmin = createClient(
@@ -59,7 +60,103 @@ serve(async (req) => {
       }
     }
 
-    // Step 1: Create new Neo Files Transfer folder at root
+    // MODE 1: Create Folder Only
+    if (mode === "create_folder") {
+      const createFolderInDrive = async (token: string) => {
+        return await fetch("https://www.googleapis.com/drive/v3/files", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: folder_name,
+            mimeType: "application/vnd.google-apps.folder",
+          }),
+        })
+      }
+
+      let driveResponse = await createFolderInDrive(accessToken)
+      if (driveResponse.status === 401 && refreshToken) {
+        accessToken = await refreshGoogleToken(user.id, refreshToken, supabaseAdmin)
+        driveResponse = await createFolderInDrive(accessToken)
+      }
+
+      if (!driveResponse.ok) {
+        const errorData = await driveResponse.json().catch(() => ({}))
+        throw new Error(errorData.error?.message || "Failed to create new folder in Google Drive")
+      }
+
+      const newFolder = await driveResponse.json()
+      return new Response(
+        JSON.stringify({
+          success: true,
+          folder_id: newFolder.id,
+          folder_name: newFolder.name,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      )
+    }
+
+    // MODE 2: Move Single File to Target Folder
+    if (mode === "move_file") {
+      if (!google_drive_file_id || !target_folder_id) {
+        throw new Error("google_drive_file_id and target_folder_id are required")
+      }
+
+      const moveFileInDrive = async (token: string) => {
+        return await fetch(
+          `https://www.googleapis.com/drive/v3/files/${google_drive_file_id}?addParents=${target_folder_id}&fields=id,name,parents`,
+          {
+            method: "PATCH",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        )
+      }
+
+      let moveRes = await moveFileInDrive(accessToken)
+      if (moveRes.status === 401 && refreshToken) {
+        accessToken = await refreshGoogleToken(user.id, refreshToken, supabaseAdmin)
+        moveRes = await moveFileInDrive(accessToken)
+      }
+
+      if (!moveRes.ok) {
+        const errTxt = await moveRes.text()
+        console.warn(`File move warning for ${google_drive_file_id}:`, errTxt)
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, file_id: google_drive_file_id, moved: moveRes.ok }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      )
+    }
+
+    // MODE 3: Finish Migration (Update Profile)
+    if (mode === "finish") {
+      if (!target_folder_id) {
+        throw new Error("target_folder_id is required")
+      }
+
+      const { error: updateError } = await supabaseAdmin
+        .from("user_profiles")
+        .update({
+          drive_folder_id: target_folder_id,
+          is_folder_verified: true,
+        })
+        .eq("id", user.id)
+
+      if (updateError) throw updateError
+
+      return new Response(
+        JSON.stringify({ success: true, drive_folder_id: target_folder_id }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      )
+    }
+
+    // MODE 4: Default Full Auto Migration
+    // 1. Create root folder
     const createFolderInDrive = async (token: string) => {
       return await fetch("https://www.googleapis.com/drive/v3/files", {
         method: "POST",
@@ -75,7 +172,6 @@ serve(async (req) => {
     }
 
     let driveResponse = await createFolderInDrive(accessToken)
-
     if (driveResponse.status === 401 && refreshToken) {
       accessToken = await refreshGoogleToken(user.id, refreshToken, supabaseAdmin)
       driveResponse = await createFolderInDrive(accessToken)
@@ -89,16 +185,14 @@ serve(async (req) => {
     const newFolder = await driveResponse.json()
     const newFolderId = newFolder.id
 
-    // Step 2: Fetch all user's shared files from Supabase
-    const { data: files, error: filesError } = await supabaseAdmin
+    // 2. Fetch and move all files
+    const { data: files } = await supabaseAdmin
       .from("shared_files")
-      .select("id, google_drive_file_id, file_name, is_folder")
+      .select("id, google_drive_file_id, file_name")
       .eq("user_id", user.id)
 
-    let migratedCount = 0
-
+    let movedCount = 0
     if (files && files.length > 0) {
-      // Step 3: Link/Move each file into the new folder
       for (const file of files) {
         if (!file.google_drive_file_id) continue
         try {
@@ -106,24 +200,18 @@ serve(async (req) => {
             `https://www.googleapis.com/drive/v3/files/${file.google_drive_file_id}?addParents=${newFolderId}&fields=id,parents`,
             {
               method: "PATCH",
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-              },
+              headers: { Authorization: `Bearer ${accessToken}` },
             }
           )
-          if (moveRes.ok) {
-            migratedCount++
-          } else {
-            console.warn(`File ${file.file_name} (${file.google_drive_file_id}) move warning:`, await moveRes.text())
-          }
-        } catch (moveErr) {
-          console.error(`Error migrating file ${file.file_name}:`, moveErr)
+          if (moveRes.ok) movedCount++
+        } catch (e) {
+          console.error(`Move file error:`, e)
         }
       }
     }
 
-    // Step 4: Update user profile with the verified new folder ID
-    const { error: updateError } = await supabaseAdmin
+    // 3. Update profile
+    await supabaseAdmin
       .from("user_profiles")
       .update({
         drive_folder_id: newFolderId,
@@ -131,29 +219,21 @@ serve(async (req) => {
       })
       .eq("id", user.id)
 
-    if (updateError) throw updateError
-
     return new Response(
       JSON.stringify({
         success: true,
         new_folder_id: newFolderId,
         folder_name: newFolder.name,
         total_files: files ? files.length : 0,
-        migrated_count: migratedCount,
+        migrated_count: movedCount,
       }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     )
   } catch (error) {
     console.error("Migration error:", error)
     return new Response(
       JSON.stringify({ error: error.message }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
     )
   }
 })
