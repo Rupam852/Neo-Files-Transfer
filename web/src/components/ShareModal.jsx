@@ -46,6 +46,27 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
   useEffect(() => {
     if (file?.id && activeTab === 'custom') {
       loadCustomLinks()
+
+      // Realtime subscription to live update download count and statuses
+      const channel = supabase
+        .channel(`custom_links_sync_${file.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'custom_share_links',
+            filter: `file_id=eq.${file.id}`
+          },
+          () => {
+            loadCustomLinks()
+          }
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
     }
   }, [file?.id, activeTab])
 
@@ -95,6 +116,8 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
         expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       }
 
+      const calculatedMaxDownloads = isOneTime ? 1 : (maxDownloads ? parseInt(maxDownloads, 10) : null)
+
       const { error } = await supabase
         .from('custom_share_links')
         .insert({
@@ -103,7 +126,7 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
           custom_share_hash: customHash,
           pin_code: pin.trim() || null,
           expires_at: expiresAt,
-          max_downloads: maxDownloads ? parseInt(maxDownloads, 10) : null,
+          max_downloads: calculatedMaxDownloads,
           is_one_time: isOneTime,
           label: label.trim() || null,
           is_active: true
@@ -425,13 +448,16 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
 
                   {/* Max Downloads */}
                   <div>
-                    <label className="text-[11px] text-gray-300 font-medium block mb-1">Download Limit</label>
+                    <label className="text-[11px] text-gray-300 font-medium block mb-1">
+                      Download Limit {isOneTime && <span className="text-amber-400 font-normal">(Locked to 1)</span>}
+                    </label>
                     <input
                       type="number"
                       min="1"
-                      placeholder="Unlimited (Leave blank)"
-                      className="input-field text-xs py-1.5"
-                      value={maxDownloads}
+                      disabled={isOneTime}
+                      placeholder={isOneTime ? '1 (One-Time Only)' : 'Unlimited (Leave blank)'}
+                      className={`input-field text-xs py-1.5 ${isOneTime ? 'opacity-50 cursor-not-allowed bg-dark-600' : ''}`}
+                      value={isOneTime ? '1' : maxDownloads}
                       onChange={e => setMaxDownloads(e.target.value)}
                     />
                   </div>
@@ -442,11 +468,19 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
                   <input
                     type="checkbox"
                     checked={isOneTime}
-                    onChange={e => setIsOneTime(e.target.checked)}
+                    onChange={e => {
+                      const checked = e.target.checked
+                      setIsOneTime(checked)
+                      if (checked) {
+                        setMaxDownloads('1')
+                      } else {
+                        setMaxDownloads('')
+                      }
+                    }}
                     className="rounded bg-dark-600 border-dark-400 text-primary-500 focus:ring-0"
                   />
                   <span className="text-xs text-gray-300 font-medium flex items-center gap-1">
-                    <Zap size={13} className="text-amber-400" /> One-Time Download (Self-Destructs after 1st download)
+                    <Zap size={13} className="text-amber-400" /> One-Time Download (Locks limit to 1 & self-destructs after download)
                   </span>
                 </label>
 

@@ -197,7 +197,9 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
       }
 
       int? maxLimit;
-      if (_limitController.text.trim().isNotEmpty) {
+      if (_isOneTime) {
+        maxLimit = 1;
+      } else if (_limitController.text.trim().isNotEmpty) {
         maxLimit = int.tryParse(_limitController.text.trim());
       }
 
@@ -639,17 +641,18 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                   Expanded(
                     child: TextField(
                       controller: _limitController,
+                      enabled: !_isOneTime,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        hintText: 'Limit (e.g. 5)',
-                        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                        hintText: _isOneTime ? '1 (One-Time)' : 'Limit (e.g. 5)',
+                        hintStyle: TextStyle(color: _isOneTime ? Colors.amber.shade300 : Colors.grey.shade500, fontSize: 12),
                         filled: true,
-                        fillColor: const Color(0xFF0F172A),
+                        fillColor: _isOneTime ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                        prefixIcon: const Icon(LucideIcons.hash, size: 14, color: Colors.grey),
+                        prefixIcon: Icon(LucideIcons.hash, size: 14, color: _isOneTime ? Colors.amber.shade400 : Colors.grey),
                       ),
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      style: TextStyle(color: _isOneTime ? Colors.amber.shade300 : Colors.white, fontSize: 12),
                     ),
                   ),
                 ],
@@ -662,9 +665,19 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                   Checkbox(
                     value: _isOneTime,
                     activeColor: const Color(0xFF4F46E5),
-                    onChanged: (v) => setState(() => _isOneTime = v ?? false),
+                    onChanged: (v) {
+                      final checked = v ?? false;
+                      setState(() {
+                        _isOneTime = checked;
+                        if (checked) {
+                          _limitController.text = '1';
+                        } else {
+                          _limitController.clear();
+                        }
+                      });
+                    },
                   ),
-                  const Text('One-time self-destruct', style: TextStyle(color: Colors.white, fontSize: 11.5)),
+                  const Text('One-time self-destruct (Locks limit to 1)', style: TextStyle(color: Colors.white, fontSize: 11.5)),
                 ],
               ),
               const SizedBox(height: 6),

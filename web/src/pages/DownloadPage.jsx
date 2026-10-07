@@ -179,7 +179,7 @@ export default function DownloadPage() {
 
     try {
       setIsInitiating(true)
-      let downloadUrl = generateDirectDownloadUrl(hash, fileInfo.is_folder, fileInfo.file_size, true)
+      let downloadUrl = generateDirectDownloadUrl(hash, fileInfo.is_folder, fileInfo.file_size, false)
       if (customLinkInfo && customLinkInfo.pin_code) {
         downloadUrl += `&pin=${encodeURIComponent(customLinkInfo.pin_code)}`
       }
@@ -199,6 +199,20 @@ export default function DownloadPage() {
       supabase
         .rpc('increment_download_count', { file_id: fileInfo.id })
         .then(() => {}, (rpcErr) => console.error(rpcErr))
+
+      if (customLinkInfo?.id) {
+        supabase
+          .rpc('increment_custom_share_download_count', { link_id: customLinkInfo.id })
+          .then(() => {}, (rpcErr) => console.error(rpcErr))
+
+        if (customLinkInfo.is_one_time) {
+          supabase
+            .from('custom_share_links')
+            .update({ expires_at: new Date().toISOString(), is_active: false })
+            .eq('id', customLinkInfo.id)
+            .then(() => {}, (err) => console.error(err))
+        }
+      }
 
       setTimeout(() => {
         setIsInitiating(false)
