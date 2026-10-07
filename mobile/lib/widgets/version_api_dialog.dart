@@ -23,6 +23,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
   bool _isSaving = false;
   bool _isRegenerating = false;
   bool _copied = false;
+  bool _previewMode = false;
 
   @override
   void initState() {
@@ -33,6 +34,32 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
     );
     _descriptionController = TextEditingController(
       text: _currentFile.apkDescription ?? '',
+    );
+  }
+
+  void _formatBullets() {
+    final text = _descriptionController.text;
+    if (text.isEmpty) return;
+
+    final lines = text.split('\n');
+    final formattedLines = lines.map((line) {
+      // If line starts with * or - or + followed by space, replace with • 
+      if (RegExp(r'^\s*[\*\-\+]\s+').hasMatch(line)) {
+        return line.replaceFirst(RegExp(r'^\s*[\*\-\+]\s+'), '• ');
+      }
+      return line;
+    }).toList();
+
+    setState(() {
+      _descriptionController.text = formattedLines.join('\n');
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('✨ Cleaned & converted * / - into bullet points (•)!'),
+        backgroundColor: Color(0xFF4F46E5),
+        duration: Duration(seconds: 2),
+      ),
     );
   }
 
@@ -282,7 +309,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'RELEASE NOTES / DESCRIPTION (EDITABLE)',
+                    'RELEASE NOTES / DESCRIPTION',
                     style: TextStyle(
                       color: Colors.grey.shade300,
                       fontSize: 11,
@@ -290,46 +317,197 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                       letterSpacing: 0.5,
                     ),
                   ),
-                  Text(
-                    'Supports emojis & bullets',
-                    style: TextStyle(color: Colors.indigo.shade300, fontSize: 10),
+                  Row(
+                    children: [
+                      // Format Bullets Button
+                      InkWell(
+                        onTap: _formatBullets,
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4F46E5).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: const Color(0xFF4F46E5).withOpacity(0.4),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(LucideIcons.sparkles, size: 11, color: Color(0xFF818CF8)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Format Bullets (•)',
+                                style: TextStyle(
+                                  color: Color(0xFF818CF8),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Edit / Preview Toggle
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          children: [
+                            InkWell(
+                              onTap: () => setState(() => _previewMode = false),
+                              borderRadius: BorderRadius.circular(4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: !_previewMode ? const Color(0xFF4F46E5) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Edit',
+                                  style: TextStyle(
+                                    color: !_previewMode ? Colors.white : Colors.grey.shade400,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () => setState(() => _previewMode = true),
+                              borderRadius: BorderRadius.circular(4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _previewMode ? const Color(0xFF4F46E5) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Preview',
+                                  style: TextStyle(
+                                    color: _previewMode ? Colors.white : Colors.grey.shade400,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-              TextField(
-                controller: _descriptionController,
-                keyboardType: TextInputType.multiline,
-                maxLines: null,
-                minLines: 3,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12.5,
-                  height: 1.45,
+              if (!_previewMode)
+                TextField(
+                  controller: _descriptionController,
+                  keyboardType: TextInputType.multiline,
+                  maxLines: null,
+                  minLines: 3,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    height: 1.45,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: "🚀 What's new in this version:\n• Fast download engine\n• Bug fixes and UI improvements\n• Enjoy the new update!",
+                    hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    filled: true,
+                    fillColor: const Color(0xFF1E293B),
+                    contentPadding: const EdgeInsets.all(12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFF34D399)),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(minHeight: 85),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  child: _descriptionController.text.trim().isEmpty
+                      ? Text(
+                          'No release notes entered yet.',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: _descriptionController.text.split('\n').map((line) {
+                            final trimmed = line.trim();
+                            if (trimmed.isEmpty) return const SizedBox(height: 6);
+                            if (trimmed.startsWith('•') ||
+                                trimmed.startsWith('*') ||
+                                trimmed.startsWith('-') ||
+                                trimmed.startsWith('+')) {
+                              final cleanLine = trimmed.replaceFirst(RegExp(r'^[\*\-\+•]\s*'), '');
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 5.0, left: 2.0),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('• ', style: TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.bold, fontSize: 13)),
+                                    Expanded(
+                                      child: Text(
+                                        cleanLine,
+                                        style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.35),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                            if (trimmed.startsWith('#') || (trimmed.startsWith('**') && trimmed.endsWith('**'))) {
+                              final cleanTitle = trimmed.replaceAll(RegExp(r'[#\*]'), '').trim();
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4.0, bottom: 4.0),
+                                child: Text(
+                                  cleanTitle,
+                                  style: const TextStyle(
+                                    color: Color(0xFF818CF8),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              );
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 4.0),
+                              child: Text(
+                                line,
+                                style: TextStyle(color: Colors.grey.shade300, fontSize: 12, height: 1.35),
+                              ),
+                            );
+                          }).toList(),
+                        ),
                 ),
-                decoration: InputDecoration(
-                  hintText: "🚀 What's new in this version:\n• Fast download engine\n• Bug fixes and UI improvements\n• Enjoy the new update!",
-                  hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                  filled: true,
-                  fillColor: const Color(0xFF1E293B),
-                  contentPadding: const EdgeInsets.all(12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF34D399)),
-                  ),
-                ),
-              ),
               const SizedBox(height: 4),
               Text(
-                'Preserves newlines, emojis, bullet points, and all formatting in the API response.',
+                'Tip: Paste markdown notes with * or - then click "Format Bullets (•)" to clean instantly.',
                 style: TextStyle(color: Colors.grey.shade500, fontSize: 10.5),
               ),
               const SizedBox(height: 12),

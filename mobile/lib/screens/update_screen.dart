@@ -310,15 +310,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
                   const Divider(color: Colors.white12, height: 1),
                   const SizedBox(height: 14),
                   if (description.trim().isNotEmpty)
-                    SelectableText(
-                      description,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13.5,
-                        height: 1.6,
-                        letterSpacing: 0.2,
-                      ),
-                    )
+                    _buildFormattedDescription(description)
                   else
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12.0),
@@ -426,4 +418,85 @@ class _UpdateScreenState extends State<UpdateScreen> {
       ],
     );
   }
+
+  Widget _buildFormattedDescription(String text) {
+    final lines = text.split('\n');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: lines.map((line) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty) {
+          return const SizedBox(height: 8);
+        }
+
+        // Check if line is a bullet item (*, -, +, •, numbers)
+        final isBullet = RegExp(r'^[\*\-\+•◦▪]\s+').hasMatch(trimmed) ||
+            trimmed.startsWith('•') ||
+            trimmed.startsWith('*') ||
+            trimmed.startsWith('-');
+
+        if (isBullet) {
+          final cleanText = trimmed.replaceFirst(RegExp(r'^[\*\-\+•◦▪]\s*'), '');
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 7.0, left: 2.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 5, right: 8),
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF34D399), // Emerald bullet point
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                Expanded(
+                  child: SelectableText(
+                    cleanText,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Check for Headings (# Heading or **Heading**)
+        if (trimmed.startsWith('#') || (trimmed.startsWith('**') && trimmed.endsWith('**'))) {
+          final cleanTitle = trimmed.replaceAll(RegExp(r'[#\*]'), '').trim();
+          return Padding(
+            padding: const EdgeInsets.only(top: 8.0, bottom: 6.0),
+            child: Text(
+              cleanTitle,
+              style: const TextStyle(
+                color: Color(0xFF818CF8), // Indigo accent header
+                fontSize: 13.5,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.3,
+              ),
+            ),
+          );
+        }
+
+        // Regular Text Line
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 5.0),
+          child: SelectableText(
+            line,
+            style: TextStyle(
+              color: Colors.grey.shade200,
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
 }
+

@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../services/supabase'
-import toast from 'react-hot-toast'
-import { Copy, Check, RefreshCw, Save, Smartphone, Code2, X, ExternalLink } from 'lucide-react'
-import { generateVersionApiUrl, generateDirectDownloadUrl } from '../utils/helpers'
+import { Copy, Check, RefreshCw, Save, Smartphone, Code2, X, ExternalLink, Sparkles } from 'lucide-react'
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 export default function VersionApiModal({ file, onClose, onFileUpdated }) {
@@ -121,6 +119,36 @@ export default function VersionApiModal({ file, onClose, onFileUpdated }) {
   }
 
 
+  const [previewMode, setPreviewMode] = useState('edit') // 'edit' | 'preview'
+
+  const handleFormatBullets = () => {
+    if (!description) return
+    const formatted = description
+      .replace(/^[\t ]*[\*\-]\s+/gm, '• ')
+      .replace(/^[\t ]*(\d+)[\)\.]\s+/gm, '$1. ')
+    setDescription(formatted)
+    toast.success('Cleaned & formatted bullet points! ✨')
+  }
+
+  const handleDescriptionPaste = (e) => {
+    const pastedText = e.clipboardData?.getData('text')
+    if (pastedText && (pastedText.includes('* ') || pastedText.includes('- '))) {
+      // Auto clean bullet points if user pastes markdown with * or -
+      e.preventDefault()
+      const formatted = pastedText
+        .replace(/^[\t ]*[\*\-]\s+/gm, '• ')
+        .replace(/^[\t ]*(\d+)[\)\.]\s+/gm, '$1. ')
+      
+      const textarea = e.target
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const currentVal = textarea.value
+      const newVal = currentVal.substring(0, start) + formatted + currentVal.substring(end)
+      setDescription(newVal)
+      toast.success('Pasted & auto-formatted bullets to •')
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
       <div
@@ -173,22 +201,82 @@ export default function VersionApiModal({ file, onClose, onFileUpdated }) {
           </div>
 
           {/* Editable Release Notes / Description Section */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider">
-                Release Notes / Description (Editable)
+                Release Notes / Description
               </label>
-              <span className="text-[10px] text-indigo-400 font-medium">Supports emojis, bullets & newlines</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleFormatBullets}
+                  className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all"
+                  title="Convert * or - into clean bullet points"
+                >
+                  <Sparkles size={12} /> Format Bullets (•)
+                </button>
+                <div className="flex bg-dark-700 rounded-lg p-0.5 border border-dark-400">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode('edit')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+                      previewMode === 'edit' ? 'bg-primary-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode('preview')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+                      previewMode === 'preview' ? 'bg-primary-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    Preview
+                  </button>
+                </div>
+              </div>
             </div>
-            <textarea
-              rows={4}
-              className="input-field w-full text-xs font-sans text-gray-100 bg-dark-700 border-dark-400 focus:border-emerald-500 p-3 leading-relaxed resize-y"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={"🚀 What's new in this update:\n• Feature 1\n• Bug fixes and speed improvements\n• Enjoy the new update!"}
-            />
-            <p className="text-[11px] text-gray-400">
-              Preserves newlines, emojis, bullet points, and all formatting in the API response.
+
+            {previewMode === 'edit' ? (
+              <textarea
+                rows={5}
+                className="input-field w-full text-xs font-sans text-gray-100 bg-dark-700 border-dark-400 focus:border-emerald-500 p-3 leading-relaxed resize-y font-mono"
+                value={description}
+                onPaste={handleDescriptionPaste}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={"🚀 What's new in this update:\n• Ultra-fast download engine\n• Real-time notifications\n• Light and dark theme\n• Bug fixes and speed improvements"}
+              />
+            ) : (
+              <div className="w-full min-h-[110px] p-3.5 bg-dark-700/80 border border-dark-400 rounded-xl space-y-1.5 text-xs text-gray-200 leading-relaxed font-sans">
+                {description.trim() ? (
+                  description.split('\n').map((line, idx) => {
+                    const trimmed = line.trim()
+                    if (trimmed.startsWith('•') || trimmed.startsWith('*') || trimmed.startsWith('-')) {
+                      return (
+                        <div key={idx} className="flex items-start gap-2 pl-1 text-gray-200">
+                          <span className="text-emerald-400 font-bold">•</span>
+                          <span>{trimmed.replace(/^[\t ]*[\*\-•]\s*/, '')}</span>
+                        </div>
+                      )
+                    }
+                    if (trimmed.startsWith('#') || (trimmed.startsWith('**') && trimmed.endsWith('**'))) {
+                      return (
+                        <p key={idx} className="font-bold text-indigo-400 pt-1">
+                          {trimmed.replace(/[#\*]/g, '')}
+                        </p>
+                      )
+                    }
+                    return <p key={idx} className={trimmed ? 'text-gray-300' : 'h-2'}>{line}</p>
+                  })
+                ) : (
+                  <p className="text-gray-500 italic">No description entered yet.</p>
+                )}
+              </div>
+            )}
+
+            <p className="text-[11px] text-gray-400 flex items-center justify-between">
+              <span>Paste formatted notes with <code className="text-indigo-400">*</code> or <code className="text-indigo-400">-</code> to auto-clean into bullet points.</span>
             </p>
           </div>
 
