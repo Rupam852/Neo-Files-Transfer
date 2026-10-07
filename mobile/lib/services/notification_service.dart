@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/in_app_notification.dart';
@@ -10,6 +11,7 @@ class NotificationService extends ChangeNotifier {
   List<InAppNotification> _notifications = [];
   bool _isLoading = false;
   RealtimeChannel? _notificationChannel;
+  Timer? _pollingTimer;
 
   // Callback to display real-time in-app notification toasts/snackbars
   void Function(InAppNotification notification)? onNewNotification;
@@ -33,13 +35,23 @@ class NotificationService extends ChangeNotifier {
       if (currentUserId != null) {
         loadNotifications();
         _setupRealtimeSubscription(currentUserId);
+        _startPolling();
       } else {
         _cleanup();
       }
     }
   }
 
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      loadNotifications(isBackground: true);
+    });
+  }
+
   void _cleanup() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
     if (_notificationChannel != null) {
       _client.removeChannel(_notificationChannel!);
       _notificationChannel = null;
@@ -48,12 +60,14 @@ class NotificationService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadNotifications() async {
+  Future<void> loadNotifications({bool isBackground = false}) async {
     final user = _authService?.currentUser;
     if (user == null) return;
 
-    _isLoading = true;
-    notifyListeners();
+    if (!isBackground) {
+      _isLoading = true;
+      notifyListeners();
+    }
 
     try {
       final res = await _client
@@ -67,10 +81,14 @@ class NotificationService extends ChangeNotifier {
           .map((item) => InAppNotification.fromJson(item as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      debugPrint('[NotificationService] Error loading notifications: $e');
+      if (!isBackground) {
+        debugPrint('[NotificationService] Error loading notifications: $e');
+      }
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!isBackground) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -80,28 +98,23 @@ class NotificationService extends ChangeNotifier {
     }
 
     _notificationChannel = _client
-        .channel('user-notifications-$userId')
+        .channel('user_notifications_$userId')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'notifications',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
           callback: (payload) {
-            _handleRealtimePayload(payload);
+            _handleRealtimePayload(payload, userId);
           },
         );
 
     _notificationChannel?.subscribe();
   }
 
-  void _handleRealtimePayload(PostgresChangePayload payload) {
+  void _handleRealtimePayload(PostgresChangePayload payload, String currentUserId) {
     if (payload.eventType == PostgresChangeEvent.insert) {
       final newRecord = payload.newRecord;
-      if (newRecord.isNotEmpty) {
+      if (newRecord.isNotEmpty && newRecord['user_id'] == currentUserId) {
         final notif = InAppNotification.fromJson(newRecord);
         // Add to top of list if not already present
         if (!_notifications.any((n) => n.id == notif.id)) {
@@ -112,7 +125,7 @@ class NotificationService extends ChangeNotifier {
       }
     } else if (payload.eventType == PostgresChangeEvent.update) {
       final updatedRecord = payload.newRecord;
-      if (updatedRecord.isNotEmpty) {
+      if (updatedRecord.isNotEmpty && updatedRecord['user_id'] == currentUserId) {
         final notif = InAppNotification.fromJson(updatedRecord);
         final index = _notifications.indexWhere((n) => n.id == notif.id);
         if (index != -1) {

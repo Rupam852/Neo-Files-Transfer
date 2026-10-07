@@ -206,7 +206,7 @@ export default function DownloadPage() {
       const os = /android/i.test(userAgent) ? 'Android' : /windows/i.test(userAgent) ? 'Windows' : /mac/i.test(userAgent) ? 'macOS' : /linux/i.test(userAgent) ? 'Linux' : /ios|iphone|ipad/i.test(userAgent) ? 'iOS' : 'OS'
 
       if (fileInfo?.id && fileInfo?.user_id) {
-        // 1. Insert download log (which invokes trigger)
+        // Insert download log (which triggers database notification with metadata)
         supabase
           .from('file_download_logs')
           .insert({
@@ -218,24 +218,6 @@ export default function DownloadPage() {
             os: os,
           })
           .then(() => {}, (err) => console.error('file_download_logs insert error:', err))
-
-        // 2. Direct insert into notifications table as fail-safe
-        supabase
-          .from('notifications')
-          .insert({
-            user_id: fileInfo.user_id,
-            title: 'File Downloaded',
-            message: `Someone downloaded your file: ${fileInfo.file_name || 'Shared file'}`,
-            type: 'download',
-            metadata: {
-              file_id: fileInfo.id,
-              file_name: fileInfo.file_name,
-              device_type: deviceType,
-              browser: browser,
-              os: os,
-            }
-          })
-          .then(() => {}, (err) => console.error('notifications direct insert error:', err))
       }
 
       supabase

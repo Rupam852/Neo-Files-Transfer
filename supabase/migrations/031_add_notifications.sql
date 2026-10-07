@@ -2,6 +2,7 @@
 -- Migration 031: Add In-App Notifications & Realtime Triggers
 -- =============================================================
 
+-- 1. Create Notifications Table
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -17,7 +18,18 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(user_id, is_read);
 
--- Enable RLS
+-- 2. Schema and Table Permissions (Crucial for Anon & Authenticated)
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.notifications TO anon, authenticated, service_role;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'file_download_logs') THEN
+    GRANT ALL ON TABLE public.file_download_logs TO anon, authenticated, service_role;
+  END IF;
+END $$;
+
+-- 3. Enable Row Level Security (RLS)
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies if any
@@ -44,7 +56,7 @@ CREATE POLICY "Anyone or service can insert notifications"
   ON notifications FOR INSERT
   WITH CHECK (TRUE);
 
--- Enable Realtime for notifications table
+-- 4. Enable Supabase Realtime for Notifications Table
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -58,41 +70,57 @@ END $$;
 ALTER TABLE notifications REPLICA IDENTITY FULL;
 
 -- -------------------------------------------------------------
--- Trigger 1: Auto-create notification on file download
+-- Trigger 1: Auto-create notification on file download (with debounce)
 -- -------------------------------------------------------------
 CREATE OR REPLACE FUNCTION notify_on_file_download()
 RETURNS TRIGGER AS $$
 DECLARE
   v_file_name TEXT;
+  v_recent_count INT;
 BEGIN
-  SELECT file_name INTO v_file_name
-  FROM shared_files
-  WHERE id = NEW.file_id;
+  -- Avoid duplicate notification if logged multiple times within 5 seconds
+  SELECT COUNT(*) INTO v_recent_count
+  FROM notifications
+  WHERE user_id = NEW.owner_id
+    AND type = 'download'
+    AND metadata->>'file_id' = NEW.file_id::text
+    AND created_at >= (NOW() - INTERVAL '5 seconds');
 
-  INSERT INTO notifications (user_id, title, message, type, metadata)
-  VALUES (
-    NEW.owner_id,
-    'File Downloaded',
-    'Someone downloaded your file: ' || COALESCE(v_file_name, 'Shared file'),
-    'download',
-    jsonb_build_object(
-      'file_id', NEW.file_id,
-      'file_name', v_file_name,
-      'device_type', NEW.device_type,
-      'browser', NEW.browser,
-      'os', NEW.os
-    )
-  );
+  IF v_recent_count = 0 THEN
+    SELECT file_name INTO v_file_name
+    FROM shared_files
+    WHERE id = NEW.file_id;
+
+    INSERT INTO notifications (user_id, title, message, type, metadata)
+    VALUES (
+      NEW.owner_id,
+      'File Downloaded 📥',
+      'Someone downloaded your file: ' || COALESCE(v_file_name, 'Shared file'),
+      'download',
+      jsonb_build_object(
+        'file_id', NEW.file_id,
+        'file_name', v_file_name,
+        'device_type', NEW.device_type,
+        'browser', NEW.browser,
+        'os', NEW.os
+      )
+    );
+  END IF;
 
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-DROP TRIGGER IF EXISTS trg_notify_on_file_download ON file_download_logs;
-CREATE TRIGGER trg_notify_on_file_download
-  AFTER INSERT ON file_download_logs
-  FOR EACH ROW
-  EXECUTE FUNCTION notify_on_file_download();
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'file_download_logs') THEN
+    DROP TRIGGER IF EXISTS trg_notify_on_file_download ON file_download_logs;
+    CREATE TRIGGER trg_notify_on_file_download
+      AFTER INSERT ON file_download_logs
+      FOR EACH ROW
+      EXECUTE FUNCTION notify_on_file_download();
+  END IF;
+END $$;
 
 -- -------------------------------------------------------------
 -- Trigger 2: Auto-create notification on user registration approval
@@ -148,7 +176,7 @@ BEGIN
         INSERT INTO notifications (user_id, title, message, type, metadata)
         VALUES (
           v_user_id,
-          'Account Access Paused',
+          'Account Access Paused ⚠️',
           'Your account access has been temporarily suspended by an administrator.',
           'system',
           jsonb_build_object('paused_at', NOW())
@@ -157,7 +185,7 @@ BEGIN
         INSERT INTO notifications (user_id, title, message, type, metadata)
         VALUES (
           v_user_id,
-          'Account Access Restored',
+          'Account Access Restored ✅',
           'Your account access has been resumed by the administrator. Welcome back!',
           'system',
           jsonb_build_object('resumed_at', NOW())
@@ -175,3 +203,4 @@ CREATE TRIGGER trg_notify_on_user_status_change
   AFTER UPDATE ON approved_users
   FOR EACH ROW
   EXECUTE FUNCTION notify_on_user_status_change();
+
