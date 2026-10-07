@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../services/update_service.dart';
+import '../services/theme_service.dart';
 import 'update_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -242,6 +243,142 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(height: 24),
+
+            // App Appearance / Theme section
+            Builder(
+              builder: (ctx) {
+                final isLight = Theme.of(ctx).brightness == Brightness.light;
+                return Text(
+                  'APP APPEARANCE / THEME',
+                  style: TextStyle(
+                    color: isLight ? Colors.grey.shade700 : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            Consumer<ThemeService>(
+              builder: (context, themeService, _) {
+                final isLight = Theme.of(context).brightness == Brightness.light;
+                return Container(
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: isLight ? Colors.white : const Color(0xFF0F172A).withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(16.0),
+                    border: Border.all(
+                      color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.06),
+                    ),
+                    boxShadow: isLight
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            themeService.themeMode == ThemeMode.light
+                                ? LucideIcons.sun
+                                : themeService.themeMode == ThemeMode.dark
+                                    ? LucideIcons.moon
+                                    : LucideIcons.smartphone,
+                            color: Colors.indigoAccent,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Choose Theme',
+                                  style: TextStyle(
+                                    color: isLight ? const Color(0xFF0F172A) : Colors.white,
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  themeService.themeMode == ThemeMode.light
+                                      ? 'Soft White Theme Active'
+                                      : themeService.themeMode == ThemeMode.dark
+                                          ? 'Midnight Dark Theme Active'
+                                          : 'System Theme Active',
+                                  style: TextStyle(
+                                    color: isLight ? Colors.grey.shade600 : Colors.grey.shade400,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // 3-Option Segmented Selector
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: isLight ? const Color(0xFFF1F5F9) : const Color(0xFF070B14),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isLight ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // Dark Mode Button
+                            Expanded(
+                              child: _ThemeOptionButton(
+                                label: 'Dark',
+                                icon: LucideIcons.moon,
+                                isSelected: themeService.themeMode == ThemeMode.dark,
+                                isLightApp: isLight,
+                                onTap: () => themeService.setThemeMode(ThemeMode.dark),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            // Light Mode Button
+                            Expanded(
+                              child: _ThemeOptionButton(
+                                label: 'Light',
+                                icon: LucideIcons.sun,
+                                isSelected: themeService.themeMode == ThemeMode.light,
+                                isLightApp: isLight,
+                                onTap: () => themeService.setThemeMode(ThemeMode.light),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            // System Mode Button
+                            Expanded(
+                              child: _ThemeOptionButton(
+                                label: 'System',
+                                icon: LucideIcons.smartphone,
+                                isSelected: themeService.themeMode == ThemeMode.system,
+                                isLightApp: isLight,
+                                onTap: () => themeService.setThemeMode(ThemeMode.system),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 28),
 
@@ -769,5 +906,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     ),
   );
+  }
+}
+
+class _ThemeOptionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final bool isLightApp;
+  final VoidCallback onTap;
+
+  const _ThemeOptionButton({
+    Key? key,
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.isLightApp,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    Color activeBg;
+    Color activeText;
+    Color inactiveText;
+
+    if (isLightApp) {
+      activeBg = Colors.white;
+      activeText = const Color(0xFF4F46E5);
+      inactiveText = Colors.grey.shade600;
+    } else {
+      activeBg = const Color(0xFF1E293B);
+      activeText = Colors.white;
+      inactiveText = Colors.grey.shade400;
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(9),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? activeBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected ? activeText : inactiveText,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? activeText : inactiveText,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

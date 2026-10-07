@@ -9,6 +9,7 @@ import {
   Settings, Activity, Pause, Play,
 } from 'lucide-react'
 import { formatDate } from '../utils/helpers'
+import ThemeToggle from '../components/ThemeToggle'
 
 export default function AdminDashboardPage() {
   const { profile, adminRecord, signOut } = useAuth()
@@ -507,6 +508,7 @@ export default function AdminDashboardPage() {
               className="w-8 h-8 rounded-full border border-dark-300 object-cover"
             />
           )}
+          <ThemeToggle />
           <span className="text-sm text-gray-400 hidden sm:block">{profile?.email}</span>
           <button
             onClick={handleSignOut}

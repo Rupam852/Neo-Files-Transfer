@@ -20,6 +20,7 @@ import SharedFilesPage from '../pages/SharedFilesPage'
 import SettingsPage from '../pages/SettingsPage'
 import VersionPage from '../pages/VersionPage'
 import NotificationBell from '../components/NotificationBell'
+import ThemeToggle from '../components/ThemeToggle'
 
 const navItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -274,6 +275,9 @@ export default function DashboardLayout() {
 
             {/* In-App Notifications Bell */}
             <NotificationBell />
+
+            {/* Theme Toggle (Light / Dark) */}
+            <ThemeToggle />
 
             <div className="relative" ref={profileRef}>
               <button

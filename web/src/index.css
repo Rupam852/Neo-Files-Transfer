@@ -2,6 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+:root, html.dark {
+  --color-dark-900: 7 11 20;     /* #070b14 */
+  --color-dark-800: 10 17 40;    /* #0a1128 */
+  --color-dark-700: 15 23 42;    /* #0f172a */
+  --color-dark-600: 20 30 54;    /* #141e36 */
+  --color-dark-500: 26 38 66;    /* #1a2642 */
+  --color-dark-400: 30 45 74;    /* #1e2d4a */
+  --color-dark-300: 36 53 82;    /* #243552 */
+  --color-dark-200: 45 64 96;    /* #2d4060 */
+  --color-dark-100: 55 77 110;   /* #374d6e */
+  --app-bg: #030712;
+  --app-text: #e2e8f0;
+}
+
+html.light {
+  --color-dark-900: 255 255 255;  /* Pure clean white */
+  --color-dark-800: 248 250 252;  /* Slate-50 soft white */
+  --color-dark-700: 255 255 255;  /* White */
+  --color-dark-600: 255 255 255;  /* White component container */
+  --color-dark-500: 241 245 249;  /* Slate-100 button/pill */
+  --color-dark-400: 226 232 240;  /* Slate-200 subtle border */
+  --color-dark-300: 203 213 225;  /* Slate-300 card border */
+  --color-dark-200: 148 163 184;  /* Slate-400 */
+  --color-dark-100: 100 116 139;  /* Slate-500 */
+  --app-bg: #f8fafc;              /* Soft elegant off-white background */
+  --app-text: #0f172a;             /* Dark Slate-900 crisp readable text */
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -20,24 +48,25 @@ body,
 
 body {
   font-family: 'Inter', 'Roboto', sans-serif;
-  background-color: #030712;
-  color: #e2e8f0;
+  background-color: var(--app-bg);
+  color: var(--app-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-500 text-white font-medium py-2.5 px-5 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-primary-600 hover:bg-primary-500 text-white font-medium py-2.5 px-5 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-primary-500/15;
   }
   .btn-secondary {
     @apply bg-dark-500 hover:bg-dark-400 text-gray-200 font-medium py-2.5 px-5 rounded-lg border border-dark-300 transition-colors duration-200;
   }
   .btn-danger {
-    @apply bg-red-600 hover:bg-red-500 text-white font-medium py-2.5 px-5 rounded-lg transition-colors duration-200;
+    @apply bg-red-600 hover:bg-red-500 text-white font-medium py-2.5 px-5 rounded-lg transition-colors duration-200 shadow-md shadow-red-500/15;
   }
   .btn-success {
-    @apply bg-green-600 hover:bg-green-500 text-white font-medium py-2.5 px-5 rounded-lg transition-colors duration-200;
+    @apply bg-green-600 hover:bg-green-500 text-white font-medium py-2.5 px-5 rounded-lg transition-colors duration-200 shadow-md shadow-green-500/15;
   }
   .input-field {
     @apply w-full px-4 py-2.5 bg-dark-600 border border-dark-300 text-gray-100 placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all duration-200;
@@ -45,6 +74,64 @@ body {
   .card {
     @apply bg-dark-600 rounded-xl shadow-lg border border-dark-400 p-6;
   }
+}
+
+/* Light Mode Overrides for Perfect Typography & Contrast */
+html.light .text-gray-100 { color: #0f172a !important; }
+html.light .text-gray-200 { color: #1e293b !important; }
+html.light .text-gray-300 { color: #334155 !important; }
+html.light .text-gray-400 { color: #64748b !important; }
+html.light .text-gray-500 { color: #94a3b8 !important; }
+html.light .border-dark-400\/80,
+html.light .border-dark-400\/90,
+html.light .border-dark-400 {
+  border-color: #e2e8f0 !important;
+}
+html.light .border-dark-300 {
+  border-color: #cbd5e1 !important;
+}
+html.light .border-dark-500 {
+  border-color: #e2e8f0 !important;
+}
+html.light .bg-dark-600\/60,
+html.light .bg-dark-600\/80,
+html.light .bg-dark-600\/90,
+html.light .bg-dark-600 {
+  background-color: #ffffff !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+}
+html.light .bg-dark-700\/80,
+html.light .bg-dark-700 {
+  background-color: #f8fafc !important;
+}
+html.light .bg-dark-500\/60,
+html.light .bg-dark-500\/70,
+html.light .bg-dark-500\/80,
+html.light .bg-dark-500 {
+  background-color: #f1f5f9 !important;
+}
+html.light .hover\:bg-dark-500:hover {
+  background-color: #e2e8f0 !important;
+}
+html.light .hover\:bg-dark-400:hover {
+  background-color: #cbd5e1 !important;
+}
+html.light .input-field {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+html.light .input-field::placeholder {
+  color: #94a3b8 !important;
+}
+html.light .btn-secondary {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+}
+html.light .btn-secondary:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
 }
 
 /* Custom Auto-hiding Scrollbar styling */

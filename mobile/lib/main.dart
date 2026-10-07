@@ -9,6 +9,7 @@ import 'services/api_service.dart';
 import 'services/file_service.dart';
 import 'services/update_service.dart';
 import 'services/notification_service.dart';
+import 'services/theme_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/pending_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -34,6 +35,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<ThemeService>(
+          create: (_) => ThemeService(),
+        ),
         ChangeNotifierProvider<AuthService>(
           create: (_) => AuthService(),
         ),
@@ -69,24 +73,18 @@ class MyApp extends StatelessWidget {
           create: (_) => UpdateService()..initialize(),
         ),
       ],
-      child: MaterialApp(
-        title: 'Neo Files',
-        navigatorKey: UpdateService.navigatorKey,
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          fontFamily: 'Plus Jakarta Sans',
-          colorScheme: const ColorScheme.dark(
-            primary: Colors.indigoAccent,
-            background: Color(0xFF030712),
-            surface: Color(0xFF0F172A),
-          ),
-          textTheme: const TextTheme(
-            bodyLarge: TextStyle(color: Colors.white70),
-            bodyMedium: TextStyle(color: Colors.white70),
-          ),
-        ),
-        home: const HomeRouteResolver(),
+      child: Consumer<ThemeService>(
+        builder: (context, themeService, _) {
+          return MaterialApp(
+            title: 'Neo Files',
+            navigatorKey: UpdateService.navigatorKey,
+            debugShowCheckedModeBanner: false,
+            themeMode: themeService.themeMode,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            home: const HomeRouteResolver(),
+          );
+        },
       ),
     );
   }
