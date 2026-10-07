@@ -30,15 +30,9 @@ serve(async (req) => {
       throw new Error("Not authenticated")
     }
 
-    const { name, parent_drive_folder_id } = await req.json()
+    const { folder_name = "Neo Files Transfer" } = await req.json().catch(() => ({}))
 
-    if (!name) {
-      throw new Error("Folder name is required")
-    }
-
-    const isRoot = !parent_drive_folder_id || parent_drive_folder_id === 'root'
-
-    // Fetch Google tokens from user profile
+    // Admin Supabase client
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -46,12 +40,12 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("user_profiles")
-      .select("google_access_token, google_refresh_token")
+      .select("google_access_token, google_refresh_token, drive_folder_id")
       .eq("id", user.id)
       .single()
 
     if (profileError || !profile) {
-      throw new Error("Failed to load user profile or Google Drive connection tokens.")
+      throw new Error("Failed to load user profile.")
     }
 
     let accessToken = profile.google_access_token
@@ -61,65 +55,99 @@ serve(async (req) => {
       if (refreshToken) {
         accessToken = await refreshGoogleToken(user.id, refreshToken, supabaseAdmin)
       } else {
-        throw new Error("Google Drive access token not found. Please sign out and sign in again.")
+        throw new Error("Google Drive connection expired. Please reconnect in Settings.")
       }
     }
 
-    // API helper to create folder in Google Drive
+    // Step 1: Create new Neo Files Transfer folder at root
     const createFolderInDrive = async (token: string) => {
-      const folderBody: Record<string, any> = {
-        name: name,
-        mimeType: "application/vnd.google-apps.folder",
-      }
-      if (!isRoot) {
-        folderBody.parents = [parent_drive_folder_id]
-      }
-
       return await fetch("https://www.googleapis.com/drive/v3/files", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(folderBody),
+        body: JSON.stringify({
+          name: folder_name,
+          mimeType: "application/vnd.google-apps.folder",
+        }),
       })
     }
 
     let driveResponse = await createFolderInDrive(accessToken)
 
-    // Handle token expiration
     if (driveResponse.status === 401 && refreshToken) {
-      console.log("Google Drive API returned 401. Attempting token refresh...")
-      try {
-        accessToken = await refreshGoogleToken(user.id, refreshToken, supabaseAdmin)
-        driveResponse = await createFolderInDrive(accessToken)
-      } catch (refreshErr) {
-        console.error("Token refresh failed during folder creation:", refreshErr)
-      }
+      accessToken = await refreshGoogleToken(user.id, refreshToken, supabaseAdmin)
+      driveResponse = await createFolderInDrive(accessToken)
     }
 
     if (!driveResponse.ok) {
-      const errorData = await driveResponse.json()
-      throw new Error(errorData.error?.message || "Failed to create folder in Google Drive")
+      const errorData = await driveResponse.json().catch(() => ({}))
+      throw new Error(errorData.error?.message || "Failed to create new folder in Google Drive")
     }
 
-    const driveFolder = await driveResponse.json()
+    const newFolder = await driveResponse.json()
+    const newFolderId = newFolder.id
+
+    // Step 2: Fetch all user's shared files from Supabase
+    const { data: files, error: filesError } = await supabaseAdmin
+      .from("shared_files")
+      .select("id, google_drive_file_id, file_name, is_folder")
+      .eq("user_id", user.id)
+
+    let migratedCount = 0
+
+    if (files && files.length > 0) {
+      // Step 3: Link/Move each file into the new folder
+      for (const file of files) {
+        if (!file.google_drive_file_id) continue
+        try {
+          const moveRes = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${file.google_drive_file_id}?addParents=${newFolderId}&fields=id,parents`,
+            {
+              method: "PATCH",
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+            }
+          )
+          if (moveRes.ok) {
+            migratedCount++
+          } else {
+            console.warn(`File ${file.file_name} (${file.google_drive_file_id}) move warning:`, await moveRes.text())
+          }
+        } catch (moveErr) {
+          console.error(`Error migrating file ${file.file_name}:`, moveErr)
+        }
+      }
+    }
+
+    // Step 4: Update user profile with the verified new folder ID
+    const { error: updateError } = await supabaseAdmin
+      .from("user_profiles")
+      .update({
+        drive_folder_id: newFolderId,
+        is_folder_verified: true,
+      })
+      .eq("id", user.id)
+
+    if (updateError) throw updateError
 
     return new Response(
       JSON.stringify({
         success: true,
-        file_id: driveFolder.id,
-        file_name: driveFolder.name,
-        mime_type: driveFolder.mimeType,
+        new_folder_id: newFolderId,
+        folder_name: newFolder.name,
+        total_files: files ? files.length : 0,
+        migrated_count: migratedCount,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       }
     )
-
   } catch (error) {
-    console.error("Folder creation error:", error)
+    console.error("Migration error:", error)
     return new Response(
       JSON.stringify({ error: error.message }),
       {
@@ -165,7 +193,6 @@ async function refreshGoogleToken(userId: string, refreshToken: string, supabase
     throw new Error("No access token returned in refresh response")
   }
 
-  // Save the new access token to the database
   const { error: updateError } = await supabaseAdmin
     .from("user_profiles")
     .update({ google_access_token: newAccessToken })

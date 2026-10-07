@@ -135,6 +135,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _handleAutoCreateFolder() async {
+    setState(() {
+      _isSaving = true;
+      _validationError = null;
+    });
+
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final userId = authService.currentUser?.id;
+      if (userId == null) return;
+
+      final folderId = await apiService.createDriveFolder('Neo Files Transfer', 'root');
+
+      await _client.from('user_profiles').update({
+        'drive_folder_id': folderId,
+        'is_folder_verified': true,
+      }).eq('id', userId);
+
+      await authService.loadProfile(authService.currentUser!);
+
+      setState(() {
+        _folderIdController.text = folderId;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Neo Files Transfer folder created & connected successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      String msg = e.toString();
+      if (msg.startsWith('Exception: ')) {
+        msg = msg.substring('Exception: '.length);
+      }
+      setState(() {
+        _validationError = msg;
+      });
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
   Future<void> _executeVerifyAndSave(String folderId, {required bool deleteExisting}) async {
     setState(() => _isSaving = true);
 
@@ -354,7 +400,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: _isSaving ? null : _handleAutoCreateFolder,
+                    icon: const Icon(LucideIcons.sparkles, size: 16),
+                    label: const Text(
+                      '✨ Auto-Create & Connect Drive Folder',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.indigo.shade600,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 4,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Center(
+                    child: Text(
+                      '— OR MANUALLY CONNECT VIA ID —',
+                      style: TextStyle(color: Colors.white38, fontSize: 10, letterSpacing: 0.8),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: _folderIdController,
                     style: const TextStyle(color: Colors.white, fontSize: 13),
