@@ -204,12 +204,16 @@ export default function SharedFilesPage() {
 
       {/* Global Processing Loader Spinner */}
       {processingText && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-dark-600 border border-dark-400 rounded-2xl max-w-xs w-full p-6 space-y-4 shadow-2xl animate-scale-in text-center">
-            <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-gray-200 text-sm font-medium font-['Space_Grotesk'] tracking-wide">
-              {processingText}
-            </p>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-dark-600 border border-dark-400/80 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-scale-in text-center relative overflow-hidden">
+            <div className="w-16 h-16 mx-auto flex items-center justify-center pt-1">
+              <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+            <div className="space-y-1.5 px-2">
+              <p className="text-gray-100 text-sm font-semibold tracking-wide break-words break-all leading-relaxed">
+                {processingText}
+              </p>
+            </div>
           </div>
         </div>
       )}
