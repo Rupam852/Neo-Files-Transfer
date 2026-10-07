@@ -7,6 +7,7 @@ import {
   QrCode, ExternalLink, Download, Check, AlertTriangle, Eye, EyeOff, Sparkles
 } from 'lucide-react'
 import { generateShareUrl, generateDirectDownloadUrl } from '../utils/helpers'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 function downloadQrImage(canvasId, baseFileName) {
   const canvas = document.getElementById(canvasId)
@@ -25,6 +26,7 @@ function downloadQrImage(canvasId, baseFileName) {
 }
 
 export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdated }) {
+  useBodyScrollLock(true)
   const [activeTab, setActiveTab] = useState('direct') // 'direct' | 'custom'
   const [showQr, setShowQr] = useState(false)
   const [activeCustomQrId, setActiveCustomQrId] = useState(null)

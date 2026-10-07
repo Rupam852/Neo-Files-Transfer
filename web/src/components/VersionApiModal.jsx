@@ -3,8 +3,10 @@ import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
 import { Copy, Check, RefreshCw, Save, Smartphone, Code2, X, ExternalLink } from 'lucide-react'
 import { generateVersionApiUrl, generateDirectDownloadUrl } from '../utils/helpers'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 export default function VersionApiModal({ file, onClose, onFileUpdated }) {
+  useBodyScrollLock(true)
   const [version, setVersion] = useState(file.apk_version || 'v1.0.1')
   const [description, setDescription] = useState(file.apk_description || '')
   const [apiKey, setApiKey] = useState(file.version_api_key || '')

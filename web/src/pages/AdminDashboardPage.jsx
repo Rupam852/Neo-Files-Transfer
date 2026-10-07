@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { formatDate } from '../utils/helpers'
 import ThemeToggle from '../components/ThemeToggle'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 export default function AdminDashboardPage() {
   const { profile, adminRecord, signOut } = useAuth()
@@ -24,6 +25,8 @@ export default function AdminDashboardPage() {
   const [newAdminEmail, setNewAdminEmail] = useState('')
   const [addingAdmin, setAddingAdmin] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+
+  useBodyScrollLock(showLogoutConfirm)
 
   const navigateTab = (tab, push = true) => {
     setActiveTab(tab)

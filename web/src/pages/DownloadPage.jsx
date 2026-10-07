@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { formatFileSize, getFileIcon, generateDirectDownloadUrl, formatErrorMessage } from '../utils/helpers'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 const ICON_MAP = {
   'file-text': FileText,
@@ -32,6 +33,8 @@ export default function DownloadPage() {
   const [isInitiating, setIsInitiating] = useState(false)
   const [showInAppPreview, setShowInAppPreview] = useState(false)
   const [showQrModal, setShowQrModal] = useState(false)
+
+  useBodyScrollLock(showQrModal)
 
   useEffect(() => {
     const preconnectUrls = [

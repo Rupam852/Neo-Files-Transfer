@@ -52,18 +52,19 @@ class NotificationSheet extends StatelessWidget {
     final notifService = Provider.of<NotificationService>(context);
     final notifications = notifService.notifications;
     final unreadCount = notifService.unreadCount;
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.75,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: isLight ? Colors.white : const Color(0xFF0F172A),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.08)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.6),
+            color: Colors.black.withOpacity(isLight ? 0.15 : 0.6),
             blurRadius: 30,
             offset: const Offset(0, -10),
           ),

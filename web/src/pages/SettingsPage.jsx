@@ -8,6 +8,7 @@ import {
   Sparkles, RefreshCw, CheckCircle2
 } from 'lucide-react'
 import { formatErrorMessage } from '../utils/helpers'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 export default function SettingsPage() {
   const { profile, signOut, refreshProfile, signInWithGoogle } = useAuth()
@@ -18,6 +19,8 @@ export default function SettingsPage() {
   const [autoCreating, setAutoCreating] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [showRecreateConfirm, setShowRecreateConfirm] = useState(false)
+
+  useBodyScrollLock(Boolean(showLogoutConfirm || showRecreateConfirm || autoCreating))
   const [validationError, setValidationError] = useState(null)
   const [existingFilesCount, setExistingFilesCount] = useState(0)
 

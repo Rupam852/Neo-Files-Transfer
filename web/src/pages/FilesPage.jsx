@@ -16,6 +16,7 @@ import VersionApiModal from '../components/VersionApiModal'
 import ShareModal from '../components/ShareModal'
 import FileAnalyticsModal from '../components/FileAnalyticsModal'
 import MediaPreviewModal from '../components/MediaPreviewModal'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 const ALLOWED_TYPES = [
   'application/pdf',
@@ -138,6 +139,13 @@ export default function FilesPage({ onViewVersions }) {
   const isCancelledRef = useRef(false)
   const [isDragging, setIsDragging] = useState(false)
   const dragCounterRef = useRef(0)
+
+  // Prevent background scrolling when any modal / confirmation popup is active
+  const isAnyModalActive = Boolean(
+    renameModal || shareModal || deleteConfirm || versionApiModalFile ||
+    previewModalFile || analyticsModalFile || folderCreateModal || bulkDeleteConfirm || moveModal
+  )
+  useBodyScrollLock(isAnyModalActive)
 
   function handleCancelUpload() {
     isCancelledRef.current = true

@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { generateMediaPreviewUrl, generateDirectDownloadUrl, formatFileSize } from '../utils/helpers'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 import {
   X, Download, Play, Pause, Volume2, Maximize2, FileText,
   Video, Music, Image as ImageIcon, Code, ExternalLink, RefreshCw
 } from 'lucide-react'
 
 export default function MediaPreviewModal({ file, onClose }) {
+  useBodyScrollLock(true)
   const [textContent, setTextContent] = useState('')
   const [loadingText, setLoadingText] = useState(false)
   const [loadError, setLoadError] = useState(null)

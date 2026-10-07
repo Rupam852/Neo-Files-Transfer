@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../services/supabase'
 import { BarChart2, Download, Monitor, Smartphone, Globe, Clock, X, Shield } from 'lucide-react'
 import { formatDate } from '../utils/helpers'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 export default function FileAnalyticsModal({ file, onClose }) {
+  useBodyScrollLock(true)
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
 

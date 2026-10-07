@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
 import { Copy, Globe, Lock, Link2 } from 'lucide-react'
 import { generateShareUrl, generateDirectDownloadUrl, formatDate } from '../utils/helpers'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 export default function SharedFilesPage() {
   const { user } = useAuth()
@@ -11,6 +12,8 @@ export default function SharedFilesPage() {
   const [loading, setLoading] = useState(true)
   const [processingText, setProcessingText] = useState(null)
   const [shareModal, setShareModal] = useState(null)
+
+  useBodyScrollLock(Boolean(shareModal || processingText))
 
   useEffect(() => {
     loadSharedFiles()
