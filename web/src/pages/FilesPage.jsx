@@ -10,7 +10,7 @@ import {
   CheckSquare, Square, FolderInput, X, Code2, BarChart2, Eye,
   RotateCcw, Trash, ShieldCheck,
 } from 'lucide-react'
-import { formatFileSize, formatDate, getExtension, generateShareUrl, generateDirectDownloadUrl, formatErrorMessage } from '../utils/helpers'
+import { formatFileSize, formatDate, getExtension, generateShareUrl, generateDirectDownloadUrl, generateMediaPreviewUrl, formatErrorMessage } from '../utils/helpers'
 import { useNavigate } from 'react-router-dom'
 import VersionApiModal from '../components/VersionApiModal'
 import ShareModal from '../components/ShareModal'
@@ -178,9 +178,9 @@ export default function FilesPage({ onViewVersions }) {
       for (let i = 0; i < selectedFiles.length; i++) {
         const sf = selectedFiles[i]
         setProcessingText(`Fetching file ${i + 1}/${selectedFiles.length}: ${sf.file_name}...`)
-        const directUrl = generateDirectDownloadUrl(sf.unique_share_hash, sf.is_folder, sf.file_size, true)
-        const res = await fetch(directUrl)
-        if (!res.ok) throw new Error(`Could not fetch ${sf.file_name}`)
+        const fetchUrl = generateMediaPreviewUrl(sf)
+        const res = await fetch(fetchUrl)
+        if (!res.ok) throw new Error(`Could not fetch ${sf.file_name} (HTTP ${res.status})`)
         const blob = await res.blob()
         zip.file(sf.file_name, blob)
       }
