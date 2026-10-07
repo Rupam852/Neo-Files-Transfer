@@ -89,10 +89,7 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
 
   String _getDirectDownloadUrl(SharedFile file) {
     final hash = file.uniqueShareHash ?? '';
-    if (file.isFolder) {
-      return '${AppConfig.proxyUrl}/download-file?hash=$hash';
-    }
-    return '${AppConfig.cfWorkerUrl}?hash=$hash';
+    return '${AppConfig.proxyUrl}/download-file?hash=$hash';
   }
 
   Future<void> _handleGenerateLink() async {
