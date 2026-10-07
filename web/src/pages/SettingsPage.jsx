@@ -256,18 +256,18 @@ export default function SettingsPage() {
 
           {/* Current Folder Info */}
           {profile?.drive_folder_id && (
-            <div className="bg-gradient-to-r from-emerald-950/40 to-dark-500 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
-              <div className="flex items-center gap-2 text-emerald-400">
-                <CheckCircle2 size={18} />
-                <span className="text-sm font-semibold text-emerald-200">Connected Storage Folder</span>
+            <div className="bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 rounded-2xl p-4 space-y-3 shadow-sm">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400" />
+                <span className="text-sm font-bold text-emerald-800 dark:text-emerald-200">Connected Storage Folder</span>
               </div>
-              <div className="flex items-center justify-between text-xs bg-black/30 p-2.5 rounded-xl border border-white/5">
-                <span className="text-gray-400">Folder ID:</span>
-                <span className="font-mono text-emerald-400 select-all font-semibold">{profile.drive_folder_id}</span>
+              <div className="flex items-center justify-between text-xs bg-emerald-500/10 dark:bg-black/30 p-2.5 rounded-xl border border-emerald-500/20 dark:border-white/5">
+                <span className="text-gray-600 dark:text-gray-400 font-medium">Folder ID:</span>
+                <span className="font-mono text-emerald-700 dark:text-emerald-400 select-all font-bold">{profile.drive_folder_id}</span>
               </div>
               {existingFilesCount > 0 && (
-                <p className="text-[11px] text-gray-400">
-                  📁 <strong className="text-gray-200">{existingFilesCount} files</strong> currently stored and accessible through your links.
+                <p className="text-[11px] text-gray-600 dark:text-gray-400">
+                  📁 <strong className="text-gray-900 dark:text-gray-200">{existingFilesCount} files</strong> currently stored and accessible through your links.
                 </p>
               )}
             </div>
@@ -297,16 +297,16 @@ export default function SettingsPage() {
                 </>
               )}
             </button>
-            <p className="text-[11px] text-center text-gray-400">
+            <p className="text-[11px] text-center text-gray-500 dark:text-gray-400">
               ⚡ Automatically creates a secure <code>Neo Files Transfer</code> folder in your Drive. Zero manual setup required!
             </p>
 
             {profile?.drive_folder_id && (
-              <div className="bg-indigo-950/30 border border-indigo-500/20 rounded-xl p-3 text-[11px] text-indigo-300 leading-relaxed space-y-1">
-                <p className="font-semibold text-indigo-200 flex items-center gap-1.5">
+              <div className="bg-indigo-500/10 dark:bg-indigo-950/30 border border-indigo-500/20 rounded-xl p-3 text-[11px] leading-relaxed space-y-1">
+                <p className="font-bold text-indigo-800 dark:text-indigo-200 flex items-center gap-1.5">
                   <span>ℹ️</span> Note for Re-connecting Folder:
                 </p>
-                <p className="text-gray-300">
+                <p className="text-gray-600 dark:text-gray-300">
                   Creating a new folder will set it as your active destination. Existing files will remain in your previous folder and keep working. You can optionally move them manually in Google Drive if you wish.
                 </p>
               </div>
@@ -314,12 +314,12 @@ export default function SettingsPage() {
           </div>
 
           {validationError && (
-            <div className="bg-red-900/30 border border-red-600/30 rounded-xl p-3.5 flex items-start gap-2.5 text-red-200 text-xs">
-              <AlertTriangle size={16} className="text-red-400 mt-0.5 flex-shrink-0" />
+            <div className="bg-red-500/10 dark:bg-red-900/30 border border-red-500/30 rounded-xl p-3.5 flex items-start gap-2.5 text-xs">
+              <AlertTriangle size={16} className="text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-red-300">Notice:</p>
-                <p className="text-red-400/90 mt-0.5 leading-relaxed">{validationError}</p>
-                <p className="text-indigo-300 mt-2 font-medium">
+                <p className="font-bold text-red-700 dark:text-red-300">Notice:</p>
+                <p className="text-red-600 dark:text-red-400 mt-0.5 leading-relaxed">{validationError}</p>
+                <p className="text-indigo-600 dark:text-indigo-300 mt-2 font-medium">
                   👉 Click the <strong>"Auto-Create & Connect"</strong> button above to create a fresh secure folder.
                 </p>
               </div>
