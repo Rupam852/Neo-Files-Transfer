@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:dio/dio.dart';
@@ -461,51 +462,96 @@ class FileService extends ChangeNotifier {
       targetDriveFolderId = _authService.profile?.driveFolderId;
     }
 
-    if (targetDriveFolderId == null) throw Exception('Drive folder not configured.');
-
-    // Step 1: Start resumable session
-    String googleToken = await _authService.getGoogleAccessToken() ?? '';
-    if (googleToken.isEmpty) {
-      googleToken = await _apiService.refreshGoogleAccessToken();
+    if (targetDriveFolderId == null || targetDriveFolderId.isEmpty) {
+      throw Exception('Google Drive folder is not configured. Please connect folder in Settings.');
     }
 
+    // Step 1: Request resumable session from Google Drive
+    String googleToken = await _authService.getGoogleAccessToken() ?? '';
     final dio = Dio();
-    final startSessionResponse = await dio.post(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
-      data: {
-        'name': fileName,
-        'parents': [targetDriveFolderId]
-      },
-      options: Options(
-        headers: {
-          'Authorization': 'Bearer $googleToken',
-          'Content-Type': 'application/json; charset=UTF-8',
-          'X-Upload-Content-Type': 'application/octet-stream',
+
+    Future<Response> startVersionUploadSession(String token) async {
+      return await dio.post(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+        data: {
+          'name': fileName,
+          'parents': [targetDriveFolderId]
         },
-      ),
-    );
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json; charset=UTF-8',
+            'X-Upload-Content-Type': 'application/octet-stream',
+          },
+        ),
+      );
+    }
 
-    final uploadUrl = startSessionResponse.headers.value('Location') ?? '';
-    if (uploadUrl.isEmpty) throw Exception('Google did not return upload URI.');
+    String uploadUrl = '';
+    try {
+      if (googleToken.isEmpty) {
+        googleToken = await _apiService.refreshGoogleAccessToken();
+      }
 
-    // Step 2: Upload file stream
+      Response startSessionResponse;
+      try {
+        startSessionResponse = await startVersionUploadSession(googleToken);
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 401) {
+          googleToken = await _apiService.refreshGoogleAccessToken();
+          startSessionResponse = await startVersionUploadSession(googleToken);
+        } else {
+          rethrow;
+        }
+      }
+
+      uploadUrl = startSessionResponse.headers.value('Location') ?? '';
+      if (uploadUrl.isEmpty) throw Exception('Google did not return upload URI.');
+    } catch (e) {
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('403') || errStr.contains('401') || errStr.contains('permission') || errStr.contains('unauthorized')) {
+        _authService.setGoogleConnectionError(true);
+      }
+      throw Exception('Initiating Google version upload failed: $e');
+    }
+
+    // Step 2: Upload raw file stream via PUT request
     final len = await newFile.length();
     final response = await dio.put(
       uploadUrl,
       data: newFile.openRead(),
       cancelToken: cancelToken,
-      options: Options(headers: {'Content-Length': len}),
+      options: Options(
+        headers: {
+          'Content-Length': len,
+        },
+      ),
       onSendProgress: (sent, total) {
-        if (total > 0) onProgress(sent / total);
+        if (total > 0) {
+          onProgress(sent / total);
+        }
       },
     );
 
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Upload failed with status ${response.statusCode}');
+      throw Exception('Google Drive upload failed with status ${response.statusCode}');
     }
 
-    final newDriveId = response.data['id'] as String;
+    dynamic driveData = response.data;
+    if (driveData is String) {
+      driveData = jsonDecode(driveData);
+    }
+    final newDriveId = driveData['id'] as String;
     final nextVersionNum = fileRecord.currentVersionNum + 1;
+
+    // Optional: Clean up old drive file if needed
+    if (fileRecord.googleDriveFileId.isNotEmpty) {
+      try {
+        await _apiService.deleteDriveFile(fileRecord.googleDriveFileId);
+      } catch (e) {
+        debugPrint('Old version cleanup notice: $e');
+      }
+    }
 
     // Step 3: Insert into file_versions and update shared_files
     await _client.from('file_versions').insert({
@@ -526,6 +572,8 @@ class FileService extends ChangeNotifier {
       'action': 'version_upload',
       'details': 'Uploaded version $nextVersionNum for: ${fileRecord.fileName}',
     });
+
+    await fetchFiles();
   }
 
 
