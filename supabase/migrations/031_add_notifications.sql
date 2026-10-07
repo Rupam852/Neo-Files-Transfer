@@ -99,15 +99,25 @@ CREATE TRIGGER trg_notify_on_file_download
 -- -------------------------------------------------------------
 CREATE OR REPLACE FUNCTION notify_on_user_approval()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_user_id UUID;
 BEGIN
-  INSERT INTO notifications (user_id, title, message, type, metadata)
-  VALUES (
-    NEW.user_id,
-    'Account Approved 🎉',
-    'Your registration has been approved by the administrator. You now have full access to Neo Files Transfer.',
-    'approval',
-    jsonb_build_object('approved_at', NOW())
-  );
+  -- Resolve auth.users id by email
+  SELECT id INTO v_user_id
+  FROM auth.users
+  WHERE LOWER(email) = LOWER(NEW.email)
+  LIMIT 1;
+
+  IF v_user_id IS NOT NULL THEN
+    INSERT INTO notifications (user_id, title, message, type, metadata)
+    VALUES (
+      v_user_id,
+      'Account Approved 🎉',
+      'Your registration has been approved by the administrator. You now have full access to Neo Files Transfer.',
+      'approval',
+      jsonb_build_object('approved_at', NOW(), 'email', NEW.email)
+    );
+  END IF;
 
   RETURN NEW;
 END;
@@ -118,3 +128,50 @@ CREATE TRIGGER trg_notify_on_user_approval
   AFTER INSERT ON approved_users
   FOR EACH ROW
   EXECUTE FUNCTION notify_on_user_approval();
+
+-- -------------------------------------------------------------
+-- Trigger 3: Notification on Account Pause / Resume Status Change
+-- -------------------------------------------------------------
+CREATE OR REPLACE FUNCTION notify_on_user_status_change()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_user_id UUID;
+BEGIN
+  IF (OLD.is_paused IS DISTINCT FROM NEW.is_paused) THEN
+    SELECT id INTO v_user_id
+    FROM auth.users
+    WHERE LOWER(email) = LOWER(NEW.email)
+    LIMIT 1;
+
+    IF v_user_id IS NOT NULL THEN
+      IF NEW.is_paused = TRUE THEN
+        INSERT INTO notifications (user_id, title, message, type, metadata)
+        VALUES (
+          v_user_id,
+          'Account Access Paused',
+          'Your account access has been temporarily suspended by an administrator.',
+          'system',
+          jsonb_build_object('paused_at', NOW())
+        );
+      ELSE
+        INSERT INTO notifications (user_id, title, message, type, metadata)
+        VALUES (
+          v_user_id,
+          'Account Access Restored',
+          'Your account access has been resumed by the administrator. Welcome back!',
+          'system',
+          jsonb_build_object('resumed_at', NOW())
+        );
+      END IF;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_notify_on_user_status_change ON approved_users;
+CREATE TRIGGER trg_notify_on_user_status_change
+  AFTER UPDATE ON approved_users
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_on_user_status_change();
