@@ -261,7 +261,7 @@ export default function DashboardLayout() {
           </div>
 
           <div className="flex items-center gap-3">
-            {currentTab !== 'files' && (
+            {!['files', 'versions'].includes(currentTab) && (
               <button
                 onClick={handleUploadClick}
                 className="btn-primary flex items-center gap-2 text-sm"
