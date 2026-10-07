@@ -71,6 +71,51 @@ const parseUserAgent = (ua = '') => {
   return { deviceType, browser, os }
 }
 
+const getMimeType = (fileName = '', existingMime = null) => {
+  if (existingMime && existingMime !== 'application/octet-stream') return existingMime
+  const ext = (fileName || '').split('.').pop().toLowerCase()
+  const map = {
+    pdf: 'application/pdf',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
+    bmp: 'image/bmp',
+    ico: 'image/x-icon',
+    mp4: 'video/mp4',
+    webm: 'video/webm',
+    mov: 'video/quicktime',
+    mkv: 'video/x-matroska',
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    ogg: 'audio/ogg',
+    m4a: 'audio/mp4',
+    aac: 'audio/aac',
+    flac: 'audio/flac',
+    txt: 'text/plain; charset=utf-8',
+    json: 'application/json; charset=utf-8',
+    js: 'application/javascript; charset=utf-8',
+    jsx: 'text/plain; charset=utf-8',
+    ts: 'text/plain; charset=utf-8',
+    tsx: 'text/plain; charset=utf-8',
+    html: 'text/html; charset=utf-8',
+    css: 'text/css; charset=utf-8',
+    md: 'text/markdown; charset=utf-8',
+    log: 'text/plain; charset=utf-8',
+    dart: 'text/plain; charset=utf-8',
+    py: 'text/plain; charset=utf-8',
+    sql: 'text/plain; charset=utf-8',
+    xml: 'application/xml; charset=utf-8',
+    yaml: 'text/plain; charset=utf-8',
+    yml: 'text/plain; charset=utf-8',
+    zip: 'application/zip',
+    apk: 'application/vnd.android.package-archive'
+  }
+  return map[ext] || existingMime || 'application/octet-stream'
+}
+
 const fetchMediaFromDriveNode = (driveId, token, rangeHeader = null) => {
   return new Promise((resolve, reject) => {
     const headers = {
@@ -560,12 +605,12 @@ app.get('/download-file', async (req, res) => {
       res.status(200)
     }
 
-    res.setHeader('Accept-Ranges', 'bytes')
-
-    const contentType = file.mime_type || driveResponse.headers['content-type'] || 'application/octet-stream'
+    const isInline = isPreview || isStream || req.query.inline === 'true'
+    const contentType = getMimeType(file.file_name, file.mime_type || driveResponse.headers['content-type'])
     res.setHeader('Content-Type', contentType)
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.file_name)}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`)
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    const dispositionType = isInline ? 'inline' : 'attachment'
+    res.setHeader('Content-Disposition', `${dispositionType}; filename="${encodeURIComponent(file.file_name)}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`)
+    res.setHeader('Cache-Control', isInline ? 'public, max-age=3600' : 'no-cache, no-store, must-revalidate')
     
     const gDriveContentLength = driveResponse.headers['content-length']
     if (gDriveContentLength) {

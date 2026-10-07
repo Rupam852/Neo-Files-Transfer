@@ -68,13 +68,16 @@ export function generateMediaPreviewUrl(file) {
   const proxyUrl = import.meta.env.VITE_PROXY_URL
   const cleanProxy = proxyUrl ? (proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl) : ''
   if (cleanProxy && file.id) {
-    return `${cleanProxy}/download-file?file_id=${file.id}&preview=true&skip_increment=true`
+    return `${cleanProxy}/download-file?file_id=${file.id}&preview=true&inline=true&skip_increment=true`
   }
   if (file.unique_share_hash) {
+    if (cleanProxy) {
+      return `${cleanProxy}/download-file?hash=${file.unique_share_hash}&preview=true&inline=true&skip_increment=true`
+    }
     return generateDirectDownloadUrl(file.unique_share_hash, file.is_folder, file.file_size, true)
   }
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-  return `${supabaseUrl}/functions/v1/download-file?file_id=${file.id}&preview=true&skip_increment=true`
+  return `${supabaseUrl}/functions/v1/download-file?file_id=${file.id}&preview=true&inline=true&skip_increment=true`
 }
 
 export function generateVersionApiUrl(apiKey) {

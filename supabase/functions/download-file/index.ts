@@ -328,11 +328,14 @@ serve(async (req) => {
       return Response.redirect(downloadUrl, 302)
     }
 
+    const isInline = isStream || url.searchParams.get("inline") === "true" || url.searchParams.get("preview") === "true"
+    const dispositionType = isInline ? "inline" : "attachment"
+
     // Set correct headers for download attachment streaming
     const responseHeaders = new Headers()
     responseHeaders.set("Content-Type", file.mime_type || driveResponse.headers.get("Content-Type") || "application/octet-stream")
-    responseHeaders.set("Content-Disposition", `attachment; filename="${file.file_name.replace(/"/g, '\\"')}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`)
-    responseHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate")
+    responseHeaders.set("Content-Disposition", `${dispositionType}; filename="${file.file_name.replace(/"/g, '\\"')}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`)
+    responseHeaders.set("Cache-Control", isInline ? "public, max-age=3600" : "no-cache, no-store, must-revalidate")
     responseHeaders.set("Pragma", "no-cache")
     responseHeaders.set("Expires", "0")
 
