@@ -16,15 +16,16 @@ export function formatDate(dateString) {
   })
 }
 
-export function getFileIcon(mimeType) {
-  if (!mimeType) return 'file'
-  if (mimeType.startsWith('image/')) return 'image'
-  if (mimeType.startsWith('video/')) return 'video'
-  if (mimeType.includes('pdf')) return 'file-text'
-  if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'table'
-  if (mimeType.includes('document') || mimeType.includes('word')) return 'file-text'
-  if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return 'presentation'
-  if (mimeType.includes('zip') || mimeType.includes('compressed')) return 'archive'
+export function getFileIcon(mimeType, fileName = '') {
+  const ext = (fileName || '').split('.').pop().toLowerCase()
+  if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'wma', 'opus'].includes(ext) || mimeType?.startsWith('audio/')) return 'music'
+  if (['mp4', 'mkv', 'mov', 'avi', 'webm'].includes(ext) || mimeType?.startsWith('video/')) return 'video'
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext) || mimeType?.startsWith('image/')) return 'image'
+  if (ext === 'pdf' || mimeType?.includes('pdf')) return 'file-text'
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext) || mimeType?.includes('zip') || mimeType?.includes('compressed')) return 'archive'
+  if (['xls', 'xlsx', 'csv'].includes(ext) || mimeType?.includes('spreadsheet') || mimeType?.includes('excel')) return 'table'
+  if (['doc', 'docx'].includes(ext) || mimeType?.includes('document') || mimeType?.includes('word')) return 'file-text'
+  if (['ppt', 'pptx'].includes(ext) || mimeType?.includes('presentation') || mimeType?.includes('powerpoint')) return 'presentation'
   return 'file'
 }
 

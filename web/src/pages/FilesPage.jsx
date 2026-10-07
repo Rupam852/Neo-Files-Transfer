@@ -22,9 +22,12 @@ const ALLOWED_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'image/jpeg', 'image/png', 'video/mp4',
-  'application/zip', 'application/x-zip-compressed',
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
+  'video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska',
+  'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/m4a', 'audio/aac', 'audio/flac', 'audio/x-m4a',
+  'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed',
   'application/vnd.android.package-archive',
+  'text/plain', 'application/json', 'text/markdown'
 ]
 
 const BLOCKED_EXTENSIONS = ['exe', 'bat', 'cmd', 'msi', 'scr']
@@ -1238,7 +1241,7 @@ export default function FilesPage({ onViewVersions }) {
               type="file"
               className="hidden"
               multiple
-              accept=".pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.gif,.webp,.svg,.mp4,.mkv,.mov,.avi,.zip,.rar,.tar,.gz,.7z,.apk,.xapk,.txt"
+              accept="audio/*,video/*,image/*,.pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.ico,.mp4,.mkv,.mov,.avi,.webm,.mp3,.wav,.ogg,.m4a,.aac,.flac,.wma,.opus,.zip,.rar,.tar,.gz,.7z,.apk,.xapk,.txt,.json,.js,.ts,.html,.css,.md,.log,.py,.dart,.sql,.xml,.yaml,.yml"
               onChange={handleUpload}
             />
             <input
