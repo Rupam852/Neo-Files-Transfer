@@ -542,7 +542,15 @@ class FileService extends ChangeNotifier {
       driveData = jsonDecode(driveData);
     }
     final newDriveId = driveData['id'] as String;
-    final nextVersionNum = fileRecord.currentVersionNum + 1;
+    // Fetch latest version from DB
+    final currentFileRes = await _client
+        .from('shared_files')
+        .select('current_version_num')
+        .eq('id', fileRecord.id)
+        .maybeSingle();
+
+    final currentNum = (currentFileRes?['current_version_num'] as int?) ?? fileRecord.currentVersionNum;
+    final nextVersionNum = currentNum + 1;
 
     // Optional: Clean up old drive file if needed
     if (fileRecord.googleDriveFileId.isNotEmpty) {
@@ -553,7 +561,10 @@ class FileService extends ChangeNotifier {
       }
     }
 
-    // Step 3: Insert into file_versions and update shared_files
+    // Step 3: Delete old version records (same as Web) to prevent DB bloating / stale history
+    await _client.from('file_versions').delete().eq('file_id', fileRecord.id);
+
+    // Insert new single active version
     await _client.from('file_versions').insert({
       'file_id': fileRecord.id,
       'google_drive_file_id': newDriveId,
