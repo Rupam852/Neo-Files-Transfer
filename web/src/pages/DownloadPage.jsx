@@ -4,8 +4,9 @@ import { supabase } from '../services/supabase'
 import {
   Download, FileX, ShieldX, AlertTriangle, FileText, Image as ImageIcon, Video, Archive,
   Table, Presentation, File, CheckCircle2, AlertCircle, Folder,
-  ArrowDown, Sparkles, RefreshCw, Lock, KeyRound, Play, Eye, EyeOff, Music, ExternalLink, X
+  ArrowDown, Sparkles, RefreshCw, Lock, KeyRound, Play, Eye, EyeOff, Music, ExternalLink, X, QrCode
 } from 'lucide-react'
+import { QRCodeCanvas } from 'qrcode.react'
 import { formatFileSize, getFileIcon, generateDirectDownloadUrl, formatErrorMessage } from '../utils/helpers'
 
 const ICON_MAP = {
@@ -30,6 +31,7 @@ export default function DownloadPage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [isInitiating, setIsInitiating] = useState(false)
   const [showInAppPreview, setShowInAppPreview] = useState(false)
+  const [showQrModal, setShowQrModal] = useState(false)
 
   useEffect(() => {
     const preconnectUrls = [
@@ -594,6 +596,43 @@ export default function DownloadPage() {
         )}
 
       </div>
+
+      {/* QR Code Modal */}
+      {showQrModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl relative">
+            <button
+              type="button"
+              onClick={() => setShowQrModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-900 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="space-y-1 pt-1">
+              <h3 className="font-bold text-white text-base font-['Space_Grotesk']">Scan on Phone</h3>
+              <p className="text-xs text-slate-400">Open mobile camera to scan</p>
+            </div>
+
+            <div className="p-3 bg-white rounded-2xl inline-block mx-auto shadow-inner">
+              <QRCodeCanvas
+                value={typeof window !== 'undefined' ? window.location.href : ''}
+                size={180}
+                level="H"
+                includeMargin={false}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowQrModal(false)}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
