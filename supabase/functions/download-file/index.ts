@@ -283,11 +283,27 @@ serve(async (req) => {
         responseHeaders.set(key, value)
       }
 
-      // Increment download count in database asynchronously if not skipped
+      // Increment download count and record folder download analytics log asynchronously if not skipped
       if (!skipIncrement) {
-        supabaseAdmin.rpc("increment_download_count", { file_id: file.id }).then(({ error }) => {
-          if (error) console.error("Failed to increment download count:", error)
-        })
+        (async () => {
+          try {
+            await supabaseAdmin.rpc("increment_download_count", { file_id: file.id })
+            const userAgent = req.headers.get("user-agent") || ""
+            const isMobile = /mobile|android|iphone|ipad/i.test(userAgent)
+            const deviceType = isMobile ? 'Mobile' : 'Desktop'
+            const browser = /chrome/i.test(userAgent) ? 'Chrome' : /firefox/i.test(userAgent) ? 'Firefox' : /safari/i.test(userAgent) ? 'Safari' : /edge/i.test(userAgent) ? 'Edge' : 'Browser'
+            const os = /android/i.test(userAgent) ? 'Android' : /windows/i.test(userAgent) ? 'Windows' : /mac/i.test(userAgent) ? 'macOS' : /linux/i.test(userAgent) ? 'Linux' : /ios|iphone|ipad/i.test(userAgent) ? 'iOS' : 'OS'
+            await supabaseAdmin.from('file_download_logs').insert({
+              file_id: file.id,
+              owner_id: fileOwner.user_id,
+              device_type: deviceType,
+              browser: browser,
+              os: os,
+            })
+          } catch (logErr) {
+            console.error("Failed to log folder download analytics:", logErr)
+          }
+        })()
       }
 
       return new Response(zippedBytes, {
@@ -349,11 +365,29 @@ serve(async (req) => {
       responseHeaders.set(key, value)
     }
 
-    // Increment download count in database asynchronously if not skipped
-    if (!skipIncrement) {
-      supabaseAdmin.rpc("increment_download_count", { file_id: file.id }).then(({ error }) => {
-        if (error) console.error("Failed to increment download count:", error)
-      })
+    // Parse user-agent info
+    const userAgent = req.headers.get("user-agent") || ""
+    const isMobile = /mobile|android|iphone|ipad/i.test(userAgent)
+    const deviceType = isMobile ? 'Mobile' : 'Desktop'
+    const browser = /chrome/i.test(userAgent) ? 'Chrome' : /firefox/i.test(userAgent) ? 'Firefox' : /safari/i.test(userAgent) ? 'Safari' : /edge/i.test(userAgent) ? 'Edge' : 'Browser'
+    const os = /android/i.test(userAgent) ? 'Android' : /windows/i.test(userAgent) ? 'Windows' : /mac/i.test(userAgent) ? 'macOS' : /linux/i.test(userAgent) ? 'Linux' : /ios|iphone|ipad/i.test(userAgent) ? 'iOS' : 'OS'
+
+    // Increment download count and record download analytics log asynchronously if not skipped
+    if (!skipIncrement && !isInline) {
+      (async () => {
+        try {
+          await supabaseAdmin.rpc("increment_download_count", { file_id: file.id })
+          await supabaseAdmin.from('file_download_logs').insert({
+            file_id: file.id,
+            owner_id: fileOwner.user_id,
+            device_type: deviceType,
+            browser: browser,
+            os: os,
+          })
+        } catch (logErr) {
+          console.error("Failed to log download analytics in edge function:", logErr)
+        }
+      })()
     }
 
     // Stream the body directly to the client

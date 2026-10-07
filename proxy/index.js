@@ -195,6 +195,15 @@ const appendStreamToArchive = (archiveInstance, source, name) => {
   })
 }
 
+function parseUserAgent(ua) {
+  const userAgent = ua || ''
+  const isMobile = /mobile|android|iphone|ipad/i.test(userAgent)
+  const deviceType = isMobile ? 'Mobile' : 'Desktop'
+  const browser = /chrome/i.test(userAgent) ? 'Chrome' : /firefox/i.test(userAgent) ? 'Firefox' : /safari/i.test(userAgent) ? 'Safari' : /edge/i.test(userAgent) ? 'Edge' : 'Browser'
+  const os = /android/i.test(userAgent) ? 'Android' : /windows/i.test(userAgent) ? 'Windows' : /mac/i.test(userAgent) ? 'macOS' : /linux/i.test(userAgent) ? 'Linux' : /ios|iphone|ipad/i.test(userAgent) ? 'iOS' : 'OS'
+  return { deviceType, browser, os }
+}
+
 const app = express()
 app.set('json spaces', 2)
 const PORT = process.env.PORT || 3001
@@ -551,12 +560,21 @@ app.get('/download-file', async (req, res) => {
       }
 
       if (!aborted && !skipIncrement) {
-        // Increment download count in database asynchronously
+        // Increment download count and log folder download in database asynchronously
         (async () => {
           try {
             await supabaseAdmin.rpc('increment_download_count', { file_id: file.id })
+            const { deviceType, browser, os } = parseUserAgent(req.headers['user-agent'] || '')
+            await supabaseAdmin.from('file_download_logs').insert({
+              file_id: file.id,
+              owner_id: file.user_id,
+              custom_link_id: customLink ? customLink.id : null,
+              device_type: deviceType,
+              browser: browser,
+              os: os,
+            })
           } catch (err) {
-            console.error('Failed to increment download count:', err)
+            console.error('Failed to log folder download analytics:', err)
           }
         })()
       }
@@ -620,7 +638,8 @@ app.get('/download-file', async (req, res) => {
     }
 
     // Increment download count and record analytics log asynchronously
-    if (!skipIncrement && driveResponse.statusCode !== 206) {
+    const isStartOfStream = !clientRange || clientRange.startsWith('bytes=0-')
+    if (!skipIncrement && (!isPreview) && (driveResponse.statusCode === 200 || isStartOfStream)) {
       (async () => {
         try {
           await supabaseAdmin.rpc('increment_download_count', { file_id: file.id })
@@ -629,7 +648,7 @@ app.get('/download-file', async (req, res) => {
             if (customLink.is_one_time) {
               await supabaseAdmin
                 .from('custom_share_links')
-                .update({ expires_at: new Date().toISOString() })
+                .update({ expires_at: new Date().toISOString(), is_active: false })
                 .eq('id', customLink.id)
             }
           }
