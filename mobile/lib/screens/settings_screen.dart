@@ -140,7 +140,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final userId = authService.currentUser?.id;
     if (userId == null) return;
 
-    await _executeDirectFolderCreate();
+    if (authService.profile?.driveFolderId != null && authService.profile!.driveFolderId!.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF0F172A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.all(24),
+          title: const Row(
+            children: [
+              Icon(LucideIcons.sparkles, color: Colors.indigoAccent, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Create New Folder?',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'A fresh Neo Files Transfer folder will be created in your Google Drive and set as your primary upload destination.\n\n'
+            '📌 Important Note:\n'
+            '• Your existing files will remain in your previous folder and their download links will stay 100% active.\n'
+            '• If you want all files in one place, you can manually move/shift them into the new folder in Google Drive.',
+            style: TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.45),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _executeDirectFolderCreate();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.indigo.shade600,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Confirm & Create', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    } else {
+      await _executeDirectFolderCreate();
+    }
   }
 
   Future<void> _executeDirectFolderCreate() async {
@@ -411,9 +459,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ElevatedButton.icon(
                     onPressed: _isSaving ? null : _handleAutoCreateFolder,
                     icon: const Icon(LucideIcons.sparkles, size: 16),
-                    label: const Text(
-                      '✨ Auto-Create & Connect Drive Folder',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    label: Text(
+                      authService.profile?.driveFolderId != null && authService.profile!.driveFolderId!.isNotEmpty
+                          ? '✨ Re-create & Connect Drive Folder'
+                          : '✨ Auto-Create & Connect Drive Folder',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.indigo.shade600,
@@ -425,6 +475,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       elevation: 4,
                     ),
                   ),
+                  if (authService.profile?.driveFolderId != null && authService.profile!.driveFolderId!.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.indigo.withOpacity(0.2)),
+                      ),
+                      child: const Text(
+                        'Note: Existing files will remain in your previous folder and keep working. You can optionally move them manually in Google Drive if you wish.',
+                        style: TextStyle(color: Colors.indigoAccent, fontSize: 11, height: 1.35),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   const Center(
                     child: Text(

@@ -19,6 +19,7 @@ export default function SettingsPage() {
   const [verifying, setVerifying] = useState(false)
   const [autoCreating, setAutoCreating] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [showRecreateConfirm, setShowRecreateConfirm] = useState(false)
   const [validationError, setValidationError] = useState(null)
   const [existingFilesCount, setExistingFilesCount] = useState(0)
   const [showManualPaste, setShowManualPaste] = useState(false)
@@ -76,7 +77,11 @@ export default function SettingsPage() {
       return
     }
 
-    await executeDirectAutoCreate()
+    if (profile?.drive_folder_id) {
+      setShowRecreateConfirm(true)
+    } else {
+      await executeDirectAutoCreate()
+    }
   }
 
   async function executeDirectAutoCreate() {
@@ -351,6 +356,17 @@ export default function SettingsPage() {
             <p className="text-[11px] text-center text-gray-400">
               ⚡ Automatically creates a secure <code>Neo Files Transfer</code> folder in your Drive. Zero manual setup required!
             </p>
+
+            {profile?.drive_folder_id && (
+              <div className="bg-indigo-950/30 border border-indigo-500/20 rounded-xl p-3 text-[11px] text-indigo-300 leading-relaxed space-y-1">
+                <p className="font-semibold text-indigo-200 flex items-center gap-1.5">
+                  <span>ℹ️</span> Note for Re-connecting Folder:
+                </p>
+                <p className="text-gray-300">
+                  Creating a new folder will set it as your active destination. Existing files will remain in your previous folder and keep working. You can optionally move them manually in Google Drive if you wish.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Advanced Manual Paste Accordion */}
@@ -436,6 +452,53 @@ export default function SettingsPage() {
           >
             <LogOut size={16} /> Sign Out
           </button>
+        </div>
+      )}
+
+      {/* Re-create / Connect Folder Confirmation Modal */}
+      {showRecreateConfirm && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-dark-600 border border-dark-400 rounded-3xl max-w-md w-full p-6 sm:p-7 space-y-5 shadow-2xl animate-scale-in">
+            <div className="space-y-3 text-center">
+              <div className="w-14 h-14 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl flex items-center justify-center mx-auto text-indigo-400 shadow-inner">
+                <Sparkles size={28} />
+              </div>
+              <h3 className="text-lg font-bold text-gray-50 font-['Space_Grotesk']">
+                Create & Connect New Drive Folder?
+              </h3>
+              <div className="text-xs text-gray-400 leading-relaxed text-left bg-dark-500/60 p-4 rounded-2xl border border-white/5 space-y-2.5">
+                <p className="text-gray-200 font-medium">
+                  A fresh <strong>Neo Files Transfer</strong> folder will be created in your Google Drive and set as your primary upload destination.
+                </p>
+                <div className="text-indigo-300 pt-2 border-t border-white/5 space-y-1.5">
+                  <p className="font-semibold text-indigo-200">📌 Important Note for Existing Files:</p>
+                  <p className="text-gray-300">
+                    • Your existing uploaded files will remain in your previous folder and their download links will stay <strong>100% active</strong>.
+                  </p>
+                  <p className="text-gray-300">
+                    • If you want all files in one place, you can <strong>manually move/shift</strong> your files from your old folder into the new folder on Google Drive.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowRecreateConfirm(false)}
+                className="flex-1 py-2.5 bg-dark-500 hover:bg-dark-400 border border-dark-300 text-gray-300 rounded-xl text-xs font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowRecreateConfirm(false)
+                  executeDirectAutoCreate()
+                }}
+                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-colors shadow-lg shadow-indigo-600/30"
+              >
+                Confirm & Create Folder
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
