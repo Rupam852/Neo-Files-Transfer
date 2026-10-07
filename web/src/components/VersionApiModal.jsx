@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../services/supabase'
+import toast from 'react-hot-toast'
 import { Copy, Check, RefreshCw, Save, Smartphone, Code2, X, ExternalLink, Sparkles } from 'lucide-react'
+import { generateVersionApiUrl, generateDirectDownloadUrl } from '../utils/helpers'
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 export default function VersionApiModal({ file, onClose, onFileUpdated }) {

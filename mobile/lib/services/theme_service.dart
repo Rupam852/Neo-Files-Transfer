@@ -81,7 +81,7 @@ class AppTheme {
         fontFamily: 'Plus Jakarta Sans',
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: Colors.white,
       elevation: 1.5,
       shadowColor: Colors.black.withOpacity(0.06),
@@ -90,7 +90,7 @@ class AppTheme {
         side: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
       ),
     ),
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
@@ -149,7 +149,7 @@ class AppTheme {
         fontFamily: 'Plus Jakarta Sans',
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: const Color(0xFF0F172A),
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -157,7 +157,7 @@ class AppTheme {
         side: const BorderSide(color: Color(0xFF1E293B), width: 1),
       ),
     ),
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       backgroundColor: const Color(0xFF0F172A),
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(

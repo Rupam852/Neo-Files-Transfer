@@ -65,7 +65,7 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
         newFile: file,
         fileName: picked.name,
         cancelToken: _cancelToken!,
-        onProgress: (pct) {
+        onProgress: (pct, [speed]) {
           if (mounted) {
             setState(() => _uploadProgress = pct);
           }

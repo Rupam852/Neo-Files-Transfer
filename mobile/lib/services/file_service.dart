@@ -205,7 +205,7 @@ class FileService extends ChangeNotifier {
     required String fileName,
     required String? parentDbFolderId,
     required String? parentDriveFolderId,
-    required Function(double progress, [String speed]) onProgress,
+    required void Function(double progress, [String? speed]) onProgress,
     required CancelToken cancelToken,
   }) async {
     final userId = _authService.currentUser?.id;
@@ -500,7 +500,7 @@ class FileService extends ChangeNotifier {
     required SharedFile fileRecord,
     required File newFile,
     required String fileName,
-    required Function(double progress, [String speed]) onProgress,
+    required void Function(double progress, [String? speed]) onProgress,
     required CancelToken cancelToken,
   }) async {
     final userId = _authService.currentUser?.id;
