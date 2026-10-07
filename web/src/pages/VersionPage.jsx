@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
 import { ArrowLeft, Upload, Check, Clock, X } from 'lucide-react'
-import { formatFileSize, formatDate, formatErrorMessage } from '../utils/helpers'
+import { formatFileSize, formatUploadSpeed, formatDate, formatErrorMessage } from '../utils/helpers'
 
 export default function VersionPage({ fileId: propFileId, onBack }) {
   const { fileId: paramFileId } = useParams()
@@ -15,6 +15,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
   const fileInputRef = useRef(null)
   const activeXhrRef = useRef(null)
   const isCancelledRef = useRef(false)
+  const speedTrackerRef = useRef({ lastTime: 0, lastLoaded: 0 })
   const [file, setFile] = useState(null)
 
   function handleCancelUpload() {
@@ -26,12 +27,14 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
     setUploading(false)
     setProcessingText(null)
     setUploadProgress(null)
+    setUploadSpeed('')
   }
   const [versions, setVersions] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [processingText, setProcessingText] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(null)
+  const [uploadSpeed, setUploadSpeed] = useState('')
 
   useEffect(() => {
     loadData()
@@ -85,6 +88,8 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
     isCancelledRef.current = false
     setUploading(true)
     setUploadProgress(0)
+    setUploadSpeed('')
+    speedTrackerRef.current = { lastTime: performance.now(), lastLoaded: 0 }
     setProcessingText('Uploading new version...')
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -167,6 +172,15 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
               if (e.lengthComputable) {
                 const pct = Math.round((e.loaded / e.total) * 100)
                 setUploadProgress(pct)
+
+                const now = performance.now()
+                const timeDiff = (now - speedTrackerRef.current.lastTime) / 1000
+                if (timeDiff >= 0.25 || e.loaded === e.total) {
+                  const bytesDiff = Math.max(0, e.loaded - speedTrackerRef.current.lastLoaded)
+                  const bps = timeDiff > 0 ? bytesDiff / timeDiff : 0
+                  setUploadSpeed(formatUploadSpeed(bps))
+                  speedTrackerRef.current = { lastTime: now, lastLoaded: e.loaded }
+                }
               }
             })
 
@@ -226,6 +240,15 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
             if (e.lengthComputable) {
               const pct = Math.round((e.loaded / e.total) * 100)
               setUploadProgress(pct)
+
+              const now = performance.now()
+              const timeDiff = (now - speedTrackerRef.current.lastTime) / 1000
+              if (timeDiff >= 0.25 || e.loaded === e.total) {
+                const bytesDiff = Math.max(0, e.loaded - speedTrackerRef.current.lastLoaded)
+                const bps = timeDiff > 0 ? bytesDiff / timeDiff : 0
+                setUploadSpeed(formatUploadSpeed(bps))
+                speedTrackerRef.current = { lastTime: now, lastLoaded: e.loaded }
+              }
             }
           })
 
@@ -315,6 +338,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
       setUploading(false)
       setProcessingText(null)
       setUploadProgress(null)
+      setUploadSpeed('')
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
@@ -458,6 +482,13 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
                 </div>
                 <div className="flex justify-between items-center text-xs text-gray-400 px-0.5 font-medium">
                   <span>Progress</span>
+                  {uploadSpeed ? (
+                    <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      ⚡ {uploadSpeed}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-gray-500">Calculating speed...</span>
+                  )}
                   <span className="text-xs font-bold text-primary-400">{uploadProgress ?? 0}%</span>
                 </div>
               </div>

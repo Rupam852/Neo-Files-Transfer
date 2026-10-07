@@ -10,7 +10,7 @@ import {
   CheckSquare, Square, FolderInput, X, Code2, BarChart2, Eye,
   RotateCcw, Trash, ShieldCheck,
 } from 'lucide-react'
-import { formatFileSize, formatDate, getExtension, generateShareUrl, generateDirectDownloadUrl, generateMediaPreviewUrl, formatErrorMessage } from '../utils/helpers'
+import { formatFileSize, formatUploadSpeed, formatDate, getExtension, generateShareUrl, generateDirectDownloadUrl, generateMediaPreviewUrl, formatErrorMessage } from '../utils/helpers'
 import { useNavigate } from 'react-router-dom'
 import VersionApiModal from '../components/VersionApiModal'
 import ShareModal from '../components/ShareModal'
@@ -81,7 +81,9 @@ export default function FilesPage({ onViewVersions }) {
   const [uploading, setUploading] = useState(false)
   const [processingText, setProcessingText] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(null)
+  const [uploadSpeed, setUploadSpeed] = useState('')
   const [uploadInfo, setUploadInfo] = useState(null)
+  const speedTrackerRef = useRef({ lastTime: 0, lastLoaded: 0 })
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('file_name')
   const [sortDir, setSortDir] = useState('asc')
@@ -146,6 +148,7 @@ export default function FilesPage({ onViewVersions }) {
     setUploading(false)
     setProcessingText(null)
     setUploadProgress(null)
+    setUploadSpeed('')
     setUploadInfo(null)
     setUploadQueue([])
   }
@@ -483,6 +486,8 @@ export default function FilesPage({ onViewVersions }) {
 
       setUploadInfo({ current: i + 1, total: batch.length, fileName: file.name })
       setUploadProgress(0)
+      setUploadSpeed('')
+      speedTrackerRef.current = { lastTime: performance.now(), lastLoaded: 0 }
       setProcessingText(`Uploading file ${i + 1} of ${batch.length}`)
 
       try {
@@ -564,6 +569,15 @@ export default function FilesPage({ onViewVersions }) {
               if (e.lengthComputable) {
                 const pct = Math.round((e.loaded / e.total) * 100)
                 setUploadProgress(pct)
+
+                const now = performance.now()
+                const timeDiff = (now - speedTrackerRef.current.lastTime) / 1000
+                if (timeDiff >= 0.25 || e.loaded === e.total) {
+                  const bytesDiff = Math.max(0, e.loaded - speedTrackerRef.current.lastLoaded)
+                  const bps = timeDiff > 0 ? bytesDiff / timeDiff : 0
+                  setUploadSpeed(formatUploadSpeed(bps))
+                  speedTrackerRef.current = { lastTime: now, lastLoaded: e.loaded }
+                }
               }
             })
 
@@ -608,6 +622,15 @@ export default function FilesPage({ onViewVersions }) {
               if (e.lengthComputable) {
                 const pct = Math.round((e.loaded / e.total) * 100)
                 setUploadProgress(pct)
+
+                const now = performance.now()
+                const timeDiff = (now - speedTrackerRef.current.lastTime) / 1000
+                if (timeDiff >= 0.25 || e.loaded === e.total) {
+                  const bytesDiff = Math.max(0, e.loaded - speedTrackerRef.current.lastLoaded)
+                  const bps = timeDiff > 0 ? bytesDiff / timeDiff : 0
+                  setUploadSpeed(formatUploadSpeed(bps))
+                  speedTrackerRef.current = { lastTime: now, lastLoaded: e.loaded }
+                }
               }
             })
 
@@ -701,6 +724,7 @@ export default function FilesPage({ onViewVersions }) {
     setUploading(false)
     setProcessingText(null)
     setUploadProgress(null)
+    setUploadSpeed('')
     setUploadInfo(null)
     loadFiles()
   }
@@ -1997,6 +2021,13 @@ export default function FilesPage({ onViewVersions }) {
                     </div>
                     <div className="flex justify-between items-center text-xs text-gray-400 px-0.5 font-medium">
                       <span>Progress</span>
+                      {uploadSpeed ? (
+                        <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                          ⚡ {uploadSpeed}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-gray-500">Calculating speed...</span>
+                      )}
                       <span className="text-xs font-bold text-primary-400">{uploadProgress ?? 0}%</span>
                     </div>
                   </div>
