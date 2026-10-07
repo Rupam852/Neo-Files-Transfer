@@ -3,31 +3,52 @@ import { supabase } from '../services/supabase'
 
 const AuthContext = createContext(null)
 
+// 1 Hour Inactivity Timeout (in milliseconds)
+const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminRecord, setAdminRecord] = useState(null)
   const [isPaused, setIsPaused] = useState(false)
-  const [isSessionInvalidated, setIsSessionInvalidated] = useState(false)
   const [isUnderMaintenance, setIsUnderMaintenance] = useState(false)
   const [downloadsEnabled, setDownloadsEnabled] = useState(true)
   const [sharingEnabled, setSharingEnabled] = useState(true)
   const [loading, setLoading] = useState(true)
   const loadingProfileRef = useRef(false)
 
-  const generateSessionId = () => {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID()
-    }
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  // 1-Hour Inactivity System: Check and update activity
+  const recordActivity = () => {
+    localStorage.setItem('neo_last_active_time', Date.now().toString())
+  }
+
+  const isSessionTimedOut = () => {
+    const lastActiveStr = localStorage.getItem('neo_last_active_time')
+    if (!lastActiveStr) return false
+    const lastActive = parseInt(lastActiveStr, 10)
+    if (isNaN(lastActive)) return false
+    return (Date.now() - lastActive) > INACTIVITY_TIMEOUT_MS
   }
 
   useEffect(() => {
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
+    // Check active session on initial load
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
+        // If 1 hour of inactivity has already elapsed while tab/browser was closed
+        if (isSessionTimedOut()) {
+          console.log('Web session expired due to 1 hour of inactivity.')
+          localStorage.removeItem('neo_last_active_time')
+          await supabase.auth.signOut()
+          setUser(null)
+          setLoading(false)
+          return
+        }
+
+        // Active session: record current activity timestamp
+        recordActivity()
+        setUser(session.user)
+
         const sessionTokens = {}
         if (session.provider_token) {
           sessionTokens.google_access_token = session.provider_token
@@ -39,15 +60,17 @@ export function AuthProvider({ children }) {
         }
         loadProfile(session.user, sessionTokens)
       } else {
+        localStorage.removeItem('neo_last_active_time')
         setLoading(false)
       }
     })
 
-    // Listen for auth changes
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setUser(session?.user ?? null)
         if (session?.user) {
+          recordActivity()
+          setUser(session.user)
           const sessionTokens = {}
           if (session.provider_token) {
             sessionTokens.google_access_token = session.provider_token
@@ -63,11 +86,12 @@ export function AuthProvider({ children }) {
           try {
             localStorage.removeItem('google_provider_token')
             localStorage.removeItem('google_refresh_token')
+            localStorage.removeItem('neo_last_active_time')
           } catch (e) {}
+          setUser(null)
           setProfile(null)
           setIsAdmin(false)
           setAdminRecord(null)
-          setIsSessionInvalidated(false)
           setIsUnderMaintenance(false)
           setLoading(false)
         }
@@ -77,6 +101,38 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Web Inactivity Tracker: Listen for user actions & keep session alive while user is active
+  useEffect(() => {
+    if (!user) return
+
+    let lastThrottle = 0
+    const handleUserActivity = () => {
+      const now = Date.now()
+      if (now - lastThrottle > 15000) { // Throttle every 15s max
+        lastThrottle = now
+        recordActivity()
+      }
+    }
+
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click', 'mousemove']
+    events.forEach(e => window.addEventListener(e, handleUserActivity, { passive: true }))
+
+    // Periodic check every 30s to verify if 1 hour of inactivity has elapsed
+    const checkInterval = setInterval(async () => {
+      if (isSessionTimedOut()) {
+        console.log('User inactive for >1 hour. Logging out automatically.')
+        clearInterval(checkInterval)
+        await signOut()
+      }
+    }, 30000)
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, handleUserActivity))
+      clearInterval(checkInterval)
+    }
+  }, [user])
+
+  // Realtime listeners for Admins and Approved Users
   useEffect(() => {
     if (!user) return
 
@@ -126,38 +182,9 @@ export function AuthProvider({ children }) {
       )
       .subscribe()
 
-    // Subscribe to realtime updates for the current user's entry in the user_profiles table
-    const profileChannel = supabase
-      .channel(`profile-status-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_profiles',
-          filter: `id=eq.${user.id}`,
-        },
-        async (payload) => {
-          console.log('Realtime profile status change:', payload)
-          if (payload.eventType === 'DELETE') {
-            await signOut()
-            return
-          }
-          if (payload.new) {
-            const newWebSession = payload.new.active_web_session_id
-            const localSession = localStorage.getItem('active_web_session_id')
-            if (newWebSession && localSession && newWebSession !== localSession) {
-              setIsSessionInvalidated(true)
-            }
-          }
-        }
-      )
-      .subscribe()
-
     return () => {
       supabase.removeChannel(adminChannel)
       supabase.removeChannel(approvedChannel)
-      supabase.removeChannel(profileChannel)
     }
   }, [user])
 
@@ -189,7 +216,6 @@ export function AuthProvider({ children }) {
     return () => supabase.removeChannel(settingsChannel)
   }, [user])
 
-
   async function loadProfile(authUser, sessionTokens = {}, isFreshSignIn = false) {
     if (loadingProfileRef.current) {
       console.log('Ignore concurrent loadProfile call')
@@ -205,7 +231,7 @@ export function AuthProvider({ children }) {
         .maybeSingle()
 
       if (!profileData) {
-        // Create profile on the fly if missing (e.g. if the user was previously blocked but now logged in)
+        // Create profile on the fly if missing
         const newProfile = {
           id: authUser.id,
           email: authUser.email,
@@ -224,11 +250,10 @@ export function AuthProvider({ children }) {
         if (!insertError && insertedData) {
           profileData = insertedData
         } else {
-          // Fallback to local profile info if insert fails
           profileData = { ...newProfile, is_folder_verified: false, drive_folder_id: null }
         }
       } else {
-        // If profile exists, check if we need to sync Google tokens to DB
+        // If profile exists, sync Google tokens if needed
         const updates = {}
         if (sessionTokens.google_access_token && profileData.google_access_token !== sessionTokens.google_access_token) {
           updates.google_access_token = sessionTokens.google_access_token
@@ -248,34 +273,6 @@ export function AuthProvider({ children }) {
             profileData = updatedData
           }
         }
-      }
-
-      // Establish & Validate active Web Session
-      let localSessionId = localStorage.getItem('active_web_session_id')
-      if (!localSessionId) {
-        localSessionId = generateSessionId()
-        localStorage.setItem('active_web_session_id', localSessionId)
-      }
-
-      const claimActiveSession =
-        localStorage.getItem('claim_active_session') === 'true' ||
-        isFreshSignIn ||
-        window.location.pathname === '/auth/callback'
-      if (claimActiveSession || !profileData.active_web_session_id) {
-        // Claim active session
-        await supabase
-          .from('user_profiles')
-          .update({ active_web_session_id: localSessionId })
-          .eq('id', authUser.id)
-        
-        localStorage.removeItem('claim_active_session')
-        profileData.active_web_session_id = localSessionId
-        setIsSessionInvalidated(false)
-      } else if (profileData.active_web_session_id !== localSessionId) {
-        // Logged out because another session is active
-        setIsSessionInvalidated(true)
-        setLoading(false)
-        return
       }
 
       setProfile(profileData)
@@ -313,13 +310,12 @@ export function AuthProvider({ children }) {
           .maybeSingle()
 
         if (!approvedData) {
-          // If not approved and not admin, revoke local session immediately
+          // If not approved and not admin, revoke session
           await supabase.auth.signOut()
           setUser(null)
           setProfile(null)
           setIsAdmin(false)
           setIsPaused(false)
-          setIsSessionInvalidated(false)
           return
         }
         setIsPaused(approvedData.is_paused || false)
@@ -335,7 +331,7 @@ export function AuthProvider({ children }) {
   }
 
   async function signInWithGoogle(forceConsent = false) {
-    localStorage.setItem('claim_active_session', 'true')
+    recordActivity()
     const queryParams = { access_type: 'offline' }
     if (forceConsent) {
       queryParams.prompt = 'consent select_account'
@@ -353,27 +349,10 @@ export function AuthProvider({ children }) {
 
   async function signOut() {
     try {
-      if (user) {
-        const localSessionId = localStorage.getItem('active_web_session_id')
-        if (localSessionId) {
-          // Only clear if the DB session matches our local session
-          const { data: profileData } = await supabase
-            .from('user_profiles')
-            .select('active_web_session_id')
-            .eq('id', user.id)
-            .maybeSingle()
-
-          if (profileData && profileData.active_web_session_id === localSessionId) {
-            await supabase
-              .from('user_profiles')
-              .update({ active_web_session_id: null })
-              .eq('id', user.id)
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Failed to clear active session in DB:', e)
-    }
+      localStorage.removeItem('neo_last_active_time')
+      localStorage.removeItem('google_provider_token')
+      localStorage.removeItem('google_refresh_token')
+    } catch (e) {}
 
     await supabase.auth.signOut()
     setUser(null)
@@ -381,13 +360,9 @@ export function AuthProvider({ children }) {
     setIsAdmin(false)
     setAdminRecord(null)
     setIsPaused(false)
-    setIsSessionInvalidated(false)
     setIsUnderMaintenance(false)
     setDownloadsEnabled(true)
     setSharingEnabled(true)
-    try {
-      localStorage.removeItem('active_web_session_id')
-    } catch (e) {}
   }
 
   async function refreshProfile() {
@@ -403,7 +378,6 @@ export function AuthProvider({ children }) {
       isAdmin,
       adminRecord,
       isPaused,
-      isSessionInvalidated,
       isUnderMaintenance,
       downloadsEnabled,
       sharingEnabled,

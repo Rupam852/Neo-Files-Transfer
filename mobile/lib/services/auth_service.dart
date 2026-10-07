@@ -10,13 +10,11 @@ class AuthService extends ChangeNotifier {
   UserProfile? _profile;
   bool _isAdmin = false;
   bool _isPaused = false;
-  bool _isSessionInvalidated = false;
   bool _isUnderMaintenance = false;
   bool _isDownloadsEnabled = true;
   bool _isSharingEnabled = true;
   bool _isLoading = true;
   String? _loginError;
-  String? _localMobileSessionId;
   bool _isProfileLoading = false;
   bool _hasGoogleConnectionError = false;
 
@@ -24,7 +22,6 @@ class AuthService extends ChangeNotifier {
   UserProfile? get profile => _profile;
   bool get isAdmin => _isAdmin;
   bool get isPaused => _isPaused;
-  bool get isSessionInvalidated => _isSessionInvalidated;
   bool get isUnderMaintenance => _isUnderMaintenance;
   bool get isDownloadsEnabled => _isDownloadsEnabled;
   bool get isSharingEnabled => _isSharingEnabled;
@@ -83,21 +80,7 @@ class AuthService extends ChangeNotifier {
 
   RealtimeChannel? _adminChannel;
   RealtimeChannel? _approvedChannel;
-  RealtimeChannel? _profileChannel;
   RealtimeChannel? _settingsChannel;
-
-  Future<String> _getOrCreateLocalMobileSessionId() async {
-    if (_localMobileSessionId != null) return _localMobileSessionId!;
-    final prefs = await SharedPreferences.getInstance();
-    var sessionId = prefs.getString('active_mobile_session_id');
-    if (sessionId == null) {
-      sessionId = DateTime.now().millisecondsSinceEpoch.toString() + '_' + 
-                  UniqueKey().hashCode.toString();
-      await prefs.setString('active_mobile_session_id', sessionId);
-    }
-    _localMobileSessionId = sessionId;
-    return sessionId;
-  }
 
   void _setupRealtimeListeners() {
     _clearRealtimeListeners();
@@ -145,32 +128,6 @@ class AuthService extends ChangeNotifier {
             });
     _approvedChannel?.subscribe();
 
-    _profileChannel = _client
-        .channel('profile-status-${_user!.id}')
-        .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'user_profiles',
-            callback: (payload) async {
-              if (_user == null) return;
-              if (payload.eventType == PostgresChangeEvent.delete) {
-                await signOut();
-                return;
-              }
-              final Map<String, dynamic>? newRecord = payload.newRecord;
-              if (newRecord != null) {
-                final newMobileSession = newRecord['active_mobile_session_id'] as String?;
-                final localSession = _localMobileSessionId;
-                if (newMobileSession != null &&
-                    localSession != null &&
-                    newMobileSession != localSession) {
-                  _isSessionInvalidated = true;
-                  notifyListeners();
-                }
-              }
-            });
-    _profileChannel?.subscribe();
-
     // Listen to system_settings for maintenance mode changes
     _settingsChannel = _client
         .channel('auth-settings-changes')
@@ -179,7 +136,6 @@ class AuthService extends ChangeNotifier {
             schema: 'public',
             table: 'system_settings',
             callback: (payload) async {
-              // Re-fetch all settings to get the latest state
               try {
                 final settingsRes = await _client.from('system_settings').select();
                 bool maintenance = false;
@@ -199,7 +155,7 @@ class AuthService extends ChangeNotifier {
                 _isSharingEnabled = sharing;
                 notifyListeners();
               } catch (e) {
-                debugPrint('Failed to refresh settings: $e');
+                debugPrint('Failed to refresh system settings: $e');
               }
             });
     _settingsChannel?.subscribe();
@@ -214,73 +170,84 @@ class AuthService extends ChangeNotifier {
       _client.removeChannel(_approvedChannel!);
       _approvedChannel = null;
     }
-    if (_profileChannel != null) {
-      _client.removeChannel(_profileChannel!);
-      _profileChannel = null;
-    }
     if (_settingsChannel != null) {
       _client.removeChannel(_settingsChannel!);
       _settingsChannel = null;
     }
   }
 
-  Future<void> loadProfile(User authUser, [Map<String, String?>? sessionTokens, bool isFreshSignIn = false]) async {
-    if (_isProfileLoading) {
-      debugPrint('Ignore concurrent loadProfile call');
-      return;
+  Future<void> refreshProfile() async {
+    if (_user != null) {
+      await loadProfile(_user!);
     }
-    _isProfileLoading = true;
-    try {
-      _isLoading = true;
-      notifyListeners();
+  }
 
-      // Fetch user profile from DB
-      var response = await _client
+  Future<void> loadProfile(
+    User authUser, [
+    Map<String, String?>? sessionTokens,
+    bool isFreshSignIn = false,
+  ]) async {
+    if (_isProfileLoading) return;
+    _isProfileLoading = true;
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // Step 1: Fetch user profile
+      final response = await _client
           .from('user_profiles')
           .select()
           .eq('id', authUser.id)
           .maybeSingle();
 
       UserProfile? profileData;
-      if (response != null) {
-        profileData = UserProfile.fromJson(response);
-      }
 
-      if (profileData == null) {
-        // Create profile on-the-fly
-        final newProfile = {
+      if (response == null) {
+        // Create new profile record
+        final insertPayload = <String, dynamic>{
           'id': authUser.id,
-          'email': authUser.email ?? '',
-          'name': authUser.userMetadata?['full_name'] ?? authUser.userMetadata?['name'] ?? '',
+          'email': authUser.email,
+          'name': authUser.userMetadata?['full_name'] ??
+              authUser.userMetadata?['name'] ??
+              '',
           'avatar_url': authUser.userMetadata?['avatar_url'] ?? '',
         };
 
         if (sessionTokens?['google_access_token'] != null) {
-          newProfile['google_access_token'] = sessionTokens!['google_access_token']!;
+          insertPayload['google_access_token'] = sessionTokens!['google_access_token'];
         }
         if (sessionTokens?['google_refresh_token'] != null) {
-          newProfile['google_refresh_token'] = sessionTokens!['google_refresh_token']!;
+          insertPayload['google_refresh_token'] = sessionTokens!['google_refresh_token'];
         }
 
         final inserted = await _client
             .from('user_profiles')
-            .insert(newProfile)
+            .insert(insertPayload)
             .select()
             .maybeSingle();
 
         if (inserted != null) {
           profileData = UserProfile.fromJson(inserted);
+        } else {
+          profileData = UserProfile(
+            id: authUser.id,
+            email: authUser.email ?? '',
+            name: (insertPayload['name'] as String?) ?? '',
+            avatarUrl: insertPayload['avatar_url'] as String?,
+          );
         }
       } else {
-        // Check if we need to sync tokens
-        final updates = <String, String>{};
+        profileData = UserProfile.fromJson(response);
+
+        // Update tokens in DB if present in session
+        final updates = <String, dynamic>{};
         if (sessionTokens?['google_access_token'] != null &&
-            response!['google_access_token'] != sessionTokens!['google_access_token']) {
-          updates['google_access_token'] = sessionTokens['google_access_token']!;
+            profileData.googleAccessToken != sessionTokens!['google_access_token']) {
+          updates['google_access_token'] = sessionTokens['google_access_token'];
         }
         if (sessionTokens?['google_refresh_token'] != null &&
-            response!['google_refresh_token'] != sessionTokens!['google_refresh_token']) {
-          updates['google_refresh_token'] = sessionTokens['google_refresh_token']!;
+            profileData.googleRefreshToken != sessionTokens!['google_refresh_token']) {
+          updates['google_refresh_token'] = sessionTokens['google_refresh_token'];
         }
 
         if (updates.isNotEmpty) {
@@ -297,47 +264,6 @@ class AuthService extends ChangeNotifier {
       }
 
       _profile = profileData;
-
-      if (profileData != null) {
-        final localSessionId = await _getOrCreateLocalMobileSessionId();
-        final dbMobileSessionId = response?['active_mobile_session_id'] as String?;
-
-        final prefs = await SharedPreferences.getInstance();
-        final claimActiveSession = prefs.getBool('claim_active_session') == true;
-
-        if (isFreshSignIn || claimActiveSession || dbMobileSessionId == null || dbMobileSessionId == localSessionId) {
-          if (claimActiveSession) {
-            await prefs.remove('claim_active_session');
-          }
-          if (dbMobileSessionId != localSessionId) {
-            await _client
-                .from('user_profiles')
-                .update({'active_mobile_session_id': localSessionId})
-                .eq('id', authUser.id);
-          }
-          _isSessionInvalidated = false;
-          profileData = UserProfile(
-            id: profileData.id,
-            email: profileData.email,
-            name: profileData.name,
-            avatarUrl: profileData.avatarUrl,
-            driveFolderId: profileData.driveFolderId,
-            isFolderVerified: profileData.isFolderVerified,
-            googleRefreshToken: profileData.googleRefreshToken,
-            activeWebSessionId: profileData.activeWebSessionId,
-            activeMobileSessionId: localSessionId,
-            createdAt: profileData.createdAt,
-            updatedAt: profileData.updatedAt,
-          );
-        } else if (dbMobileSessionId != localSessionId) {
-          // If session was invalidated by another device logging in
-          _isSessionInvalidated = true;
-          _isLoading = false;
-          notifyListeners();
-          return;
-        }
-
-      }
 
       // Check if user is Admin
       final adminResponse = await _client
@@ -429,8 +355,6 @@ class AuthService extends ChangeNotifier {
   Future<void> signInWithGoogle({bool forceConsent = false}) async {
     _loginError = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('claim_active_session', true);
 
     try {
       final queryParams = <String, String>{'access_type': 'offline'};
@@ -470,7 +394,6 @@ class AuthService extends ChangeNotifier {
     _profile = null;
     _isAdmin = false;
     _isPaused = false;
-    _isSessionInvalidated = false;
     _isUnderMaintenance = false;
     _isDownloadsEnabled = true;
     _isSharingEnabled = true;

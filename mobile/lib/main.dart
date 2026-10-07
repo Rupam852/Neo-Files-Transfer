@@ -12,7 +12,6 @@ import 'screens/login_screen.dart';
 import 'screens/pending_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/admin_screen.dart';
-import 'screens/session_invalidated_screen.dart';
 import 'screens/maintenance_screen.dart';
 
 void main() async {
@@ -91,7 +90,6 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
   AuthService? _authService;
   bool? _lastIsAdmin;
   bool? _lastIsPaused;
-  bool? _lastIsSessionInvalidated;
   bool? _lastIsUnderMaintenance;
   String? _lastUserId;
 
@@ -105,7 +103,6 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
       _authService?.addListener(_onAuthChanged);
       _lastIsAdmin = auth.isAdmin;
       _lastIsPaused = auth.isPaused;
-      _lastIsSessionInvalidated = auth.isSessionInvalidated;
       _lastIsUnderMaintenance = auth.isUnderMaintenance;
       _lastUserId = auth.currentUser?.id;
     }
@@ -122,25 +119,21 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
 
     final newIsAdmin = _authService!.isAdmin;
     final newIsPaused = _authService!.isPaused;
-    final newIsSessionInvalidated = _authService!.isSessionInvalidated;
     final newIsUnderMaintenance = _authService!.isUnderMaintenance;
     final newUserId = _authService!.currentUser?.id;
 
     final maintenanceChanged = newIsUnderMaintenance != _lastIsUnderMaintenance;
     final shouldPop = (newIsAdmin != _lastIsAdmin) ||
         (newIsPaused != _lastIsPaused) ||
-        (newIsSessionInvalidated != _lastIsSessionInvalidated) ||
         (newUserId != _lastUserId) ||
         (maintenanceChanged && !newIsAdmin);
 
     if (newIsAdmin != _lastIsAdmin ||
         newIsPaused != _lastIsPaused ||
-        newIsSessionInvalidated != _lastIsSessionInvalidated ||
         newIsUnderMaintenance != _lastIsUnderMaintenance ||
         newUserId != _lastUserId) {
       _lastIsAdmin = newIsAdmin;
       _lastIsPaused = newIsPaused;
-      _lastIsSessionInvalidated = newIsSessionInvalidated;
       _lastIsUnderMaintenance = newIsUnderMaintenance;
       _lastUserId = newUserId;
 
@@ -181,10 +174,6 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
           ),
         ),
       );
-    }
-
-    if (auth.isSessionInvalidated) {
-      return const SessionInvalidatedScreen();
     }
 
     if (auth.currentUser == null) {
