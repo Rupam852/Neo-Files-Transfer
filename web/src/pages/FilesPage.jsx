@@ -1544,29 +1544,27 @@ export default function FilesPage({ onViewVersions }) {
                             : <Square size={16} />}
                         </button>
                       </td>
-                      <td className="px-4 py-3">
+                      <td
+                        className="px-4 py-3 cursor-pointer group"
+                        onClick={() => {
+                          if (file.is_folder) {
+                            handleOpenFolder(file)
+                          } else if (viewMode === 'files') {
+                            setPreviewModalFile(file)
+                          }
+                        }}
+                      >
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-primary-500/20' : 'bg-dark-500'
-                            }`}>
-                            <Icon size={16} className={isSelected ? 'text-primary-400' : 'text-gray-400'} />
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
+                            isSelected ? 'bg-primary-500/20' : 'bg-dark-500 group-hover:bg-primary-500/15'
+                          }`}>
+                            <Icon size={16} className={`transition-colors ${isSelected ? 'text-primary-400' : 'text-gray-400 group-hover:text-primary-400'}`} />
                           </div>
-                          <div className="min-w-0">
-                            {file.is_folder ? (
-                              <button
-                                onClick={() => handleOpenFolder(file)}
-                                className="text-sm font-medium text-gray-100 hover:text-primary-400 text-left truncate w-full"
-                              >
-                                {file.file_name}
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => viewMode === 'files' && setPreviewModalFile(file)}
-                                className="text-sm font-medium text-gray-100 hover:text-primary-400 text-left truncate block w-full"
-                              >
-                                {file.file_name}
-                              </button>
-                            )}
-                            <p className="text-xs text-gray-400">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-sm font-medium text-gray-100 group-hover:text-primary-400 transition-colors text-left truncate block w-full">
+                              {file.file_name}
+                            </span>
+                            <p className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
                               {file.is_folder ? 'Folder' : getExtension(file.file_name)}
                             </p>
                           </div>
