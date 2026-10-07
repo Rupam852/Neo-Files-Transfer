@@ -238,8 +238,8 @@ export default function NotificationBell() {
       >
         <Bell size={19} className={unreadCount > 0 ? 'text-primary-400' : ''} />
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 min-w-[17px] h-[17px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-red-500/50 animate-pulse border-2 border-dark-700">
-            {unreadCount > 9 ? '9+' : unreadCount}
+          <span className="absolute top-1 right-1 min-w-[16px] h-[16px] px-1 bg-red-500 text-white text-[9.5px] font-extrabold rounded-full flex items-center justify-center border-2 border-dark-700 leading-none pointer-events-none">
+            {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>

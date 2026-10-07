@@ -32,13 +32,6 @@ class NotificationBellButton extends StatelessWidget {
                     color: const Color(0xFFEF4444),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFF0F172A), width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFEF4444).withOpacity(0.5),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                   constraints: const BoxConstraints(
                     minWidth: 16,
