@@ -67,7 +67,7 @@ export default function DownloadPage() {
         // 1. First check standard shared_files (Permanent main link - 100% untouched)
         const { data: file } = await supabase
           .from('shared_files')
-          .select('id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
+          .select('id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
           .eq('unique_share_hash', hash)
           .maybeSingle()
 
@@ -109,7 +109,7 @@ export default function DownloadPage() {
         // Fetch the corresponding file
         const { data: linkedFile } = await supabase
           .from('shared_files')
-          .select('id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
+          .select('id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
           .eq('id', customLink.file_id)
           .maybeSingle()
 
@@ -197,6 +197,46 @@ export default function DownloadPage() {
       setTimeout(() => {
         try { document.body.removeChild(link) } catch (_) {}
       }, 1500)
+
+      // Record device info for real-time notification
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+      const isMobile = /mobile|android|iphone|ipad/i.test(userAgent)
+      const deviceType = isMobile ? 'Mobile' : 'Desktop'
+      const browser = /chrome/i.test(userAgent) ? 'Chrome' : /firefox/i.test(userAgent) ? 'Firefox' : /safari/i.test(userAgent) ? 'Safari' : /edge/i.test(userAgent) ? 'Edge' : 'Browser'
+      const os = /android/i.test(userAgent) ? 'Android' : /windows/i.test(userAgent) ? 'Windows' : /mac/i.test(userAgent) ? 'macOS' : /linux/i.test(userAgent) ? 'Linux' : /ios|iphone|ipad/i.test(userAgent) ? 'iOS' : 'OS'
+
+      if (fileInfo?.id && fileInfo?.user_id) {
+        // 1. Insert download log (which invokes trigger)
+        supabase
+          .from('file_download_logs')
+          .insert({
+            file_id: fileInfo.id,
+            owner_id: fileInfo.user_id,
+            custom_link_id: customLinkInfo?.id || null,
+            device_type: deviceType,
+            browser: browser,
+            os: os,
+          })
+          .then(() => {}, (err) => console.error('file_download_logs insert error:', err))
+
+        // 2. Direct insert into notifications table as fail-safe
+        supabase
+          .from('notifications')
+          .insert({
+            user_id: fileInfo.user_id,
+            title: 'File Downloaded',
+            message: `Someone downloaded your file: ${fileInfo.file_name || 'Shared file'}`,
+            type: 'download',
+            metadata: {
+              file_id: fileInfo.id,
+              file_name: fileInfo.file_name,
+              device_type: deviceType,
+              browser: browser,
+              os: os,
+            }
+          })
+          .then(() => {}, (err) => console.error('notifications direct insert error:', err))
+      }
 
       supabase
         .rpc('increment_download_count', { file_id: fileInfo.id })
