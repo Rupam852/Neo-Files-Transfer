@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ThemeService extends ChangeNotifier {
   static const String _themePrefKey = 'neo_app_theme_mode';
 
-  ThemeMode _themeMode = ThemeMode.dark;
+  ThemeMode _themeMode = ThemeMode.system;
 
   ThemeMode get themeMode => _themeMode;
   bool get isDarkMode => _themeMode == ThemeMode.dark;
@@ -19,10 +19,10 @@ class ThemeService extends ChangeNotifier {
       final savedMode = prefs.getString(_themePrefKey);
       if (savedMode == 'light') {
         _themeMode = ThemeMode.light;
-      } else if (savedMode == 'system') {
-        _themeMode = ThemeMode.system;
-      } else {
+      } else if (savedMode == 'dark') {
         _themeMode = ThemeMode.dark;
+      } else {
+        _themeMode = ThemeMode.system; // Default to System theme on Android
       }
       notifyListeners();
     } catch (e) {
