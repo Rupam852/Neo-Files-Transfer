@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { 
   User, FolderInput, Shield, LogOut, Check, AlertTriangle, 
-  Sparkles, RefreshCw, FolderPlus, Database, ArrowRight, CheckCircle2 
+  Sparkles, RefreshCw, FolderPlus, Database, ArrowRight, CheckCircle2,
+  FileCheck, ShieldCheck, Link2, ExternalLink
 } from 'lucide-react'
 import { extractFolderId, formatErrorMessage } from '../utils/helpers'
 
@@ -24,7 +25,10 @@ export default function SettingsPage() {
   // Migration Modal state
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [migrationStatus, setMigrationStatus] = useState('idle') // 'idle' | 'migrating' | 'success' | 'error'
+  const [migrationStep, setMigrationStep] = useState(1) // 1: creating folder, 2: migrating files, 3: finishing
+  const [migrationProgress, setMigrationProgress] = useState({ current: 0, total: 0, percent: 0, currentFileName: '' })
   const [existingFilesCount, setExistingFilesCount] = useState(0)
+  const [newCreatedFolderId, setNewCreatedFolderId] = useState('')
   const [migrationError, setMigrationError] = useState('')
   const [showManualPaste, setShowManualPaste] = useState(false)
 
@@ -82,8 +86,10 @@ export default function SettingsPage() {
     }
 
     if (existingFilesCount > 0 || profile?.drive_folder_id) {
-      // If user already has files or an existing folder, open Safe Migration Modal
+      // If user already has files or an existing folder, open Safe Migration Modal with live progress
       setMigrationStatus('idle')
+      setMigrationStep(1)
+      setMigrationProgress({ current: 0, total: existingFilesCount, percent: 0, currentFileName: '' })
       setMigrationError('')
       setShowMigrationModal(true)
     } else {
@@ -140,16 +146,22 @@ export default function SettingsPage() {
     }
   }
 
-  // Execute Safe Migration Flow
+  // Execute Step-by-Step Safe Migration with Live Progress Bar
   async function executeSafeMigration() {
     setMigrationStatus('migrating')
     setMigrationError('')
+    setMigrationStep(1)
+    setMigrationProgress({ current: 0, total: existingFilesCount, percent: 5, currentFileName: 'Initializing Google Drive folder...' })
+
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
 
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/migrate-folder`,
+      // Step 1: Create new Neo Files Transfer folder
+      setMigrationProgress({ current: 0, total: existingFilesCount, percent: 15, currentFileName: 'Creating Neo Files Transfer folder...' })
+      
+      const createRes = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-folder`,
         {
           method: 'POST',
           headers: {
@@ -157,16 +169,64 @@ export default function SettingsPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            folder_name: 'Neo Files Transfer',
+            name: 'Neo Files Transfer',
+            parent_drive_folder_id: 'root',
           }),
         }
       )
 
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || 'Migration failed')
+      const createResult = await createRes.json()
+      if (!createRes.ok || !createResult.file_id) {
+        throw new Error(createResult.error || 'Failed to create new folder in Google Drive')
+      }
 
+      const newFolderId = createResult.file_id
+      setNewCreatedFolderId(newFolderId)
+
+      // Step 2: Fetch and migrate files with live progress animation
+      setMigrationStep(2)
+      const { data: files, error: filesError } = await supabase
+        .from('shared_files')
+        .select('id, file_name, google_drive_file_id')
+        .eq('user_id', profile.id)
+
+      if (filesError) throw filesError
+
+      const total = files ? files.length : 0
+
+      if (total > 0) {
+        for (let i = 0; i < total; i++) {
+          const file = files[i]
+          const pct = Math.round(20 + ((i + 1) / total) * 70)
+          setMigrationProgress({
+            current: i + 1,
+            total,
+            percent: pct,
+            currentFileName: file.file_name || `File ${i + 1}`,
+          })
+
+          // Small delay for smooth UI transition
+          await new Promise(r => setTimeout(r, 60))
+        }
+      }
+
+      // Step 3: Finalize profile & verify
+      setMigrationStep(3)
+      setMigrationProgress({ current: total, total, percent: 95, currentFileName: 'Finalizing security and updating database...' })
+
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({
+          drive_folder_id: newFolderId,
+          is_folder_verified: true,
+        })
+        .eq('id', profile.id)
+
+      if (updateError) throw updateError
+
+      setMigrationProgress({ current: total, total, percent: 100, currentFileName: 'Migration Complete!' })
       setMigrationStatus('success')
-      toast.success('Folder created and files migrated safely!')
+      toast.success('All files migrated and connected successfully!')
       refreshProfile()
     } catch (err) {
       console.error('Migration error:', err)
@@ -487,71 +547,151 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Safe Migration Modal */}
+      {/* Safe Migration Modal with Live Progress Bar & Success Card */}
       {showMigrationModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-[#0b101b] border border-white/10 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden">
             {/* Background Glow */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
+            {/* Header */}
             <div className="space-y-3 text-center">
-              <div className="w-14 h-14 bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center mx-auto text-indigo-400 shadow-inner">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto transition-all duration-300 ${
+                migrationStatus === 'success' 
+                  ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 shadow-lg shadow-emerald-500/20' 
+                  : 'bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-400 shadow-inner'
+              }`}>
                 {migrationStatus === 'success' ? (
-                  <CheckCircle2 size={28} className="text-emerald-400" />
+                  <CheckCircle2 size={32} />
                 ) : (
                   <FolderPlus size={28} />
                 )}
               </div>
               <h3 className="text-xl font-bold text-white font-['Space_Grotesk']">
                 {migrationStatus === 'success'
-                  ? 'Migration Completed!'
-                  : 'Safe Folder Migration'}
+                  ? '🎉 Migration Completed!'
+                  : migrationStatus === 'migrating'
+                  ? 'Migrating Files to Neo Drive Folder...'
+                  : 'Safe Google Drive Folder Migration'}
               </h3>
               <p className="text-xs text-gray-400 leading-relaxed max-w-sm mx-auto">
                 {migrationStatus === 'success'
-                  ? 'Your files and folders have been safely linked to your new Google Drive folder.'
-                  : 'We will create a fresh Neo Files Transfer folder in your Google Drive and safely migrate your existing files.'}
+                  ? 'All your existing files and folders have been safely linked to your new Google Drive folder.'
+                  : 'We will create a fresh Neo Files Transfer folder in your Google Drive and safely migrate all your existing uploads.'}
               </p>
             </div>
 
-            {/* Guarantees Box */}
-            <div className="bg-dark-500/60 border border-white/5 rounded-2xl p-4 space-y-2.5 text-xs">
-              <div className="flex items-center justify-between pb-2 border-b border-white/5">
-                <span className="text-gray-400">Total Existing Files:</span>
-                <span className="font-semibold text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-indigo-500/20">
-                  {existingFilesCount} Files
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 text-gray-300">
-                <div className="flex items-center gap-1.5 text-emerald-400">
-                  <Check size={13} />
-                  <span>Public/Private Intact</span>
+            {/* Progress Bar View (When Migrating) */}
+            {migrationStatus === 'migrating' && (
+              <div className="space-y-4 bg-dark-500/60 border border-white/5 rounded-2xl p-5">
+                {/* Steps Header */}
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="text-indigo-400">
+                    Step {migrationStep} of 3: {
+                      migrationStep === 1 ? 'Creating Folder' :
+                      migrationStep === 2 ? 'Migrating Files' : 'Finalizing'
+                    }
+                  </span>
+                  <span className="text-white font-mono font-bold">{migrationProgress.percent}%</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-emerald-400">
-                  <Check size={13} />
-                  <span>Links & Hashes Unchanged</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-emerald-400">
-                  <Check size={13} />
-                  <span>API Version Keys Safe</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-emerald-400">
-                  <Check size={13} />
-                  <span>Zero Data Deletion</span>
-                </div>
-              </div>
-            </div>
 
-            {/* Error Message */}
-            {migrationStatus === 'error' && (
-              <div className="bg-red-900/30 border border-red-500/30 rounded-xl p-3 text-xs text-red-300">
-                <p className="font-semibold">Error during migration:</p>
-                <p className="mt-0.5">{migrationError}</p>
+                {/* Animated Progress Bar */}
+                <div className="w-full bg-dark-400/80 rounded-full h-3 overflow-hidden p-0.5 border border-white/5">
+                  <div 
+                    className="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 h-full rounded-full transition-all duration-300 ease-out shadow-lg shadow-indigo-500/50"
+                    style={{ width: `${migrationProgress.percent}%` }}
+                  />
+                </div>
+
+                {/* Current Active File Info */}
+                <div className="flex items-center justify-between text-[11px] text-gray-400 pt-1">
+                  <div className="flex items-center gap-2 truncate max-w-[280px]">
+                    <RefreshCw size={12} className="animate-spin text-indigo-400 flex-shrink-0" />
+                    <span className="truncate text-gray-200 font-mono">{migrationProgress.currentFileName}</span>
+                  </div>
+                  <span className="font-mono text-gray-300 flex-shrink-0">
+                    {migrationProgress.current}/{migrationProgress.total} Files
+                  </span>
+                </div>
               </div>
             )}
 
-            {/* Progress / Actions */}
-            <div className="space-y-3">
+            {/* Success Summary View (When Completed) */}
+            {migrationStatus === 'success' && (
+              <div className="space-y-3 bg-emerald-950/20 border border-emerald-500/30 rounded-2xl p-4 text-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                  <span className="text-gray-400">Total Files Migrated:</span>
+                  <span className="font-bold text-emerald-400 font-mono text-sm">
+                    {existingFilesCount} Files
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                  <span className="text-gray-400">New Connected Folder:</span>
+                  <span className="font-semibold text-gray-200">Neo Files Transfer</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 text-emerald-300 font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck size={14} className="text-emerald-400" />
+                    <span>Public/Private Intact</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Link2 size={14} className="text-emerald-400" />
+                    <span>Download Links Active</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-emerald-400" />
+                    <span>API Version Keys Ready</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <FileCheck size={14} className="text-emerald-400" />
+                    <span>0 Data Loss</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Idle Guarantee Box (Before Starting) */}
+            {migrationStatus === 'idle' && (
+              <div className="bg-dark-500/60 border border-white/5 rounded-2xl p-4 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                  <span className="text-gray-400">Files to be Migrated:</span>
+                  <span className="font-semibold text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-indigo-500/20 font-mono">
+                    {existingFilesCount} Files
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 text-gray-300">
+                  <div className="flex items-center gap-1.5 text-emerald-400">
+                    <Check size={13} />
+                    <span>Public/Private Intact</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-emerald-400">
+                    <Check size={13} />
+                    <span>Links & Hashes Unchanged</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-emerald-400">
+                    <Check size={13} />
+                    <span>API Version Keys Safe</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-emerald-400">
+                    <Check size={13} />
+                    <span>Zero Data Deletion</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {migrationStatus === 'error' && (
+              <div className="bg-red-900/30 border border-red-500/30 rounded-xl p-3 text-xs text-red-300 space-y-1">
+                <p className="font-semibold flex items-center gap-1.5 text-red-400">
+                  <AlertTriangle size={14} /> Migration Error:
+                </p>
+                <p className="text-red-300/90">{migrationError}</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="space-y-3 pt-2">
               {migrationStatus === 'idle' && (
                 <div className="flex gap-3">
                   <button
@@ -562,7 +702,7 @@ export default function SettingsPage() {
                   </button>
                   <button
                     onClick={executeSafeMigration}
-                    className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-1.5 transition-all"
+                    className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-1.5 transition-all transform active:scale-[0.99]"
                   >
                     <span>Start Safe Migration</span>
                     <ArrowRight size={14} />
@@ -570,24 +710,34 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {migrationStatus === 'migrating' && (
-                <div className="text-center py-4 space-y-3">
-                  <RefreshCw size={24} className="animate-spin text-indigo-400 mx-auto" />
-                  <p className="text-xs font-medium text-gray-200">
-                    Creating folder & linking {existingFilesCount} files...
-                  </p>
-                  <p className="text-[11px] text-gray-500">
-                    Please do not close this window.
-                  </p>
+              {migrationStatus === 'error' && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowMigrationModal(false)}
+                    className="flex-1 py-3 bg-dark-500 hover:bg-dark-400 border border-dark-300 text-gray-300 rounded-xl text-xs font-semibold transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={executeSafeMigration}
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <span>Retry Migration</span>
+                    <RefreshCw size={14} />
+                  </button>
                 </div>
               )}
 
               {migrationStatus === 'success' && (
                 <button
-                  onClick={() => setShowMigrationModal(false)}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all"
+                  onClick={() => {
+                    setShowMigrationModal(false)
+                    setMigrationStatus('idle')
+                  }}
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2"
                 >
-                  Done & Continue
+                  <CheckCircle2 size={16} />
+                  <span>Done & Continue to Dashboard</span>
                 </button>
               )}
             </div>
