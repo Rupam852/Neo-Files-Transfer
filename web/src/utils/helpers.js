@@ -34,22 +34,28 @@ export function generateShareUrl(hash) {
 }
 
 export function generateDirectDownloadUrl(hash, isFolder, fileSize, skipIncrement = false) {
-  console.log("VITE_CF_WORKER_URL value in helper:", import.meta.env.VITE_CF_WORKER_URL)
   const cfWorkerUrl = import.meta.env.VITE_CF_WORKER_URL
   const proxyUrl = import.meta.env.VITE_PROXY_URL
   
   const incrementParam = skipIncrement ? '&skip_increment=true' : ''
+  const isCustomLink = typeof hash === 'string' && hash.startsWith('sec_')
 
-  // If it's a folder, zip it via Render Proxy
-  if (isFolder && proxyUrl) {
+  // If it's a custom protected link or a folder, route via Render Proxy (which handles PIN, Expiry, and Limits)
+  if ((isCustomLink || isFolder) && proxyUrl) {
     const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
     return `${cleanProxy}/download-file?hash=${hash}${incrementParam}`
   }
 
-  // If it's a single file, route through high-speed Cloudflare Worker
+  // If it's a single standard file, route through high-speed Cloudflare Worker
   if (cfWorkerUrl) {
     const cleanWorker = cfWorkerUrl.endsWith('/') ? cfWorkerUrl.slice(0, -1) : cfWorkerUrl
     return `${cleanWorker}?hash=${hash}${incrementParam}`
+  }
+
+  // Fallback to Render Proxy
+  if (proxyUrl) {
+    const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
+    return `${cleanProxy}/download-file?hash=${hash}${incrementParam}`
   }
 
   // Fallback to Supabase regional Deno Edge Function

@@ -42,14 +42,49 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     )
 
-    // Find file by share hash
-    const { data: file, error: fileError } = await supabaseAdmin
+    // Find file by share hash (standard or custom protected)
+    let file = null
+    const pin = url.searchParams.get("pin") || req.headers.get("x-share-pin")
+
+    const { data: standardFile } = await supabaseAdmin
       .from("shared_files")
       .select("id, file_name, mime_type, sharing_status, current_version_num, google_drive_file_id, is_folder")
       .eq("unique_share_hash", hash)
       .maybeSingle()
 
-    if (fileError || !file) {
+    if (standardFile) {
+      file = standardFile
+    } else {
+      const { data: linkRecord } = await supabaseAdmin
+        .from("custom_share_links")
+        .select("*")
+        .eq("custom_share_hash", hash)
+        .maybeSingle()
+
+      if (linkRecord) {
+        if (linkRecord.expires_at && new Date(linkRecord.expires_at) < new Date()) {
+          return new Response(JSON.stringify({ error: "Share link has expired" }), { status: 410, headers: corsHeaders })
+        }
+        if (linkRecord.max_downloads && linkRecord.download_count >= linkRecord.max_downloads) {
+          return new Response(JSON.stringify({ error: "Download limit reached" }), { status: 410, headers: corsHeaders })
+        }
+        if (linkRecord.pin_code && linkRecord.pin_code !== pin) {
+          return new Response(JSON.stringify({ error: "PIN required", requires_pin: true }), { status: 401, headers: corsHeaders })
+        }
+
+        const { data: linkedFile } = await supabaseAdmin
+          .from("shared_files")
+          .select("id, file_name, mime_type, sharing_status, current_version_num, google_drive_file_id, is_folder")
+          .eq("id", linkRecord.file_id)
+          .maybeSingle()
+
+        if (linkedFile) {
+          file = linkedFile
+        }
+      }
+    }
+
+    if (!file) {
       if (isStream) {
         return new Response(
           JSON.stringify({ error: "The requested file does not exist or has been removed." }),
