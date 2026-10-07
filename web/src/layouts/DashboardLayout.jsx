@@ -19,6 +19,7 @@ import FilesPage from '../pages/FilesPage'
 import SharedFilesPage from '../pages/SharedFilesPage'
 import SettingsPage from '../pages/SettingsPage'
 import VersionPage from '../pages/VersionPage'
+import NotificationBell from '../components/NotificationBell'
 
 const navItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -270,6 +271,10 @@ export default function DashboardLayout() {
                 <span className="hidden sm:inline">Upload</span>
               </button>
             )}
+
+            {/* In-App Notifications Bell */}
+            <NotificationBell />
+
             <div className="relative" ref={profileRef}>
               <button
                 onClick={() => setProfileOpen(!profileOpen)}

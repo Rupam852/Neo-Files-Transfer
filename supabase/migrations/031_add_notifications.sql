@@ -1,0 +1,120 @@
+-- =============================================================
+-- Migration 031: Add In-App Notifications & Realtime Triggers
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'download', -- 'download', 'approval', 'system', 'security'
+  is_read BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  metadata JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(user_id, is_read);
+
+-- Enable RLS
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if any
+DROP POLICY IF EXISTS "Users can view own notifications" ON notifications;
+DROP POLICY IF EXISTS "Users can update own notifications" ON notifications;
+DROP POLICY IF EXISTS "Users can delete own notifications" ON notifications;
+DROP POLICY IF EXISTS "Anyone or service can insert notifications" ON notifications;
+
+-- RLS Policies
+CREATE POLICY "Users can view own notifications"
+  ON notifications FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own notifications"
+  ON notifications FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own notifications"
+  ON notifications FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Anyone or service can insert notifications"
+  ON notifications FOR INSERT
+  WITH CHECK (TRUE);
+
+-- Enable Realtime for notifications table
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'notifications'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+  END IF;
+END $$;
+
+ALTER TABLE notifications REPLICA IDENTITY FULL;
+
+-- -------------------------------------------------------------
+-- Trigger 1: Auto-create notification on file download
+-- -------------------------------------------------------------
+CREATE OR REPLACE FUNCTION notify_on_file_download()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_file_name TEXT;
+BEGIN
+  SELECT file_name INTO v_file_name
+  FROM shared_files
+  WHERE id = NEW.file_id;
+
+  INSERT INTO notifications (user_id, title, message, type, metadata)
+  VALUES (
+    NEW.owner_id,
+    'File Downloaded',
+    'Someone downloaded your file: ' || COALESCE(v_file_name, 'Shared file'),
+    'download',
+    jsonb_build_object(
+      'file_id', NEW.file_id,
+      'file_name', v_file_name,
+      'device_type', NEW.device_type,
+      'browser', NEW.browser,
+      'os', NEW.os
+    )
+  );
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_notify_on_file_download ON file_download_logs;
+CREATE TRIGGER trg_notify_on_file_download
+  AFTER INSERT ON file_download_logs
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_on_file_download();
+
+-- -------------------------------------------------------------
+-- Trigger 2: Auto-create notification on user registration approval
+-- -------------------------------------------------------------
+CREATE OR REPLACE FUNCTION notify_on_user_approval()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO notifications (user_id, title, message, type, metadata)
+  VALUES (
+    NEW.user_id,
+    'Account Approved 🎉',
+    'Your registration has been approved by the administrator. You now have full access to Neo Files Transfer.',
+    'approval',
+    jsonb_build_object('approved_at', NOW())
+  );
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_notify_on_user_approval ON approved_users;
+CREATE TRIGGER trg_notify_on_user_approval
+  AFTER INSERT ON approved_users
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_on_user_approval();
