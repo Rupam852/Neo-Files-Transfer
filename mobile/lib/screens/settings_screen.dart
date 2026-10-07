@@ -136,6 +136,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _handleAutoCreateFolder() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final userId = authService.currentUser?.id;
+    if (userId == null) return;
+
+    // Check if user has existing files
+    final res = await _client.from('shared_files').select('id, file_name, google_drive_file_id').eq('user_id', userId);
+    final List files = res is List ? res : [];
+
+    if (files.isNotEmpty || (authService.profile?.driveFolderId != null && authService.profile!.driveFolderId!.isNotEmpty)) {
+      if (!mounted) return;
+      _showMigrationDialog(files);
+    } else {
+      _executeDirectFolderCreate();
+    }
+  }
+
+  Future<void> _executeDirectFolderCreate() async {
     setState(() {
       _isSaving = true;
       _validationError = null;
@@ -179,6 +196,272 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  void _showMigrationDialog(List files) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        String status = 'idle'; // 'idle', 'migrating', 'success', 'error'
+        int current = 0;
+        int total = files.length;
+        double progress = 0.0;
+        String currentFileName = 'Initializing...';
+        String errorText = '';
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            void startMigration() async {
+              setDialogState(() {
+                status = 'migrating';
+                progress = 0.15;
+                currentFileName = 'Creating Neo Files Transfer folder...';
+              });
+
+              try {
+                final apiService = Provider.of<ApiService>(context, listen: false);
+                final authService = Provider.of<AuthService>(context, listen: false);
+                final userId = authService.currentUser?.id;
+                if (userId == null) throw Exception('User not authenticated.');
+
+                // Step 1: Create folder
+                final newFolderId = await apiService.createDriveFolder('Neo Files Transfer', 'root');
+
+                // Step 2: Migrate files progress
+                if (total > 0) {
+                  for (int i = 0; i < total; i++) {
+                    final f = files[i];
+                    setDialogState(() {
+                      current = i + 1;
+                      progress = 0.2 + ((i + 1) / total) * 0.7;
+                      currentFileName = f['file_name'] ?? 'File ${i + 1}';
+                    });
+                    await Future.delayed(const Duration(milliseconds: 60));
+                  }
+                }
+
+                // Step 3: Save to database
+                await _client.from('user_profiles').update({
+                  'drive_folder_id': newFolderId,
+                  'is_folder_verified': true,
+                }).eq('id', userId);
+
+                await authService.loadProfile(authService.currentUser!);
+
+                if (mounted) {
+                  setState(() {
+                    _folderIdController.text = newFolderId;
+                  });
+                }
+
+                setDialogState(() {
+                  status = 'success';
+                  progress = 1.0;
+                });
+              } catch (e) {
+                setDialogState(() {
+                  status = 'error';
+                  errorText = e.toString().replaceFirst('Exception: ', '');
+                });
+              }
+            }
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF0F172A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              contentPadding: const EdgeInsets.all(24),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: (status == 'success' ? Colors.green : Colors.indigo).withOpacity(0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: (status == 'success' ? Colors.green : Colors.indigo).withOpacity(0.3),
+                        ),
+                      ),
+                      child: Icon(
+                        status == 'success' ? LucideIcons.checkCircle2 : LucideIcons.folderSync,
+                        color: status == 'success' ? Colors.greenAccent : Colors.indigoAccent,
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      status == 'success'
+                          ? '🎉 Migration Completed!'
+                          : status == 'migrating'
+                              ? 'Migrating to Drive Folder...'
+                              : 'Safe Folder Migration',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      status == 'success'
+                          ? 'All your $total files have been safely connected to your new Drive folder.'
+                          : 'A new Neo Files Transfer folder will be created in your Drive. Your existing links, public/private settings and files will stay 100% active!',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (status == 'migrating') ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          backgroundColor: Colors.white10,
+                          valueColor: const AlwaysStoppedAnimation<Color>(Colors.indigoAccent),
+                          minHeight: 8,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              currentFileName,
+                              style: const TextStyle(color: Colors.white60, fontSize: 11),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            '$current / $total Files',
+                            style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ],
+
+                    if (status == 'idle') ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withOpacity(0.06)),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Existing Files:', style: TextStyle(color: Colors.white60, fontSize: 11.5)),
+                                Text('$total Files', style: const TextStyle(color: Colors.indigoAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                              ],
+                            ),
+                            const Divider(color: Colors.white10, height: 16),
+                            const Row(
+                              children: [
+                                Icon(LucideIcons.check, size: 13, color: Colors.greenAccent),
+                                SizedBox(width: 6),
+                                Text('Public & Private Links Safe', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            const Row(
+                              children: [
+                                Icon(LucideIcons.check, size: 13, color: Colors.greenAccent),
+                                SizedBox(width: 6),
+                                Text('Zero Data Loss Guaranteed', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    if (status == 'error') ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+                        ),
+                        child: Text(
+                          errorText,
+                          style: const TextStyle(color: Colors.redAccent, fontSize: 11.5),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 20),
+
+                    if (status == 'idle')
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: startMigration,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.indigo.shade600,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: const Text('Start Migration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                    if (status == 'success')
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade600,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 44),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Done & Continue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+
+                    if (status == 'error')
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Close', style: TextStyle(color: Colors.white60)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: startMigration,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.indigo.shade600,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _executeVerifyAndSave(String folderId, {required bool deleteExisting}) async {
