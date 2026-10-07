@@ -16,6 +16,25 @@
     <meta name="theme-color" content="#030712" />
     <link rel="canonical" href="https://neofilestransfer.site/" />
 
+    <!-- Instant Theme Loader to Prevent Flash of Wrong Theme (FOUC) -->
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('neo_theme');
+          var root = document.documentElement;
+          if (saved === 'light') {
+            root.classList.add('light');
+            root.classList.remove('dark');
+            root.setAttribute('data-theme', 'light');
+          } else {
+            root.classList.add('dark');
+            root.classList.remove('light');
+            root.setAttribute('data-theme', 'dark');
+          }
+        } catch(e) {}
+      })();
+    </script>
+
     <!-- Google Site Verification -->
     <meta name="google-site-verification" content="googlecc290a38a9a0d2d5" />
 
