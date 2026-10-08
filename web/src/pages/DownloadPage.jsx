@@ -74,7 +74,7 @@ export default function DownloadPage() {
           const [linkRes, settingsRes] = await Promise.all([
             supabase
               .from('custom_share_links')
-              .select('*, shared_files(id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder)')
+              .select('*')
               .eq('custom_share_hash', hash)
               .maybeSingle(),
             supabase
@@ -100,7 +100,13 @@ export default function DownloadPage() {
             return
           }
 
-          const linkedFile = customLink.shared_files
+          // Fetch the corresponding file
+          const { data: linkedFile } = await supabase
+            .from('shared_files')
+            .select('id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
+            .eq('id', customLink.file_id)
+            .maybeSingle()
+
           if (!linkedFile) {
             setStatus('notfound')
             return
