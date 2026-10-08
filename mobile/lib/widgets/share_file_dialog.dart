@@ -281,14 +281,15 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
     try {
       final fileService = Provider.of<FileService>(context, listen: false);
       DateTime? expiresAt;
+      final nowUtc = DateTime.now().toUtc();
       if (_expiryOption == '1h') {
-        expiresAt = DateTime.now().add(const Duration(hours: 1));
+        expiresAt = nowUtc.add(const Duration(hours: 1));
       } else if (_expiryOption == '1d') {
-        expiresAt = DateTime.now().add(const Duration(days: 1));
+        expiresAt = nowUtc.add(const Duration(days: 1));
       } else if (_expiryOption == '7d') {
-        expiresAt = DateTime.now().add(const Duration(days: 7));
+        expiresAt = nowUtc.add(const Duration(days: 7));
       } else if (_expiryOption == '30d') {
-        expiresAt = DateTime.now().add(const Duration(days: 30));
+        expiresAt = nowUtc.add(const Duration(days: 30));
       }
 
       int? maxLimit;

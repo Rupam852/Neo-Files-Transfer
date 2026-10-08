@@ -893,7 +893,7 @@ class FileService extends ChangeNotifier {
       'user_id': userId,
       'custom_share_hash': customHash,
       'pin_code': pinCode != null && pinCode.trim().isNotEmpty ? pinCode.trim() : null,
-      'expires_at': expiresAt?.toIso8601String(),
+      'expires_at': expiresAt?.toUtc().toIso8601String(),
       'max_downloads': maxDownloads,
       'is_one_time': isOneTime,
       'label': label != null && label.trim().isNotEmpty ? label.trim() : null,
