@@ -70,21 +70,12 @@ export default function DownloadPage() {
         const isCustom = typeof hash === 'string' && hash.startsWith('sec_')
 
         if (isCustom) {
-          // Parallel fetch: custom_share_links and system_settings
-          const [linkRes, settingsRes] = await Promise.all([
-            supabase
-              .from('custom_share_links')
-              .select('*')
-              .eq('custom_share_hash', hash)
-              .maybeSingle(),
-            supabase
-              .from('system_settings')
-              .select('value')
-              .eq('key', 'downloads_enabled')
-              .maybeSingle()
-          ])
+          const { data: customLink } = await supabase
+            .from('custom_share_links')
+            .select('*')
+            .eq('custom_share_hash', hash)
+            .maybeSingle()
 
-          const customLink = linkRes.data
           if (!customLink) {
             setStatus('notfound')
             return
@@ -121,30 +112,17 @@ export default function DownloadPage() {
             return
           }
 
-          if (settingsRes.data && settingsRes.data.value === false) {
-            setStatus('maintenance')
-            return
-          }
-
           setStatus('preview')
           return
         }
 
-        // Standard link: Parallel fetch file and system_settings
-        const [fileRes, settingsRes] = await Promise.all([
-          supabase
-            .from('shared_files')
-            .select('id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
-            .eq('unique_share_hash', hash)
-            .maybeSingle(),
-          supabase
-            .from('system_settings')
-            .select('value')
-            .eq('key', 'downloads_enabled')
-            .maybeSingle()
-        ])
+        // Standard link: Instant direct single query
+        const { data: file } = await supabase
+          .from('shared_files')
+          .select('id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
+          .eq('unique_share_hash', hash)
+          .maybeSingle()
 
-        const file = fileRes.data
         if (!file) {
           setStatus('notfound')
           return
@@ -157,12 +135,6 @@ export default function DownloadPage() {
 
         setFileInfo(file)
         setTotalBytes(file.file_size || 0)
-
-        if (settingsRes.data && settingsRes.data.value === false) {
-          setStatus('maintenance')
-          return
-        }
-
         setStatus('preview')
 
       } catch (err) {
