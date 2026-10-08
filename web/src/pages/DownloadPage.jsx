@@ -38,86 +38,144 @@ export default function DownloadPage() {
 
 
 
+  // Realtime listener for Admin live controls (maintenance / downloads disabled)
   useEffect(() => {
-    async function loadMetadata() {
-      try {
-        const isCustom = typeof hash === 'string' && hash.startsWith('sec_')
+    const channel = supabase
+      .channel(`download-settings-realtime-${hash}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'system_settings' },
+        (payload) => {
+          if (payload.new) {
+            if (payload.new.key === 'maintenance_mode' && payload.new.value === true) {
+              setStatus('maintenance')
+            } else if (payload.new.key === 'downloads_enabled' && payload.new.value === false) {
+              setStatus('maintenance')
+            } else {
+              loadMetadata()
+            }
+          }
+        }
+      )
+      .subscribe()
 
-        if (isCustom) {
-          const { data: customLink } = await supabase
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [hash])
+
+  async function loadMetadata() {
+    try {
+      const isCustom = typeof hash === 'string' && hash.startsWith('sec_')
+
+      if (isCustom) {
+        // Parallel check: custom_share_links & system_settings
+        const [linkRes, settingsRes] = await Promise.all([
+          supabase
             .from('custom_share_links')
             .select('*')
             .eq('custom_share_hash', hash)
-            .maybeSingle()
+            .maybeSingle(),
+          supabase
+            .from('system_settings')
+            .select('key, value')
+            .in('key', ['downloads_enabled', 'maintenance_mode'])
+        ])
 
-          if (!customLink) {
-            setStatus('notfound')
-            return
-          }
-
-          if (customLink.expires_at && new Date(customLink.expires_at) < new Date()) {
-            setStatus('expired')
-            return
-          }
-
-          if (customLink.max_downloads && customLink.download_count >= customLink.max_downloads) {
-            setStatus('limit_reached')
-            return
-          }
-
-          // Fetch the corresponding file
-          const { data: linkedFile } = await supabase
-            .from('shared_files')
-            .select('id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
-            .eq('id', customLink.file_id)
-            .maybeSingle()
-
-          if (!linkedFile) {
-            setStatus('notfound')
-            return
-          }
-
-          setFileInfo(linkedFile)
-          setCustomLinkInfo(customLink)
-          setTotalBytes(linkedFile.file_size || 0)
-
-          if (customLink.pin_code) {
-            setStatus('pin_required')
-            return
-          }
-
-          setStatus('preview')
+        const isMaintenance = settingsRes.data?.some(
+          s => (s.key === 'maintenance_mode' && s.value === true) || (s.key === 'downloads_enabled' && s.value === false)
+        )
+        if (isMaintenance) {
+          setStatus('maintenance')
           return
         }
 
-        // Standard link: Instant direct single query
-        const { data: file } = await supabase
-          .from('shared_files')
-          .select('id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
-          .eq('unique_share_hash', hash)
-          .maybeSingle()
-
-        if (!file) {
+        const customLink = linkRes.data
+        if (!customLink) {
           setStatus('notfound')
           return
         }
 
-        if (file.sharing_status === 'private') {
-          setStatus('denied')
+        if (customLink.expires_at && new Date(customLink.expires_at) < new Date()) {
+          setStatus('expired')
           return
         }
 
-        setFileInfo(file)
-        setTotalBytes(file.file_size || 0)
+        if (customLink.max_downloads && customLink.download_count >= customLink.max_downloads) {
+          setStatus('limit_reached')
+          return
+        }
+
+        // Fetch the corresponding file
+        const { data: linkedFile } = await supabase
+          .from('shared_files')
+          .select('id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
+          .eq('id', customLink.file_id)
+          .maybeSingle()
+
+        if (!linkedFile) {
+          setStatus('notfound')
+          return
+        }
+
+        setFileInfo(linkedFile)
+        setCustomLinkInfo(customLink)
+        setTotalBytes(linkedFile.file_size || 0)
+
+        if (customLink.pin_code) {
+          setStatus('pin_required')
+          return
+        }
+
         setStatus('preview')
-
-      } catch (err) {
-        console.error('Metadata resolve error:', err)
-        setErrorMsg('Failed to resolve sharing details.')
-        setStatus('error')
+        return
       }
-    }
 
+      // Standard link: Parallel check shared_files & system_settings
+      const [fileRes, settingsRes] = await Promise.all([
+        supabase
+          .from('shared_files')
+          .select('id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
+          .eq('unique_share_hash', hash)
+          .maybeSingle(),
+        supabase
+          .from('system_settings')
+          .select('key, value')
+          .in('key', ['downloads_enabled', 'maintenance_mode'])
+      ])
+
+      const isMaintenance = settingsRes.data?.some(
+        s => (s.key === 'maintenance_mode' && s.value === true) || (s.key === 'downloads_enabled' && s.value === false)
+      )
+      if (isMaintenance) {
+        setStatus('maintenance')
+        return
+      }
+
+      const file = fileRes.data
+      if (!file) {
+        setStatus('notfound')
+        return
+      }
+
+      if (file.sharing_status === 'private') {
+        setStatus('denied')
+        return
+      }
+
+      setFileInfo(file)
+      setTotalBytes(file.file_size || 0)
+
+      setStatus('preview')
+
+    } catch (err) {
+      console.error('Metadata resolve error:', err)
+      setErrorMsg('Failed to resolve sharing details.')
+      setStatus('error')
+    }
+  }
+
+  useEffect(() => {
     loadMetadata()
   }, [hash])
 

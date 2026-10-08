@@ -188,33 +188,40 @@ export function AuthProvider({ children }) {
     }
   }, [user])
 
-  // Realtime listener for system_settings (maintenance mode & downloads & sharing)
+  // Fetch system settings on initial app mount
+  const fetchSystemSettings = async () => {
+    try {
+      const { data } = await supabase.from('system_settings').select('key, value')
+      if (data) {
+        const maintenance = data.find(s => s.key === 'maintenance_mode')?.value || false
+        setIsUnderMaintenance(maintenance)
+        const downloads = data.find(s => s.key === 'downloads_enabled')?.value !== false
+        setDownloadsEnabled(downloads)
+        const sharing = data.find(s => s.key === 'sharing_enabled')?.value !== false
+        setSharingEnabled(sharing)
+      }
+    } catch (e) {
+      console.error('Failed to fetch system settings:', e)
+    }
+  }
+
+  // Realtime listener for system_settings (maintenance mode & downloads & sharing) - active for all visitors & users
   useEffect(() => {
-    if (!user) return
+    fetchSystemSettings()
 
     const settingsChannel = supabase
-      .channel('auth-settings-maintenance')
+      .channel('auth-settings-maintenance-global')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'system_settings' },
         async () => {
-          try {
-            const { data } = await supabase.from('system_settings').select('key, value')
-            const maintenance = data?.find(s => s.key === 'maintenance_mode')?.value || false
-            setIsUnderMaintenance(maintenance)
-            const downloads = data?.find(s => s.key === 'downloads_enabled')?.value !== false
-            setDownloadsEnabled(downloads)
-            const sharing = data?.find(s => s.key === 'sharing_enabled')?.value !== false
-            setSharingEnabled(sharing)
-          } catch (e) {
-            console.error('Failed to refresh settings:', e)
-          }
+          await fetchSystemSettings()
         }
       )
       .subscribe()
 
     return () => supabase.removeChannel(settingsChannel)
-  }, [user])
+  }, [])
 
   async function loadProfile(authUser, sessionTokens = {}, isFreshSignIn = false) {
     if (loadingProfileRef.current) {
