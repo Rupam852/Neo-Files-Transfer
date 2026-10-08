@@ -11,7 +11,9 @@ import 'services/update_service.dart';
 import 'services/notification_service.dart';
 import 'services/theme_service.dart';
 import 'services/security_service.dart';
+import 'services/share_receiver_service.dart';
 import 'widgets/app_lock_screen.dart';
+import 'widgets/share_upload_dialog.dart';
 import 'screens/login_screen.dart';
 import 'screens/pending_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -42,6 +44,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<SecurityService>(
           create: (_) => SecurityService(),
+        ),
+        ChangeNotifierProvider<ShareReceiverService>(
+          create: (_) => ShareReceiverService(),
         ),
         ChangeNotifierProvider<AuthService>(
           create: (_) => AuthService(),
@@ -108,6 +113,45 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
   bool? _lastIsPaused;
   bool? _lastIsUnderMaintenance;
   String? _lastUserId;
+  bool _checkedInitialShare = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initShareListener();
+    });
+  }
+
+  void _initShareListener() {
+    final shareReceiver = Provider.of<ShareReceiverService>(context, listen: false);
+    
+    // Listen for ongoing share intents
+    shareReceiver.onSharedFilesReceived.listen((files) {
+      if (files.isNotEmpty && mounted) {
+        _checkAndShowShareDialog(files);
+      }
+    });
+
+    // Check cold-start share intent once
+    if (!_checkedInitialShare) {
+      _checkedInitialShare = true;
+      shareReceiver.checkInitialSharedFiles().then((files) {
+        if (files.isNotEmpty && mounted) {
+          _checkAndShowShareDialog(files);
+        }
+      });
+    }
+  }
+
+  void _checkAndShowShareDialog(List<IncomingSharedFile> files) {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final security = Provider.of<SecurityService>(context, listen: false);
+
+    if (auth.currentUser != null && !security.isLocked && !auth.isPaused && !auth.isUnderMaintenance) {
+      ShareUploadDialog.show(context: context, files: files);
+    }
+  }
 
   @override
   void didChangeDependencies() {
