@@ -1,10 +1,13 @@
-import 'dart:math';
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/shared_file.dart';
 import '../models/custom_share_link.dart';
 import '../services/file_service.dart';
@@ -30,7 +33,9 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
   bool _isGenerating = false;
   bool _isToggling = false;
   bool _showQr = false;
+  bool _isSavingQr = false;
   int _activeTab = 0; // 0 = Direct Link & QR, 1 = PIN & Protected Links
+  final GlobalKey _qrBoundaryKey = GlobalKey();
 
   // Custom link creation form state
   final TextEditingController _pinController = TextEditingController();
@@ -179,6 +184,96 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
     }
   }
 
+  Future<Uint8List?> _captureQrPng() async {
+    try {
+      final boundary = _qrBoundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('Error capturing QR: $e');
+      return null;
+    }
+  }
+
+  Future<void> _saveQrCode() async {
+    if (_isSavingQr) return;
+    setState(() => _isSavingQr = true);
+
+    try {
+      final pngBytes = await _captureQrPng();
+      if (pngBytes == null) throw 'Failed to generate QR image';
+
+      final safeName = _currentFile.fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      final fileName = 'QR_$safeName.png';
+
+      Directory? downloadDir;
+      if (Platform.isAndroid) {
+        downloadDir = Directory('/storage/emulated/0/Download');
+        if (!downloadDir.existsSync()) {
+          downloadDir = await getExternalStorageDirectory();
+        }
+      } else {
+        downloadDir = await getApplicationDocumentsDirectory();
+      }
+
+      if (downloadDir == null) throw 'Could not access storage directory';
+
+      final file = File('${downloadDir.path}/$fileName');
+      await file.writeAsBytes(pngBytes);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved QR Code to Downloads: $fileName'),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving QR code: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingQr = false);
+    }
+  }
+
+  Future<void> _shareQrCodeImage() async {
+    try {
+      final pngBytes = await _captureQrPng();
+      if (pngBytes == null) throw 'Failed to generate QR image';
+
+      final tempDir = await getTemporaryDirectory();
+      final safeName = _currentFile.fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      final tempFile = File('${tempDir.path}/QR_$safeName.png');
+      await tempFile.writeAsBytes(pngBytes);
+
+      await Share.shareXFiles(
+        [XFile(tempFile.path)],
+        text: 'Download link QR code for ${_currentFile.fileName}',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sharing QR: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _handleCreateCustomLink() async {
     if (_isCreatingCustom) return;
     setState(() => _isCreatingCustom = true);
@@ -276,6 +371,7 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final authService = Provider.of<AuthService>(context);
     final sharingEnabled = authService.isSharingEnabled;
     final hasShareLink = _currentFile.uniqueShareHash != null &&
@@ -287,8 +383,14 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
         : '';
     final directUrl = hasShareLink ? _getDirectDownloadUrl(_currentFile) : '';
 
+    final dialogBg = isLight ? Colors.white : const Color(0xFF0F172A);
+    final borderColor = isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.08);
+    final titleColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+    final subColor = isLight ? const Color(0xFF64748B) : Colors.grey.shade400;
+    final tabBg = isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B);
+
     return Dialog(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: dialogBg,
       elevation: 16,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -296,9 +398,9 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
         constraints: const BoxConstraints(maxWidth: 480, maxHeight: 680),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F172A),
+          color: dialogBg,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: borderColor),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -311,11 +413,11 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: Colors.indigoAccent.withOpacity(0.12),
+                    color: const Color(0xFF4F46E5).withOpacity(0.12),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.indigoAccent.withOpacity(0.25)),
+                    border: Border.all(color: const Color(0xFF4F46E5).withOpacity(0.25)),
                   ),
-                  child: Icon(_getFileIcon(), color: const Color(0xFF818CF8), size: 20),
+                  child: Icon(_getFileIcon(), color: const Color(0xFF4F46E5), size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -324,8 +426,8 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                     children: [
                       Text(
                         _currentFile.isFolder ? 'Share Folder' : 'Share File',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: titleColor,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -335,7 +437,7 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.grey.shade400,
+                          color: subColor,
                           fontSize: 12,
                         ),
                       ),
@@ -344,7 +446,7 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: Colors.grey, size: 20),
+                  icon: Icon(Icons.close, color: subColor, size: 20),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -356,7 +458,7 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
+                color: tabBg,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -373,12 +475,16 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(LucideIcons.share2, size: 14, color: _activeTab == 0 ? Colors.white : Colors.grey.shade400),
+                            Icon(
+                              LucideIcons.share2,
+                              size: 14,
+                              color: _activeTab == 0 ? Colors.white : subColor,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               'Direct Link & QR',
                               style: TextStyle(
-                                color: _activeTab == 0 ? Colors.white : Colors.grey.shade400,
+                                color: _activeTab == 0 ? Colors.white : subColor,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -400,12 +506,16 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(LucideIcons.shield, size: 14, color: _activeTab == 1 ? Colors.white : Colors.grey.shade400),
+                            Icon(
+                              LucideIcons.shield,
+                              size: 14,
+                              color: _activeTab == 1 ? Colors.white : subColor,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               'PIN & Protection',
                               style: TextStyle(
-                                color: _activeTab == 1 ? Colors.white : Colors.grey.shade400,
+                                color: _activeTab == 1 ? Colors.white : subColor,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -424,8 +534,8 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
             Expanded(
               child: SingleChildScrollView(
                 child: _activeTab == 0
-                    ? _buildDirectTab(hasShareLink, isPublic, webUrl, directUrl, sharingEnabled)
-                    : _buildProtectedTab(sharingEnabled),
+                    ? _buildDirectTab(hasShareLink, isPublic, webUrl, directUrl, sharingEnabled, isLight)
+                    : _buildProtectedTab(sharingEnabled, isLight),
               ),
             ),
           ],
@@ -434,28 +544,40 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
     );
   }
 
-  Widget _buildDirectTab(bool hasShareLink, bool isPublic, String webUrl, String directUrl, bool sharingEnabled) {
+  Widget _buildDirectTab(
+    bool hasShareLink,
+    bool isPublic,
+    String webUrl,
+    String directUrl,
+    bool sharingEnabled,
+    bool isLight,
+  ) {
+    final titleColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+    final subColor = isLight ? const Color(0xFF64748B) : Colors.grey.shade400;
+    final cardBg = isLight ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B).withOpacity(0.5);
+    final cardBorder = isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.06);
+
     if (!hasShareLink) {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E293B).withOpacity(0.5),
+          color: cardBg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.06)),
+          border: Border.all(color: cardBorder),
         ),
         child: Column(
           children: [
-            const Icon(LucideIcons.share2, size: 36, color: Color(0xFF818CF8)),
+            const Icon(LucideIcons.share2, size: 36, color: Color(0xFF4F46E5)),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'No Share Link Yet',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              style: TextStyle(color: titleColor, fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const SizedBox(height: 6),
             Text(
               'Generate a permanent direct share link. It will never change and is safe for app updates.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+              style: TextStyle(color: subColor, fontSize: 12),
             ),
             const SizedBox(height: 16),
             if (sharingEnabled)
@@ -496,7 +618,7 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: isPublic ? const Color(0xFF34D399) : Colors.amber,
+                  color: isPublic ? const Color(0xFF10B981) : Colors.amber,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -505,7 +627,7 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                 child: Text(
                   isPublic ? 'Public — Link is active' : 'Private — Link is blocked',
                   style: TextStyle(
-                    color: isPublic ? const Color(0xFF6EE7B7) : Colors.amber.shade300,
+                    color: isPublic ? (isLight ? const Color(0xFF047857) : const Color(0xFF6EE7B7)) : (isLight ? const Color(0xFFB45309) : Colors.amber.shade300),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -515,7 +637,11 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                 onPressed: _isToggling ? null : () => _handleToggleSharing(sharingEnabled),
                 child: Text(
                   isPublic ? 'Make Private' : 'Make Public',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: isPublic ? (isLight ? const Color(0xFFB45309) : Colors.amber.shade300) : const Color(0xFF10B981),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -529,12 +655,12 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
           children: [
             const Text(
               'WEB DOWNLOAD PAGE',
-              style: TextStyle(color: Color(0xFF818CF8), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              style: TextStyle(color: Color(0xFF4F46E5), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
             ),
             TextButton.icon(
               onPressed: () => setState(() => _showQr = !_showQr),
-              icon: Icon(LucideIcons.qrCode, size: 13, color: Colors.indigo.shade300),
-              label: Text(_showQr ? 'Hide QR' : 'Show QR', style: TextStyle(color: Colors.indigo.shade300, fontSize: 11)),
+              icon: const Icon(LucideIcons.qrCode, size: 13, color: Color(0xFF4F46E5)),
+              label: Text(_showQr ? 'Hide QR' : 'Show QR', style: const TextStyle(color: Color(0xFF4F46E5), fontSize: 11, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -542,38 +668,113 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
 
         if (_showQr) ...[
           Center(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: QrImageView(
-                data: webUrl,
-                version: QrVersions.auto,
-                size: 140.0,
-              ),
+            child: Column(
+              children: [
+                RepaintBoundary(
+                  key: _qrBoundaryKey,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        QrImageView(
+                          data: webUrl,
+                          version: QrVersions.auto,
+                          size: 150.0,
+                          backgroundColor: Colors.white,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _currentFile.fileName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _isSavingQr ? null : _saveQrCode,
+                      icon: _isSavingQr
+                          ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(LucideIcons.download, size: 13),
+                      label: Text(_isSavingQr ? 'Saving...' : 'Download QR', style: const TextStyle(fontSize: 11)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4F46E5),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: _shareQrCodeImage,
+                      icon: const Icon(LucideIcons.share2, size: 13),
+                      label: const Text('Share QR', style: TextStyle(fontSize: 11)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF4F46E5),
+                        side: const BorderSide(color: Color(0xFF4F46E5)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
             ),
           ),
         ],
 
         // Web Link Copy Box
-        _buildLinkBox(webUrl, 'Web link copied!'),
+        _buildLinkBox(webUrl, 'Web link copied!', isLight),
         const SizedBox(height: 14),
 
         // Direct Stream Link
-        const Text(
+        Text(
           'DIRECT STREAM LINK (FOR APPS/UPDATES)',
-          style: TextStyle(color: Color(0xFFF472B6), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          style: TextStyle(
+            color: isLight ? const Color(0xFFDB2777) : const Color(0xFFF472B6),
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
         ),
         const SizedBox(height: 6),
-        _buildLinkBox(directUrl, 'Direct link copied!'),
+        _buildLinkBox(directUrl, 'Direct link copied!', isLight),
       ],
     );
   }
 
-  Widget _buildProtectedTab(bool sharingEnabled) {
+  Widget _buildProtectedTab(bool sharingEnabled, bool isLight) {
+    final titleColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+    final subColor = isLight ? const Color(0xFF64748B) : Colors.grey.shade400;
+    final cardBg = isLight ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B).withOpacity(0.5);
+    final cardBorder = isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.06);
+    final inputBg = isLight ? Colors.white : const Color(0xFF0F172A);
+    final inputBorder = isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.08);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -581,16 +782,16 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E293B).withOpacity(0.5),
+            color: cardBg,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
+            border: Border.all(color: cardBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
                 'CREATE PROTECTED LINK',
-                style: TextStyle(color: Color(0xFF818CF8), fontSize: 11, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Color(0xFF4F46E5), fontSize: 11, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
 
@@ -599,14 +800,21 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                 controller: _pinController,
                 decoration: InputDecoration(
                   hintText: 'PIN / Password (e.g. 1234)',
-                  hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                  hintStyle: TextStyle(color: subColor, fontSize: 12),
                   filled: true,
-                  fillColor: const Color(0xFF0F172A),
+                  fillColor: inputBg,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                  prefixIcon: const Icon(LucideIcons.lock, size: 14, color: Colors.grey),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: inputBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: inputBorder),
+                  ),
+                  prefixIcon: Icon(LucideIcons.lock, size: 14, color: subColor),
                 ),
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+                style: TextStyle(color: titleColor, fontSize: 12),
               ),
               const SizedBox(height: 8),
 
@@ -617,20 +825,21 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
+                        color: inputBg,
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: inputBorder),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           value: _expiryOption,
                           isExpanded: true,
-                          dropdownColor: const Color(0xFF0F172A),
-                          items: const [
-                            DropdownMenuItem(value: 'none', child: Text('Never Expire', style: TextStyle(color: Colors.white, fontSize: 11))),
-                            DropdownMenuItem(value: '1h', child: Text('1 Hour', style: TextStyle(color: Colors.white, fontSize: 11))),
-                            DropdownMenuItem(value: '1d', child: Text('24 Hours', style: TextStyle(color: Colors.white, fontSize: 11))),
-                            DropdownMenuItem(value: '7d', child: Text('7 Days', style: TextStyle(color: Colors.white, fontSize: 11))),
-                            DropdownMenuItem(value: '30d', child: Text('30 Days', style: TextStyle(color: Colors.white, fontSize: 11))),
+                          dropdownColor: inputBg,
+                          items: [
+                            DropdownMenuItem(value: 'none', child: Text('Never Expire', style: TextStyle(color: titleColor, fontSize: 11))),
+                            DropdownMenuItem(value: '1h', child: Text('1 Hour', style: TextStyle(color: titleColor, fontSize: 11))),
+                            DropdownMenuItem(value: '1d', child: Text('24 Hours', style: TextStyle(color: titleColor, fontSize: 11))),
+                            DropdownMenuItem(value: '7d', child: Text('7 Days', style: TextStyle(color: titleColor, fontSize: 11))),
+                            DropdownMenuItem(value: '30d', child: Text('30 Days', style: TextStyle(color: titleColor, fontSize: 11))),
                           ],
                           onChanged: (val) => setState(() => _expiryOption = val ?? 'none'),
                         ),
@@ -645,14 +854,21 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         hintText: _isOneTime ? '1 (One-Time)' : 'Limit (e.g. 5)',
-                        hintStyle: TextStyle(color: _isOneTime ? Colors.amber.shade300 : Colors.grey.shade500, fontSize: 12),
+                        hintStyle: TextStyle(color: _isOneTime ? Colors.amber.shade700 : subColor, fontSize: 12),
                         filled: true,
-                        fillColor: _isOneTime ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
+                        fillColor: _isOneTime ? (isLight ? const Color(0xFFFEF3C7) : const Color(0xFF1E293B)) : inputBg,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                        prefixIcon: Icon(LucideIcons.hash, size: 14, color: _isOneTime ? Colors.amber.shade400 : Colors.grey),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: inputBorder),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: inputBorder),
+                        ),
+                        prefixIcon: Icon(LucideIcons.hash, size: 14, color: _isOneTime ? Colors.amber.shade600 : subColor),
                       ),
-                      style: TextStyle(color: _isOneTime ? Colors.amber.shade300 : Colors.white, fontSize: 12),
+                      style: TextStyle(color: _isOneTime ? Colors.amber.shade700 : titleColor, fontSize: 12),
                     ),
                   ),
                 ],
@@ -677,7 +893,7 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                       });
                     },
                   ),
-                  const Text('One-time self-destruct (Locks limit to 1)', style: TextStyle(color: Colors.white, fontSize: 11.5)),
+                  Text('One-time self-destruct (Locks limit to 1)', style: TextStyle(color: titleColor, fontSize: 11.5)),
                 ],
               ),
               const SizedBox(height: 6),
@@ -707,7 +923,7 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
         // Active links
         Text(
           'ACTIVE PROTECTED LINKS (${_customLinks.length})',
-          style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold),
+          style: TextStyle(color: subColor, fontSize: 11, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
 
@@ -718,10 +934,11 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
             padding: const EdgeInsets.all(16),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: const Color(0xFF1E293B).withOpacity(0.3),
+              color: cardBg,
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: cardBorder),
             ),
-            child: const Text('No custom protected links created yet', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            child: Text('No custom protected links created yet', style: TextStyle(color: subColor, fontSize: 12)),
           )
         else
           ..._customLinks.map((lnk) {
@@ -730,9 +947,9 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B).withOpacity(0.6),
+                color: cardBg,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white.withOpacity(0.06)),
+                border: Border.all(color: cardBorder),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -746,14 +963,14 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.indigo.withOpacity(0.2),
+                                color: const Color(0xFF4F46E5).withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Row(
                                 children: [
-                                  Icon(LucideIcons.lock, size: 10, color: Color(0xFF818CF8)),
+                                  Icon(LucideIcons.lock, size: 10, color: Color(0xFF4F46E5)),
                                   SizedBox(width: 4),
-                                  Text('PIN', style: TextStyle(color: Color(0xFF818CF8), fontSize: 10, fontWeight: FontWeight.bold)),
+                                  Text('PIN', style: TextStyle(color: Color(0xFF4F46E5), fontSize: 10, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
@@ -763,7 +980,7 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.amber.withOpacity(0.2),
+                                color: Colors.amber.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text('1-Time', style: TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -780,7 +997,7 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  _buildLinkBox(linkUrl, 'Protected link copied!'),
+                  _buildLinkBox(linkUrl, 'Protected link copied!', isLight),
                 ],
               ),
             );
@@ -789,13 +1006,17 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
     );
   }
 
-  Widget _buildLinkBox(String url, String copyMsg) {
+  Widget _buildLinkBox(String url, String copyMsg, bool isLight) {
+    final boxBg = isLight ? const Color(0xFFF1F5F9) : const Color(0xFF0B1329);
+    final borderColor = isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.08);
+    final textColor = isLight ? const Color(0xFF1E293B) : Colors.white70;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1329),
+        color: boxBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
@@ -804,7 +1025,7 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
               url,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white70, fontSize: 11, fontFamily: 'monospace'),
+              style: TextStyle(color: textColor, fontSize: 11, fontFamily: 'monospace'),
             ),
           ),
           IconButton(
@@ -814,14 +1035,14 @@ class _ShareFileDialogState extends State<ShareFileDialog> {
                 SnackBar(content: Text(copyMsg), backgroundColor: const Color(0xFF10B981), behavior: SnackBarBehavior.floating),
               );
             },
-            icon: const Icon(LucideIcons.copy, size: 14, color: Color(0xFF818CF8)),
+            icon: const Icon(LucideIcons.copy, size: 14, color: Color(0xFF4F46E5)),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
           const SizedBox(width: 8),
           IconButton(
             onPressed: () => Share.share(url),
-            icon: const Icon(LucideIcons.share2, size: 14, color: Colors.white),
+            icon: Icon(LucideIcons.share2, size: 14, color: isLight ? const Color(0xFF475569) : Colors.white),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),

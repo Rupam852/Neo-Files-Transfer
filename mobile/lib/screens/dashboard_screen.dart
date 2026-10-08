@@ -26,6 +26,7 @@ import '../widgets/upload_progress.dart';
 import '../widgets/version_api_dialog.dart';
 import '../widgets/manage_versions_dialog.dart';
 import '../widgets/share_file_dialog.dart';
+import '../widgets/media_preview_dialog.dart';
 import '../widgets/notification_bell.dart';
 
 
@@ -1095,6 +1096,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  void _handlePreview(SharedFile file) {
+    showDialog(
+      context: context,
+      builder: (context) => MediaPreviewDialog(
+        file: file,
+        onDownload: () => _handleDownload(file),
+      ),
+    );
+  }
+
   void _handleManageVersions(SharedFile file) {
     showDialog(
       context: context,
@@ -1104,8 +1115,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final fileService = Provider.of<FileService>(context);
+
+    final bgColor = isLight ? const Color(0xFFF8FAFC) : const Color(0xFF030712);
+    final navBgColor = isLight ? Colors.white : const Color(0xFF0F172A);
+    final navBorderColor = isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.08);
+    final searchBg = isLight ? Colors.white : const Color(0xFF0F172A).withOpacity(0.5);
+    final searchBorder = isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.06);
+    final titleTextColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+    final iconColor = isLight ? const Color(0xFF475569) : Colors.white;
 
     // Apply search filter
     final filteredFiles = fileService.files.where((f) {
@@ -1118,369 +1137,392 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Stack(
         children: [
           Scaffold(
-        backgroundColor: const Color(0xFF030712),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Row(
-          children: [
-            const Text(
-              'Neo',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+            backgroundColor: bgColor,
+            appBar: AppBar(
+              backgroundColor: isLight ? Colors.white : Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              title: Row(
+                children: [
+                  Text(
+                    'Neo',
+                    style: TextStyle(
+                      color: titleTextColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const Text(
+                    'Files',
+                    style: TextStyle(
+                      color: Color(0xFF4F46E5),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                const NotificationBellButton(),
+                Consumer<UpdateService>(
+                  builder: (context, updateService, _) {
+                    return IconButton(
+                      tooltip: updateService.hasUpdate ? 'Update Available!' : 'Settings',
+                      icon: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Icon(LucideIcons.settings, color: iconColor, size: 20),
+                          if (updateService.hasUpdate)
+                            Positioned(
+                              top: -2,
+                              right: -2,
+                              child: Container(
+                                width: 9,
+                                height: 9,
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: bgColor, width: 1.5),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
-            Text(
-              'Files',
-              style: TextStyle(color: Colors.indigo.shade400, fontWeight: FontWeight.bold, fontSize: 18),
+            bottomNavigationBar: Container(
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: navBorderColor, width: 1)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isUploading)
+                    UploadProgressWidget(
+                      fileName: _uploadingFileName,
+                      progress: _uploadProgress,
+                      speed: _uploadSpeed,
+                      onCancel: _handleCancelUpload,
+                    ),
+                  BottomNavigationBar(
+                    currentIndex: _currentTab,
+                    onTap: _onTabTapped,
+                    backgroundColor: navBgColor,
+                    selectedItemColor: const Color(0xFF4F46E5),
+                    unselectedItemColor: isLight ? const Color(0xFF64748B) : Colors.white60,
+                    showSelectedLabels: true,
+                    showUnselectedLabels: true,
+                    type: BottomNavigationBarType.fixed,
+                    items: const [
+                      BottomNavigationBarItem(
+                        icon: Icon(LucideIcons.folder),
+                        label: 'My Files',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(LucideIcons.share2),
+                        label: 'Shared Links',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(LucideIcons.trash2),
+                        label: 'Recycle Bin',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-        actions: [
-          const NotificationBellButton(),
-          Consumer<UpdateService>(
-            builder: (context, updateService, _) {
-              return IconButton(
-                tooltip: updateService.hasUpdate ? 'Update Available!' : 'Settings',
-                icon: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    const Icon(LucideIcons.settings, color: Colors.white, size: 20),
-                    if (updateService.hasUpdate)
-                      Positioned(
-                        top: -2,
-                        right: -2,
-                        child: Container(
-                          width: 9,
-                          height: 9,
-                          decoration: BoxDecoration(
-                            color: Colors.redAccent,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFF030712), width: 1.5),
+            floatingActionButton: _currentTab == 0
+                ? AnimatedSlide(
+                    duration: const Duration(milliseconds: 250),
+                    offset: _isFabVisible ? Offset.zero : const Offset(0, 2),
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 250),
+                      opacity: _isFabVisible ? 1.0 : 0.0,
+                      child: FloatingActionButton(
+                        onPressed: () {
+                          final bottomBg = isLight ? Colors.white : const Color(0xFF0F172A);
+                          final bottomItemColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+
+                          showModalBottomSheet(
+                            backgroundColor: bottomBg,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                            ),
+                            context: context,
+                            builder: (context) => SafeArea(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ListTile(
+                                    leading: const Icon(LucideIcons.filePlus, color: Color(0xFF4F46E5)),
+                                    title: Text('Upload Files', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _handleUploadFile();
+                                    },
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(LucideIcons.folder, color: Colors.teal),
+                                    title: Text('Upload Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _handleUploadFolder();
+                                    },
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(LucideIcons.folderPlus, color: Colors.amber),
+                                    title: Text('Create Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _handleCreateFolder();
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        backgroundColor: const Color(0xFF4F46E5),
+                        child: const Icon(LucideIcons.plus, color: Colors.white),
+                      ),
+                    ),
+                  )
+                : null,
+            body: PopScope(
+              canPop: false,
+              onPopInvokedWithResult: (didPop, result) {
+                if (didPop) return;
+
+                if (_searchQuery.isNotEmpty || _searchFocusNode.hasFocus) {
+                  _searchFocusNode.unfocus();
+                  if (_searchQuery.isNotEmpty) {
+                    setState(() {
+                      _searchController.clear();
+                      _searchQuery = '';
+                    });
+                  }
+                  return;
+                }
+
+                if (_folderPath.isNotEmpty) {
+                  _navigateBackOneLevel();
+                  return;
+                }
+
+                if (_currentTab != 0) {
+                  setState(() {
+                    _currentTab = 0;
+                    _isFabVisible = true;
+                  });
+                  _refreshFiles();
+                  return;
+                }
+
+                SystemNavigator.pop();
+              },
+              child: NotificationListener<UserScrollNotification>(
+                onNotification: (notification) {
+                  if (notification.direction == ScrollDirection.reverse) {
+                    if (_isFabVisible) {
+                      setState(() => _isFabVisible = false);
+                    }
+                  } else if (notification.direction == ScrollDirection.forward) {
+                    if (!_isFabVisible) {
+                      setState(() => _isFabVisible = true);
+                    }
+                  }
+                  return true;
+                },
+                child: RefreshIndicator(
+                  onRefresh: _refreshFiles,
+                  color: const Color(0xFF4F46E5),
+                  backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
+                  child: _currentTab == 0
+                      ? Column(
+                          children: [
+                            // Search Bar & Info card
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                              child: TextFormField(
+                                controller: _searchController,
+                                focusNode: _searchFocusNode,
+                                style: TextStyle(color: titleTextColor, fontSize: 13.5),
+                                textInputAction: TextInputAction.search,
+                                onFieldSubmitted: (_) => _searchFocusNode.unfocus(),
+                                onChanged: (val) => setState(() => _searchQuery = val),
+                                decoration: InputDecoration(
+                                  prefixIcon: Icon(LucideIcons.search, color: isLight ? const Color(0xFF94A3B8) : Colors.white38, size: 16),
+                                  suffixIcon: _searchQuery.isNotEmpty
+                                      ? IconButton(
+                                          icon: Icon(LucideIcons.x, color: isLight ? const Color(0xFF64748B) : Colors.white54, size: 16),
+                                          tooltip: 'Clear search',
+                                          splashRadius: 18,
+                                          onPressed: () {
+                                            setState(() {
+                                              _searchController.clear();
+                                              _searchQuery = '';
+                                            });
+                                            _searchFocusNode.unfocus();
+                                          },
+                                        )
+                                      : null,
+                                  hintText: 'Search files and folders...',
+                                  hintStyle: TextStyle(color: isLight ? const Color(0xFF94A3B8) : Colors.white30, fontSize: 12.5),
+                                  filled: true,
+                                  fillColor: searchBg,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: searchBorder),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: searchBorder),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: Color(0xFF4F46E5)),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // Download Progress overlay banner
+                            if (_downloadingFileName.isNotEmpty) ...[
+                              Container(
+                                width: double.infinity,
+                                color: const Color(0xFF4F46E5),
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                child: Row(
+                                  children: [
+                                    const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Downloading $_downloadingFileName (${(_downloadProgress * 100).round()}%)...',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+
+                            // Breadcrumb path navigation bar
+                            _buildBreadcrumbs(isLight),
+
+                            // Files view list
+                            Expanded(
+                              child: fileService.isLoading
+                                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5)))
+                                  : filteredFiles.isEmpty
+                                      ? _buildEmptyState(isLight)
+                                      : ListView.builder(
+                                          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                                          itemCount: filteredFiles.length,
+                                          itemBuilder: (context, index) {
+                                            final file = filteredFiles[index];
+                                            return FileListItem(
+                                              file: file,
+                                              onTap: () {
+                                                if (file.isFolder) {
+                                                  _navigateToFolder(file);
+                                                } else {
+                                                  _handlePreview(file);
+                                                }
+                                              },
+                                              onActionSelected: (action) {
+                                                if (action == 'preview') _handlePreview(file);
+                                                if (action == 'share_file') _handleShareFile(file);
+                                                if (action == 'rename') _handleRename(file);
+                                                if (action == 'share') _handleToggleSharing(file);
+                                                if (action == 'download') _handleDownload(file);
+                                                if (action == 'manage_versions') _handleManageVersions(file);
+                                                if (action == 'version_api') _handleGetVersionApi(file);
+                                                if (action == 'delete') _handleDelete(file);
+                                              },
+                                            );
+                                          },
+                                        ),
+                            ),
+                          ],
+                        )
+                      : _currentTab == 1
+                          ? _buildSharedFilesTab(isLight)
+                          : _buildTrashTab(isLight),
+                ),
+              ),
+            ),
+          ),
+          if (_isActionLoading)
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+                child: Container(
+                  color: Colors.black.withOpacity(0.4),
+                  child: Center(
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: isLight ? Colors.white : const Color(0xFF0F172A).withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.1),
+                            width: 1,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                      ),
-                  ],
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_isUploading)
-            UploadProgressWidget(
-              fileName: _uploadingFileName,
-              progress: _uploadProgress,
-              speed: _uploadSpeed,
-              onCancel: _handleCancelUpload,
-            ),
-          BottomNavigationBar(
-            currentIndex: _currentTab,
-            onTap: _onTabTapped,
-            backgroundColor: const Color(0xFF0F172A),
-            selectedItemColor: Colors.indigoAccent,
-            unselectedItemColor: Colors.white60,
-            showSelectedLabels: true,
-            showUnselectedLabels: true,
-            type: BottomNavigationBarType.fixed,
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(LucideIcons.folder),
-                label: 'My Files',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(LucideIcons.share2),
-                label: 'Shared Links',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(LucideIcons.trash2),
-                label: 'Recycle Bin',
-              ),
-            ],
-          ),
-        ],
-      ),
-      floatingActionButton: _currentTab == 0
-          ? AnimatedSlide(
-              duration: const Duration(milliseconds: 250),
-              offset: _isFabVisible ? Offset.zero : const Offset(0, 2),
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 250),
-                opacity: _isFabVisible ? 1.0 : 0.0,
-                child: FloatingActionButton(
-                  onPressed: () {
-                    // Bottom options dialog
-                    showModalBottomSheet(
-                      backgroundColor: const Color(0xFF0F172A),
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                      ),
-                      context: context,
-                      builder: (context) => SafeArea(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            ListTile(
-                              leading: const Icon(LucideIcons.filePlus, color: Colors.indigoAccent),
-                              title: const Text('Upload Files', style: TextStyle(color: Colors.white)),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _handleUploadFile();
-                              },
-                            ),
-                            ListTile(
-                              leading: const Icon(LucideIcons.folder, color: Colors.teal),
-                              title: const Text('Upload Folder', style: TextStyle(color: Colors.white)),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _handleUploadFolder();
-                              },
-                            ),
-                            ListTile(
-                              leading: const Icon(LucideIcons.folderPlus, color: Colors.amber),
-                              title: const Text('Create Folder', style: TextStyle(color: Colors.white)),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _handleCreateFolder();
-                              },
+                            const CircularProgressIndicator(color: Color(0xFF4F46E5)),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Please wait...',
+                              style: TextStyle(
+                                color: titleTextColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                    );
-                  },
-                  backgroundColor: Colors.indigo.shade600,
-                  child: const Icon(LucideIcons.plus, color: Colors.white),
-                ),
-              ),
-            )
-          : null,
-      body: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, result) {
-          if (didPop) return;
-
-          // 1. If search is active or focused, dismiss search first and return to full file list
-          if (_searchQuery.isNotEmpty || _searchFocusNode.hasFocus) {
-            _searchFocusNode.unfocus();
-            if (_searchQuery.isNotEmpty) {
-              setState(() {
-                _searchController.clear();
-                _searchQuery = '';
-              });
-            }
-            return;
-          }
-
-          // 2. If inside a sub-folder, navigate back up one level
-          if (_folderPath.isNotEmpty) {
-            _navigateBackOneLevel();
-            return;
-          }
-
-          // 3. If on Shared Files or other tab, return to My Files tab (tab 0)
-          if (_currentTab != 0) {
-            setState(() {
-              _currentTab = 0;
-              _isFabVisible = true;
-            });
-            _refreshFiles();
-            return;
-          }
-
-          // 4. At the root of My Files with no search active -> exit app
-          SystemNavigator.pop();
-        },
-        child: NotificationListener<UserScrollNotification>(
-          onNotification: (notification) {
-            if (notification.direction == ScrollDirection.reverse) {
-              if (_isFabVisible) {
-                setState(() => _isFabVisible = false);
-              }
-            } else if (notification.direction == ScrollDirection.forward) {
-              if (!_isFabVisible) {
-                setState(() => _isFabVisible = true);
-              }
-            }
-            return true;
-          },
-          child: RefreshIndicator(
-            onRefresh: _refreshFiles,
-            color: Colors.indigoAccent,
-            backgroundColor: const Color(0xFF0F172A),
-            child: _currentTab == 0
-                ? Column(
-                    children: [
-                      // Search Bar & Info card
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-                        child: TextFormField(
-                          controller: _searchController,
-                          focusNode: _searchFocusNode,
-                          style: const TextStyle(color: Colors.white, fontSize: 13.5),
-                          textInputAction: TextInputAction.search,
-                          onFieldSubmitted: (_) => _searchFocusNode.unfocus(),
-                          onChanged: (val) => setState(() => _searchQuery = val),
-                          decoration: InputDecoration(
-                            prefixIcon: const Icon(LucideIcons.search, color: Colors.white38, size: 16),
-                            suffixIcon: _searchQuery.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(LucideIcons.x, color: Colors.white54, size: 16),
-                                    tooltip: 'Clear search',
-                                    splashRadius: 18,
-                                    onPressed: () {
-                                      setState(() {
-                                        _searchController.clear();
-                                        _searchQuery = '';
-                                      });
-                                      _searchFocusNode.unfocus();
-                                    },
-                                  )
-                                : null,
-                            hintText: 'Search files and folders...',
-                            hintStyle: const TextStyle(color: Colors.white30, fontSize: 12.5),
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A).withOpacity(0.5),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.indigoAccent.withOpacity(0.4)),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Download Progress overlay banner
-                      if (_downloadingFileName.isNotEmpty) ...[
-                        Container(
-                          width: double.infinity,
-                          color: Colors.indigo.shade900.withOpacity(0.8),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          child: Row(
-                            children: [
-                              const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'Downloading $_downloadingFileName (${(_downloadProgress * 100).round()}%)...',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      // Breadcrumb path navigation bar
-                      _buildBreadcrumbs(),
-
-                      // Files view list
-                      Expanded(
-                        child: fileService.isLoading
-                            ? const Center(child: CircularProgressIndicator(color: Colors.indigoAccent))
-                            : filteredFiles.isEmpty
-                                ? _buildEmptyState()
-                                : ListView.builder(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                                    itemCount: filteredFiles.length,
-                                    itemBuilder: (context, index) {
-                                      final file = filteredFiles[index];
-                                      return FileListItem(
-                                        file: file,
-                                        onTap: () {
-                                          if (file.isFolder) {
-                                            _navigateToFolder(file);
-                                          } else {
-                                            _showViewInDriveDialog(file);
-                                          }
-                                        },
-                                        onActionSelected: (action) {
-                                          if (action == 'share_file') _handleShareFile(file);
-                                          if (action == 'rename') _handleRename(file);
-                                          if (action == 'share') _handleToggleSharing(file);
-                                          if (action == 'download') _handleDownload(file);
-                                          if (action == 'manage_versions') _handleManageVersions(file);
-                                          if (action == 'version_api') _handleGetVersionApi(file);
-                                          if (action == 'delete') _handleDelete(file);
-                                        },
-                                      );
-                                    },
-                                  ),
-                      ),
-                    ],
-                  )
-                : _currentTab == 1
-                    ? _buildSharedFilesTab()
-                    : _buildTrashTab(),
-          ),
-        ),
-      ),
-
-    ),
-    if (_isActionLoading)
-      Positioned.fill(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-          child: Container(
-            color: Colors.black.withOpacity(0.5),
-            child: Center(
-              child: Material(
-                type: MaterialType.transparency,
-                child: Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A).withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.1),
-                      width: 1,
                     ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      CircularProgressIndicator(color: Colors.indigoAccent),
-                      SizedBox(height: 16),
-                      Text(
-                        'Please wait...',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ),
             ),
-          ),
-        ),
+        ],
       ),
-      ],
-    ),
-  );
+    );
   }
 
-  Widget _buildBreadcrumbs() {
+  Widget _buildBreadcrumbs(bool isLight) {
+    final activeColor = const Color(0xFF4F46E5);
+    final inactiveColor = isLight ? const Color(0xFF64748B) : Colors.white60;
+    final chevronColor = isLight ? const Color(0xFF94A3B8) : Colors.white30;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
       alignment: Alignment.centerLeft,
@@ -1493,20 +1535,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Text(
                 'Root',
                 style: TextStyle(
-                  color: _currentFolder == null ? Colors.indigo.shade300 : Colors.white60,
+                  color: _currentFolder == null ? activeColor : inactiveColor,
                   fontSize: 12.5,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
             for (int i = 0; i < _folderPath.length; i++) ...[
-              const Icon(LucideIcons.chevronRight, color: Colors.white30, size: 14),
+              Icon(LucideIcons.chevronRight, color: chevronColor, size: 14),
               GestureDetector(
                 onTap: () => _navigateBackTo(i),
                 child: Text(
                   _folderPath[i].fileName,
                   style: TextStyle(
-                    color: i == _folderPath.length - 1 ? Colors.indigo.shade300 : Colors.white60,
+                    color: i == _folderPath.length - 1 ? activeColor : inactiveColor,
                     fontSize: 12.5,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1519,7 +1561,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isLight) {
+    final titleColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+    final subColor = isLight ? const Color(0xFF64748B) : Colors.white38;
+
     if (_searchQuery.isNotEmpty) {
       return Center(
         child: Padding(
@@ -1527,17 +1572,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(LucideIcons.searchX, color: Colors.white24, size: 48),
+              Icon(LucideIcons.searchX, color: subColor, size: 48),
               const SizedBox(height: 12),
               Text(
                 'No results found for "$_searchQuery"',
-                style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600),
+                style: TextStyle(color: titleColor, fontSize: 14, fontWeight: FontWeight.w600),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Check for spelling errors or try different keywords',
-                style: TextStyle(color: Colors.white30, fontSize: 12),
+                style: TextStyle(color: subColor, fontSize: 12),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -1552,8 +1597,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 icon: const Icon(LucideIcons.x, size: 14),
                 label: const Text('Clear Search', style: TextStyle(fontSize: 12)),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.indigoAccent,
-                  side: BorderSide(color: Colors.indigoAccent.withOpacity(0.3)),
+                  foregroundColor: const Color(0xFF4F46E5),
+                  side: const BorderSide(color: Color(0xFF4F46E5)),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
@@ -1566,24 +1611,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(LucideIcons.folderOpen, color: Colors.white24, size: 48),
-          SizedBox(height: 12),
+        children: [
+          Icon(LucideIcons.folderOpen, color: subColor, size: 48),
+          const SizedBox(height: 12),
           Text(
             'This folder is empty',
-            style: TextStyle(color: Colors.white30, fontSize: 13.5),
+            style: TextStyle(color: subColor, fontSize: 13.5),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSharedFilesTab() {
+  Widget _buildSharedFilesTab(bool isLight) {
     final fileService = Provider.of<FileService>(context);
     final sharedFiles = fileService.sharedFiles;
 
+    final cardBg = isLight ? Colors.white : const Color(0xFF0B1329).withOpacity(0.5);
+    final cardBorder = isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.04);
+    final titleColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+    final subColor = isLight ? const Color(0xFF64748B) : Colors.grey.shade400;
+    final linkBoxBg = isLight ? const Color(0xFFF1F5F9) : Colors.black.withOpacity(0.2);
+
     if (fileService.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Colors.indigoAccent));
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5)));
     }
 
     if (sharedFiles.isEmpty) {
@@ -1591,16 +1642,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(LucideIcons.link2, size: 48, color: Colors.white24),
+            Icon(LucideIcons.link2, size: 48, color: isLight ? const Color(0xFFCBD5E1) : Colors.white24),
             const SizedBox(height: 16),
             Text(
               'No shared files yet',
-              style: TextStyle(color: Colors.grey.shade400, fontSize: 15, fontWeight: FontWeight.bold),
+              style: TextStyle(color: titleColor, fontSize: 15, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               'Generate public links on files to see them here.',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              style: TextStyle(color: subColor, fontSize: 12),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1620,12 +1671,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           margin: const EdgeInsets.only(bottom: 12.0),
           padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
-            color: const Color(0xFF0B1329).withOpacity(0.5),
+            color: cardBg,
             borderRadius: BorderRadius.circular(16.0),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.04),
-              width: 1.0,
-            ),
+            border: Border.all(color: cardBorder, width: 1.0),
+            boxShadow: isLight
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1637,12 +1694,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.indigoAccent.withOpacity(0.1),
+                      color: const Color(0xFF4F46E5).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(10.0),
                     ),
                     child: Icon(
                       file.isFolder ? LucideIcons.folder : LucideIcons.file,
-                      color: Colors.indigoAccent,
+                      color: const Color(0xFF4F46E5),
                       size: 20,
                     ),
                   ),
@@ -1655,8 +1712,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           file.fileName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: titleColor,
                             fontWeight: FontWeight.w600,
                             fontSize: 14.0,
                           ),
@@ -1699,7 +1756,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const SizedBox(width: 10),
                             Text(
                               'v${file.currentVersionNum} · $formattedDate',
-                              style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                              style: TextStyle(color: subColor, fontSize: 11),
                             ),
                           ],
                         ),
@@ -1712,7 +1769,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.2),
+                  color: linkBoxBg,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -1724,8 +1781,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             : 'No share link generated yet',
                         style: TextStyle(
                           color: file.uniqueShareHash != null && file.uniqueShareHash!.isNotEmpty
-                              ? Colors.grey.shade400
-                              : Colors.grey.shade600,
+                              ? (isLight ? const Color(0xFF1E293B) : Colors.grey.shade400)
+                              : Colors.grey.shade500,
                           fontSize: 11,
                           fontFamily: file.uniqueShareHash != null && file.uniqueShareHash!.isNotEmpty
                               ? 'monospace'
@@ -1740,7 +1797,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     if (file.uniqueShareHash != null && file.uniqueShareHash!.isNotEmpty)
                       IconButton(
-                        icon: const Icon(LucideIcons.copy, size: 14, color: Colors.white60),
+                        icon: Icon(LucideIcons.copy, size: 14, color: isLight ? const Color(0xFF4F46E5) : Colors.white60),
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: '${AppConfig.appUrl}/download/${file.uniqueShareHash}'));
                           _showSuccessSnackBar('Share URL copied to clipboard!');
@@ -1759,7 +1816,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onPressed: () => _showShareDialog(file),
                     icon: const Icon(LucideIcons.copy, size: 14),
                     label: const Text('Get Links', style: TextStyle(fontSize: 12)),
-                    style: TextButton.styleFrom(foregroundColor: Colors.indigoAccent),
+                    style: TextButton.styleFrom(foregroundColor: const Color(0xFF4F46E5)),
                   ),
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
@@ -1767,8 +1824,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     icon: Icon(isPublic ? LucideIcons.lock : LucideIcons.globe, size: 14),
                     label: Text(isPublic ? 'Make Private' : 'Make Public', style: const TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: isPublic ? Colors.amber : Colors.green,
-                      side: BorderSide(color: isPublic ? Colors.amber.withOpacity(0.3) : Colors.green.withOpacity(0.3)),
+                      foregroundColor: isPublic ? Colors.amber.shade700 : Colors.green,
+                      side: BorderSide(color: isPublic ? Colors.amber.withOpacity(0.4) : Colors.green.withOpacity(0.4)),
                     ),
                   ),
                 ],
@@ -1780,12 +1837,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildTrashTab() {
+  Widget _buildTrashTab(bool isLight) {
     final fileService = Provider.of<FileService>(context);
     final trashFiles = fileService.trashFiles;
 
+    final cardBg = isLight ? Colors.white : const Color(0xFF0B1329).withOpacity(0.5);
+    final titleColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+    final subColor = isLight ? const Color(0xFF64748B) : Colors.grey.shade400;
+
     if (fileService.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Colors.indigoAccent));
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5)));
     }
 
     if (trashFiles.isEmpty) {
@@ -1793,16 +1854,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(LucideIcons.trash2, size: 48, color: Colors.white24),
+            Icon(LucideIcons.trash2, size: 48, color: isLight ? const Color(0xFFCBD5E1) : Colors.white24),
             const SizedBox(height: 16),
             Text(
               'Recycle Bin is Empty',
-              style: TextStyle(color: Colors.grey.shade400, fontSize: 15, fontWeight: FontWeight.bold),
+              style: TextStyle(color: titleColor, fontSize: 15, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               'Deleted files are stored safely until permanently removed.',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              style: TextStyle(color: subColor, fontSize: 12),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1823,12 +1884,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           margin: const EdgeInsets.only(bottom: 12.0),
           padding: const EdgeInsets.all(14.0),
           decoration: BoxDecoration(
-            color: const Color(0xFF0B1329).withOpacity(0.5),
+            color: cardBg,
             borderRadius: BorderRadius.circular(16.0),
             border: Border.all(
-              color: Colors.redAccent.withOpacity(0.12),
+              color: Colors.redAccent.withOpacity(0.18),
               width: 1.0,
             ),
+            boxShadow: isLight
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             children: [
@@ -1854,8 +1924,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       file.fileName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: titleColor,
                         fontWeight: FontWeight.w600,
                         fontSize: 14.0,
                       ),
@@ -1864,7 +1934,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Text(
                       'Deleted: $deletedDate',
                       style: TextStyle(
-                        color: Colors.grey.shade400,
+                        color: subColor,
                         fontSize: 11.0,
                       ),
                     ),
@@ -1873,7 +1943,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               IconButton(
                 tooltip: 'Restore File',
-                icon: const Icon(LucideIcons.rotateCcw, color: Color(0xFF34D399), size: 18),
+                icon: const Icon(LucideIcons.rotateCcw, color: Color(0xFF10B981), size: 18),
                 onPressed: () async {
                   setState(() => _isActionLoading = true);
                   try {
@@ -1893,12 +1963,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   showDialog(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      backgroundColor: const Color(0xFF0F172A),
+                      backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      title: const Text('Delete Permanently?', style: TextStyle(color: Colors.white)),
-                      content: Text('Permanently delete "${file.fileName}" from Google Drive and DB? This cannot be undone.', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                      title: Text('Delete Permanently?', style: TextStyle(color: titleColor)),
+                      content: Text(
+                        'Permanently delete "${file.fileName}" from Google Drive and DB? This cannot be undone.',
+                        style: TextStyle(color: subColor, fontSize: 13),
+                      ),
                       actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.white60))),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: Text('Cancel', style: TextStyle(color: subColor)),
+                        ),
                         ElevatedButton(
                           onPressed: () async {
                             Navigator.pop(ctx);

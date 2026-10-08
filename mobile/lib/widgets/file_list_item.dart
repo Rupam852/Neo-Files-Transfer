@@ -53,18 +53,28 @@ class FileListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final formattedDate = DateFormat('MMM dd, yyyy').format(file.createdAt);
     final sizeStr = file.isFolder ? 'Folder' : _formatFileSize(file.fileSize);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12.0),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1329).withOpacity(0.5),
+        color: isLight ? Colors.white : const Color(0xFF0B1329).withOpacity(0.5),
         borderRadius: BorderRadius.circular(16.0),
         border: Border.all(
-          color: Colors.white.withOpacity(0.04),
+          color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.04),
           width: 1.0,
         ),
+        boxShadow: isLight
+            ? [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
       child: ListTile(
         onTap: onTap,
@@ -90,8 +100,8 @@ class FileListItem extends StatelessWidget {
           file.fileName,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: isLight ? const Color(0xFF0F172A) : Colors.white,
             fontWeight: FontWeight.w600,
             fontSize: 14.5,
           ),
@@ -106,7 +116,7 @@ class FileListItem extends StatelessWidget {
                   Text(
                     sizeStr,
                     style: TextStyle(
-                      color: Colors.grey.shade400,
+                      color: isLight ? Colors.grey.shade600 : Colors.grey.shade400,
                       fontSize: 11.5,
                     ),
                   ),
@@ -115,7 +125,7 @@ class FileListItem extends StatelessWidget {
                     width: 3,
                     height: 3,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade600,
+                      color: isLight ? Colors.grey.shade400 : Colors.grey.shade600,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -123,7 +133,7 @@ class FileListItem extends StatelessWidget {
                   Text(
                     formattedDate,
                     style: TextStyle(
-                      color: Colors.grey.shade400,
+                      color: isLight ? Colors.grey.shade600 : Colors.grey.shade400,
                       fontSize: 11.5,
                     ),
                   ),
@@ -138,7 +148,7 @@ class FileListItem extends StatelessWidget {
                       child: Text(
                         'Shared',
                         style: TextStyle(
-                          color: Colors.indigo.shade300,
+                          color: isLight ? Colors.indigo.shade700 : Colors.indigo.shade300,
                           fontSize: 9.5,
                           fontWeight: FontWeight.bold,
                         ),
@@ -152,7 +162,7 @@ class FileListItem extends StatelessWidget {
                 Text(
                   'Modified: ${DateFormat('MMM dd, yyyy, hh:mm a').format(file.modifiedAt!.toLocal())}',
                   style: TextStyle(
-                    color: Colors.indigo.shade300.withOpacity(0.8),
+                    color: isLight ? Colors.indigo.shade700 : Colors.indigo.shade300.withOpacity(0.8),
                     fontSize: 10.5,
                     fontWeight: FontWeight.w500,
                   ),
@@ -162,26 +172,49 @@ class FileListItem extends StatelessWidget {
           ),
         ),
         trailing: PopupMenuButton<String>(
-          color: const Color(0xFF0F172A),
+          color: isLight ? Colors.white : const Color(0xFF0F172A),
           elevation: 8,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.08),
+            ),
+          ),
           onSelected: onActionSelected,
           icon: Icon(
             LucideIcons.moreVertical,
-            color: Colors.grey.shade400,
+            color: isLight ? Colors.grey.shade700 : Colors.grey.shade400,
             size: 20,
           ),
           itemBuilder: (context) => [
-            const PopupMenuItem(
+            if (!file.isFolder)
+              PopupMenuItem(
+                value: 'preview',
+                child: Row(
+                  children: [
+                    const Icon(LucideIcons.eye, color: Color(0xFF10B981), size: 16),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Preview',
+                      style: TextStyle(
+                        color: isLight ? const Color(0xFF059669) : const Color(0xFF34D399),
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            PopupMenuItem(
               value: 'share_file',
               child: Row(
                 children: [
-                  Icon(LucideIcons.share2, color: Color(0xFF818CF8), size: 16),
-                  SizedBox(width: 10),
+                  const Icon(LucideIcons.share2, color: Color(0xFF818CF8), size: 16),
+                  const SizedBox(width: 10),
                   Text(
                     'Share File',
                     style: TextStyle(
-                      color: Color(0xFFC7D2FE),
+                      color: isLight ? const Color(0xFF4F46E5) : const Color(0xFFC7D2FE),
                       fontSize: 13.5,
                       fontWeight: FontWeight.bold,
                     ),
@@ -189,13 +222,19 @@ class FileListItem extends StatelessWidget {
                 ],
               ),
             ),
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'rename',
               child: Row(
                 children: [
-                  Icon(LucideIcons.pencil, color: Colors.white70, size: 16),
-                  SizedBox(width: 10),
-                  Text('Rename', style: TextStyle(color: Colors.white70, fontSize: 13.5)),
+                  Icon(LucideIcons.pencil, color: isLight ? Colors.grey.shade800 : Colors.white70, size: 16),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Rename',
+                    style: TextStyle(
+                      color: isLight ? const Color(0xFF0F172A) : Colors.white70,
+                      fontSize: 13.5,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -205,50 +244,65 @@ class FileListItem extends StatelessWidget {
                 children: [
                   Icon(
                     file.sharingStatus == 'public' ? LucideIcons.lock : LucideIcons.globe,
-                    color: Colors.white70,
+                    color: isLight ? Colors.grey.shade800 : Colors.white70,
                     size: 16,
                   ),
                   const SizedBox(width: 10),
                   Text(
                     file.sharingStatus == 'public' ? 'Make Private' : 'Make Public',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13.5),
+                    style: TextStyle(
+                      color: isLight ? const Color(0xFF0F172A) : Colors.white70,
+                      fontSize: 13.5,
+                    ),
                   ),
                 ],
               ),
             ),
             if (!file.isFolder) ...[
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'download',
                 child: Row(
                   children: [
-                    Icon(LucideIcons.download, color: Colors.white70, size: 16),
-                    SizedBox(width: 10),
-                    Text('Download', style: TextStyle(color: Colors.white70, fontSize: 13.5)),
+                    Icon(LucideIcons.download, color: isLight ? Colors.grey.shade800 : Colors.white70, size: 16),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Download',
+                      style: TextStyle(
+                        color: isLight ? const Color(0xFF0F172A) : Colors.white70,
+                        fontSize: 13.5,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'manage_versions',
                 child: Row(
                   children: [
-                    Icon(LucideIcons.history, color: Colors.white70, size: 16),
-                    SizedBox(width: 10),
-                    Text('Manage Versions', style: TextStyle(color: Colors.white70, fontSize: 13.5)),
+                    Icon(LucideIcons.history, color: isLight ? Colors.grey.shade800 : Colors.white70, size: 16),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Manage Versions',
+                      style: TextStyle(
+                        color: isLight ? const Color(0xFF0F172A) : Colors.white70,
+                        fontSize: 13.5,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
             if (!file.isFolder && (file.fileName.toLowerCase().endsWith('.apk') || file.mimeType.contains('android.package-archive'))) ...[
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'version_api',
                 child: Row(
                   children: [
-                    Icon(LucideIcons.code, color: Color(0xFF34D399), size: 16),
-                    SizedBox(width: 10),
+                    const Icon(LucideIcons.code, color: Color(0xFF34D399), size: 16),
+                    const SizedBox(width: 10),
                     Text(
                       'Get Version API',
                       style: TextStyle(
-                        color: Color(0xFF6EE7B7),
+                        color: isLight ? const Color(0xFF059669) : const Color(0xFF6EE7B7),
                         fontSize: 13.5,
                         fontWeight: FontWeight.bold,
                       ),
@@ -257,8 +311,6 @@ class FileListItem extends StatelessWidget {
                 ),
               ),
             ],
-
-
             const PopupMenuDivider(),
             const PopupMenuItem(
               value: 'delete',

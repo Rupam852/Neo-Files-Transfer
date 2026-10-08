@@ -168,14 +168,20 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final apiUrl = _getApiUrl();
 
     return Dialog(
-      backgroundColor: const Color(0xFF0F172A),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.08),
+        ),
+      ),
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.all(18.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,7 +201,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                     ),
                     child: const Icon(
                       LucideIcons.smartphone,
-                      color: Color(0xFF34D399),
+                      color: Color(0xFF10B981),
                       size: 20,
                     ),
                   ),
@@ -206,10 +212,10 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                       children: [
                         Row(
                           children: [
-                            const Text(
+                            Text(
                               'Get Version API',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: isLight ? const Color(0xFF0F172A) : Colors.white,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
@@ -219,16 +225,16 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withOpacity(0.2),
+                                color: const Color(0xFF10B981).withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(4),
                                 border: Border.all(
                                   color: const Color(0xFF10B981).withOpacity(0.3),
                                 ),
                               ),
-                              child: const Text(
+                              child: Text(
                                 'APK',
                                 style: TextStyle(
-                                  color: Color(0xFF6EE7B7),
+                                  color: isLight ? const Color(0xFF059669) : const Color(0xFF6EE7B7),
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -242,7 +248,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.grey.shade400,
+                            color: isLight ? Colors.grey.shade600 : Colors.grey.shade400,
                             fontSize: 11.5,
                           ),
                         ),
@@ -251,188 +257,195 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: Icon(LucideIcons.x, color: Colors.grey.shade400, size: 20),
+                    icon: Icon(LucideIcons.x, color: isLight ? Colors.grey.shade700 : Colors.grey.shade400, size: 20),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               // Editable Version Section
               Text(
                 'APK VERSION (EDITABLE)',
                 style: TextStyle(
-                  color: Colors.grey.shade300,
+                  color: isLight ? Colors.grey.shade700 : Colors.grey.shade300,
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               TextField(
                 controller: _versionController,
-                style: const TextStyle(
-                  color: Color(0xFF6EE7B7),
+                style: TextStyle(
+                  color: isLight ? const Color(0xFF059669) : const Color(0xFF6EE7B7),
                   fontWeight: FontWeight.bold,
                   fontFamily: 'monospace',
                   fontSize: 14,
                 ),
                 decoration: InputDecoration(
                   hintText: 'e.g. v1.0.1',
-                  hintStyle: TextStyle(color: Colors.grey.shade600),
+                  hintStyle: TextStyle(color: Colors.grey.shade500),
                   filled: true,
-                  fillColor: const Color(0xFF1E293B),
+                  fillColor: isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
                   contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 12),
+                      horizontal: 12, vertical: 11),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                    borderSide: BorderSide(
+                      color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                    borderSide: BorderSide(
+                      color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF34D399)),
+                    borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
                   ),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                'This version will be returned when your app calls the API endpoint. Default is v1.0.1.',
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 10.5),
+                'This version will be returned when your app calls the API endpoint.',
+                style: TextStyle(color: isLight ? Colors.grey.shade600 : Colors.grey.shade400, fontSize: 10.5),
               ),
               const SizedBox(height: 16),
 
-              // Editable Release Notes / Description Section
+              // Editable Release Notes / Description Header (2-Row Layout to prevent overflow)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     'RELEASE NOTES / DESCRIPTION',
                     style: TextStyle(
-                      color: Colors.grey.shade300,
-                      fontSize: 11,
+                      color: isLight ? Colors.grey.shade700 : Colors.grey.shade300,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
                     ),
                   ),
-                  Row(
-                    children: [
-                      // Format Bullets Button
-                      InkWell(
-                        onTap: _formatBullets,
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4F46E5).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: const Color(0xFF4F46E5).withOpacity(0.4),
+                  // Edit / Preview Toggle
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: isLight ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        InkWell(
+                          onTap: () => setState(() => _previewMode = false),
+                          borderRadius: BorderRadius.circular(4),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: !_previewMode ? const Color(0xFF4F46E5) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'Edit',
+                              style: TextStyle(
+                                color: !_previewMode ? Colors.white : (isLight ? Colors.grey.shade700 : Colors.grey.shade400),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(LucideIcons.sparkles, size: 11, color: Color(0xFF818CF8)),
-                              SizedBox(width: 4),
-                              Text(
-                                'Format Bullets (•)',
-                                style: TextStyle(
-                                  color: Color(0xFF818CF8),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                        ),
+                        InkWell(
+                          onTap: () => setState(() => _previewMode = true),
+                          borderRadius: BorderRadius.circular(4),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: _previewMode ? const Color(0xFF4F46E5) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'Preview',
+                              style: TextStyle(
+                                color: _previewMode ? Colors.white : (isLight ? Colors.grey.shade700 : Colors.grey.shade400),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
                               ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      // Edit / Preview Toggle
-                      Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          children: [
-                            InkWell(
-                              onTap: () => setState(() => _previewMode = false),
-                              borderRadius: BorderRadius.circular(4),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: !_previewMode ? const Color(0xFF4F46E5) : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  'Edit',
-                                  style: TextStyle(
-                                    color: !_previewMode ? Colors.white : Colors.grey.shade400,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            InkWell(
-                              onTap: () => setState(() => _previewMode = true),
-                              borderRadius: BorderRadius.circular(4),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: _previewMode ? const Color(0xFF4F46E5) : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  'Preview',
-                                  style: TextStyle(
-                                    color: _previewMode ? Colors.white : Colors.grey.shade400,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
+              // Format Bullets Button Row
+              Align(
+                alignment: Alignment.centerRight,
+                child: InkWell(
+                  onTap: _formatBullets,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4F46E5).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: const Color(0xFF4F46E5).withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(LucideIcons.sparkles, size: 11, color: Color(0xFF6366F1)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Format Bullets (•)',
+                          style: TextStyle(
+                            color: isLight ? const Color(0xFF4F46E5) : const Color(0xFF818CF8),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
               if (!_previewMode)
                 TextField(
                   controller: _descriptionController,
                   keyboardType: TextInputType.multiline,
                   maxLines: null,
                   minLines: 3,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: isLight ? const Color(0xFF0F172A) : Colors.white,
                     fontSize: 12.5,
                     height: 1.45,
                   ),
                   decoration: InputDecoration(
                     hintText: "🚀 What's new in this version:\n• Fast download engine\n• Bug fixes and UI improvements\n• Enjoy the new update!",
-                    hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
                     filled: true,
-                    fillColor: const Color(0xFF1E293B),
+                    fillColor: isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
                     contentPadding: const EdgeInsets.all(12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                      borderSide: BorderSide(
+                        color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                      borderSide: BorderSide(
+                        color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF34D399)),
+                      borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
                     ),
                   ),
                 )
@@ -442,9 +455,11 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   constraints: const BoxConstraints(minHeight: 85),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
+                    color: isLight ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    border: Border.all(
+                      color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
+                    ),
                   ),
                   child: _descriptionController.text.trim().isEmpty
                       ? Text(
@@ -470,11 +485,15 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('• ', style: TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.bold, fontSize: 13)),
+                                    const Text('• ', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 13)),
                                     Expanded(
                                       child: Text(
                                         cleanLine,
-                                        style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.35),
+                                        style: TextStyle(
+                                          color: isLight ? const Color(0xFF1E293B) : Colors.white,
+                                          fontSize: 12,
+                                          height: 1.35,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -487,8 +506,8 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                                 padding: const EdgeInsets.only(top: 4.0, bottom: 4.0),
                                 child: Text(
                                   cleanTitle,
-                                  style: const TextStyle(
-                                    color: Color(0xFF818CF8),
+                                  style: TextStyle(
+                                    color: isLight ? const Color(0xFF4F46E5) : const Color(0xFF818CF8),
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12.5,
                                   ),
@@ -499,7 +518,11 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                               padding: const EdgeInsets.only(bottom: 4.0),
                               child: Text(
                                 line,
-                                style: TextStyle(color: Colors.grey.shade300, fontSize: 12, height: 1.35),
+                                style: TextStyle(
+                                  color: isLight ? const Color(0xFF334155) : Colors.grey.shade300,
+                                  fontSize: 12,
+                                  height: 1.35,
+                                ),
                               ),
                             );
                           }).toList(),
@@ -508,7 +531,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
               const SizedBox(height: 4),
               Text(
                 'Tip: Paste markdown notes with * or - then click "Format Bullets (•)" to clean instantly.',
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 10.5),
+                style: TextStyle(color: isLight ? Colors.grey.shade600 : Colors.grey.shade400, fontSize: 10.5),
               ),
               const SizedBox(height: 12),
 
@@ -532,7 +555,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                     style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo.shade600,
+                    backgroundColor: const Color(0xFF4F46E5),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -541,7 +564,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               // Version API Link Section
               Row(
@@ -549,12 +572,12 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                 children: [
                   Row(
                     children: [
-                      Icon(LucideIcons.code, color: Colors.indigo.shade300, size: 14),
+                      Icon(LucideIcons.code, color: const Color(0xFF6366F1), size: 14),
                       const SizedBox(width: 6),
                       Text(
                         'VERSION API LINK',
                         style: TextStyle(
-                          color: Colors.grey.shade300,
+                          color: isLight ? Colors.grey.shade700 : Colors.grey.shade300,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.5,
@@ -574,10 +597,10 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                             ),
                           )
                         : Icon(LucideIcons.refreshCw,
-                            color: Colors.grey.shade400, size: 12),
+                            color: isLight ? Colors.grey.shade700 : Colors.grey.shade400, size: 12),
                     label: Text(
                       'Regenerate',
-                      style: TextStyle(color: Colors.grey.shade400, fontSize: 10.5),
+                      style: TextStyle(color: isLight ? Colors.grey.shade700 : Colors.grey.shade400, fontSize: 10.5),
                     ),
                     style: TextButton.styleFrom(
                       padding: EdgeInsets.zero,
@@ -587,18 +610,21 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B),
+                  color: isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  border: Border.all(
+                    color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.08),
+                  ),
                 ),
                 child: SelectableText(
                   apiUrl.isNotEmpty ? apiUrl : 'Generating link...',
                   style: TextStyle(
-                    color: Colors.grey.shade300,
+                    color: isLight ? const Color(0xFF0F172A) : Colors.grey.shade300,
                     fontSize: 11,
                     fontFamily: 'monospace',
                   ),
@@ -623,7 +649,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               // JSON Preview Header
               Row(
@@ -632,7 +658,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   Text(
                     'API RESPONSE PREVIEW (JSON)',
                     style: TextStyle(
-                      color: Colors.grey.shade400,
+                      color: isLight ? Colors.grey.shade700 : Colors.grey.shade400,
                       fontSize: 10.5,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
@@ -663,12 +689,12 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                         child: Row(
                           children: [
-                            Icon(Icons.copy, size: 12, color: Colors.grey.shade400),
+                            Icon(Icons.copy, size: 12, color: isLight ? Colors.grey.shade700 : Colors.grey.shade400),
                             const SizedBox(width: 4),
                             Text(
                               'Copy JSON',
                               style: TextStyle(
-                                color: Colors.grey.shade400,
+                                color: isLight ? Colors.grey.shade700 : Colors.grey.shade400,
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -684,9 +710,11 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF030712),
+                  color: isLight ? const Color(0xFFF8FAFC) : const Color(0xFF030712),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withOpacity(0.06)),
+                  border: Border.all(
+                    color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.06),
+                  ),
                 ),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -704,7 +732,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                       "updated_at": (_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String(),
                     }),
                     style: TextStyle(
-                      color: const Color(0xFF34D399).withOpacity(0.9),
+                      color: isLight ? const Color(0xFF059669) : const Color(0xFF34D399).withOpacity(0.9),
                       fontSize: 10.5,
                       fontFamily: 'monospace',
                       height: 1.4,
@@ -712,12 +740,12 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Close', style: TextStyle(color: Colors.grey.shade400)),
+                  child: Text('Close', style: TextStyle(color: isLight ? Colors.grey.shade700 : Colors.grey.shade400)),
                 ),
               ),
             ],
