@@ -36,33 +36,7 @@ export default function DownloadPage() {
 
   useBodyScrollLock(showQrModal)
 
-  useEffect(() => {
-    const preconnectUrls = [
-      'https://download.neofilestransfer.site',
-      'https://api.neofilestransfer.site'
-    ]
-    const createdLinks = []
-    preconnectUrls.forEach(url => {
-      const link = document.createElement('link')
-      link.rel = 'preconnect'
-      link.href = url
-      link.crossOrigin = 'anonymous'
-      document.head.appendChild(link)
-      createdLinks.push(link)
 
-      const dnsLink = document.createElement('link')
-      dnsLink.rel = 'dns-prefetch'
-      dnsLink.href = url
-      document.head.appendChild(dnsLink)
-      createdLinks.push(dnsLink)
-    })
-
-    return () => {
-      createdLinks.forEach(link => {
-        try { document.head.removeChild(link) } catch (_) {}
-      })
-    }
-  }, [])
 
   useEffect(() => {
     async function loadMetadata() {
