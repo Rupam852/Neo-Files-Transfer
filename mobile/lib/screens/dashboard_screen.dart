@@ -1511,6 +1511,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ),
+          ),
           if (_isActionLoading)
             Positioned.fill(
               child: BackdropFilter(
