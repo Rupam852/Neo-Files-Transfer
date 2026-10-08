@@ -195,15 +195,6 @@ const appendStreamToArchive = (archiveInstance, source, name) => {
   })
 }
 
-function parseUserAgent(ua) {
-  const userAgent = ua || ''
-  const isMobile = /mobile|android|iphone|ipad/i.test(userAgent)
-  const deviceType = isMobile ? 'Mobile' : 'Desktop'
-  const browser = /chrome/i.test(userAgent) ? 'Chrome' : /firefox/i.test(userAgent) ? 'Firefox' : /safari/i.test(userAgent) ? 'Safari' : /edge/i.test(userAgent) ? 'Edge' : 'Browser'
-  const os = /android/i.test(userAgent) ? 'Android' : /windows/i.test(userAgent) ? 'Windows' : /mac/i.test(userAgent) ? 'macOS' : /linux/i.test(userAgent) ? 'Linux' : /ios|iphone|ipad/i.test(userAgent) ? 'iOS' : 'OS'
-  return { deviceType, browser, os }
-}
-
 const app = express()
 app.set('json spaces', 2)
 const PORT = process.env.PORT || 3001
