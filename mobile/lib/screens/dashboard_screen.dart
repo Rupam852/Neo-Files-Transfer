@@ -1453,28 +1453,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<void> _handleGetVersionApi(SharedFile file) async {
-
-    setState(() => _isActionLoading = true);
-    try {
-      final fileService = Provider.of<FileService>(context, listen: false);
-      final updatedFile = await fileService.getOrGenerateVersionApiKey(file);
-      await _refreshFiles();
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => VersionApiDialog(file: updatedFile),
+  void _handleGetVersionApi(SharedFile file) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'VersionApi',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (context, anim1, anim2) {
+        return VersionApiDialog(file: file);
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        final curvedValue = Curves.easeOutCubic.transform(anim1.value);
+        return Transform.scale(
+          scale: 0.94 + (0.06 * curvedValue),
+          child: Opacity(
+            opacity: anim1.value.clamp(0.0, 1.0),
+            child: child,
+          ),
         );
-      }
-    } catch (e) {
-      if (mounted) {
-        _showErrorSnackBar('Failed to load Version API: ${_formatError(e)}');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isActionLoading = false);
-      }
-    }
+      },
+    );
   }
 
   void _handlePreview(SharedFile file) {

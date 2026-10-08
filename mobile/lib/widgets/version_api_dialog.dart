@@ -22,6 +22,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
   late SharedFile _currentFile;
   bool _isSaving = false;
   bool _isRegenerating = false;
+  bool _isInitializing = false;
   bool _copied = false;
   bool _previewMode = false;
 
@@ -35,6 +36,35 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
     _descriptionController = TextEditingController(
       text: _currentFile.apkDescription ?? '',
     );
+
+    if (_currentFile.versionApiKey == null || _currentFile.versionApiKey!.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _initApiKey();
+      });
+    }
+  }
+
+  Future<void> _initApiKey() async {
+    if (!mounted) return;
+    setState(() => _isInitializing = true);
+    try {
+      final fileService = Provider.of<FileService>(context, listen: false);
+      final updated = await fileService.getOrGenerateVersionApiKey(_currentFile);
+      if (mounted) {
+        setState(() {
+          _currentFile = updated;
+          if (_versionController.text.isEmpty || _versionController.text == 'v1.0.1') {
+            _versionController.text = updated.apkVersion ?? 'v1.0.1';
+          }
+          if (_descriptionController.text.isEmpty) {
+            _descriptionController.text = updated.apkDescription ?? '';
+          }
+          _isInitializing = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isInitializing = false);
+    }
   }
 
   void _formatBullets() {
@@ -621,13 +651,32 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                     color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.08),
                   ),
                 ),
-                child: SelectableText(
-                  apiUrl.isNotEmpty ? apiUrl : 'Generating link...',
-                  style: TextStyle(
-                    color: isLight ? const Color(0xFF0F172A) : Colors.grey.shade300,
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                  ),
+                child: Row(
+                  children: [
+                    if (_isInitializing) ...[
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: SelectableText(
+                        _isInitializing
+                            ? 'Generating secure API key...'
+                            : (apiUrl.isNotEmpty ? apiUrl : 'Generating link...'),
+                        style: TextStyle(
+                          color: isLight ? const Color(0xFF0F172A) : Colors.grey.shade300,
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 10),
