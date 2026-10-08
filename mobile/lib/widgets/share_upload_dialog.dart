@@ -135,7 +135,7 @@ class _ShareUploadDialogState extends State<ShareUploadDialog> {
         if (_autoMakePublic) {
           SharedFile targetFile = uploadedFile;
           if (targetFile.sharingStatus != 'public' || targetFile.uniqueShareHash == null) {
-            targetFile = await fileService.generateShareLink(targetFile);
+            targetFile = await fileService.generateShareHash(targetFile);
           }
           if (targetFile.uniqueShareHash != null) {
             lastShareUrl = '${AppConfig.appUrl}/download/${targetFile.uniqueShareHash}';
@@ -519,7 +519,7 @@ class _ShareUploadDialogState extends State<ShareUploadDialog> {
                   Switch(
                     value: _autoMakePublic,
                     onChanged: (v) => setState(() => _autoMakePublic = v),
-                    activeColor: const Color(0xFF4F46E5),
+                    activeTrackColor: const Color(0xFF4F46E5),
                   ),
                 ],
               ),
