@@ -67,97 +67,103 @@ export default function DownloadPage() {
   useEffect(() => {
     async function loadMetadata() {
       try {
-        // 1. First check standard shared_files (Permanent main link - 100% untouched)
-        const { data: file } = await supabase
-          .from('shared_files')
-          .select('id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
-          .eq('unique_share_hash', hash)
-          .maybeSingle()
+        const isCustom = typeof hash === 'string' && hash.startsWith('sec_')
 
-        if (file) {
-          if (file.sharing_status === 'private') {
-            setStatus('denied')
+        if (isCustom) {
+          // Parallel fetch: custom_share_links and system_settings
+          const [linkRes, settingsRes] = await Promise.all([
+            supabase
+              .from('custom_share_links')
+              .select('*, shared_files(id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder)')
+              .eq('custom_share_hash', hash)
+              .maybeSingle(),
+            supabase
+              .from('system_settings')
+              .select('value')
+              .eq('key', 'downloads_enabled')
+              .maybeSingle()
+          ])
+
+          const customLink = linkRes.data
+          if (!customLink) {
+            setStatus('notfound')
             return
           }
-          setFileInfo(file)
-          setTotalBytes(file.file_size || 0)
-          checkSystemAndSetReady(file)
+
+          if (customLink.expires_at && new Date(customLink.expires_at) < new Date()) {
+            setStatus('expired')
+            return
+          }
+
+          if (customLink.max_downloads && customLink.download_count >= customLink.max_downloads) {
+            setStatus('limit_reached')
+            return
+          }
+
+          const linkedFile = customLink.shared_files
+          if (!linkedFile) {
+            setStatus('notfound')
+            return
+          }
+
+          setFileInfo(linkedFile)
+          setCustomLinkInfo(customLink)
+          setTotalBytes(linkedFile.file_size || 0)
+
+          if (customLink.pin_code) {
+            setStatus('pin_required')
+            return
+          }
+
+          if (settingsRes.data && settingsRes.data.value === false) {
+            setStatus('maintenance')
+            return
+          }
+
+          setStatus('preview')
           return
         }
 
-        // 2. If not found in standard, check custom protected share links
-        const { data: customLink } = await supabase
-          .from('custom_share_links')
-          .select('*')
-          .eq('custom_share_hash', hash)
-          .maybeSingle()
+        // Standard link: Parallel fetch file and system_settings
+        const [fileRes, settingsRes] = await Promise.all([
+          supabase
+            .from('shared_files')
+            .select('id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
+            .eq('unique_share_hash', hash)
+            .maybeSingle(),
+          supabase
+            .from('system_settings')
+            .select('value')
+            .eq('key', 'downloads_enabled')
+            .maybeSingle()
+        ])
 
-        if (!customLink) {
+        const file = fileRes.data
+        if (!file) {
           setStatus('notfound')
           return
         }
 
-        // Check expiration
-        if (customLink.expires_at && new Date(customLink.expires_at) < new Date()) {
-          setStatus('expired')
+        if (file.sharing_status === 'private') {
+          setStatus('denied')
           return
         }
 
-        // Check download limit
-        if (customLink.max_downloads && customLink.download_count >= customLink.max_downloads) {
-          setStatus('limit_reached')
+        setFileInfo(file)
+        setTotalBytes(file.file_size || 0)
+
+        if (settingsRes.data && settingsRes.data.value === false) {
+          setStatus('maintenance')
           return
         }
 
-        // Fetch the corresponding file
-        const { data: linkedFile } = await supabase
-          .from('shared_files')
-          .select('id, user_id, file_name, mime_type, sharing_status, current_version_num, file_size, google_drive_file_id, is_folder')
-          .eq('id', customLink.file_id)
-          .maybeSingle()
-
-        if (!linkedFile) {
-          setStatus('notfound')
-          return
-        }
-
-        setFileInfo(linkedFile)
-        setCustomLinkInfo(customLink)
-        setTotalBytes(linkedFile.file_size || 0)
-
-        // Check PIN protection
-        if (customLink.pin_code) {
-          setStatus('pin_required')
-          return
-        }
-
-        checkSystemAndSetReady(linkedFile)
+        setStatus('preview')
 
       } catch (err) {
         console.error('Metadata resolve error:', err)
         setErrorMsg('Failed to resolve sharing details.')
         setStatus('error')
       }
-    }
-
-    async function checkSystemAndSetReady(file) {
-      const { data: downloadSetting } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'downloads_enabled')
-        .maybeSingle()
-
-      if (downloadSetting && downloadSetting.value === false) {
-        setStatus('maintenance')
-        return
-      }
-
-      setStatus('preview')
-
-      try {
-        const prewarmUrl = generateDirectDownloadUrl(hash, file.is_folder, file.file_size, true)
-        fetch(prewarmUrl, { method: 'HEAD', mode: 'no-cors' }).catch(() => {})
-      } catch (_) {}
     }
 
     loadMetadata()
