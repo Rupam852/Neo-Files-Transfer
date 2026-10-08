@@ -605,7 +605,7 @@ export default function FilesPage({ onViewVersions }) {
 
             xhr.onerror = () => {
               activeXhrRef.current = null
-              reject(new Error('Upload failed. Connection interrupted.'))
+              reject(new Error('Upload failed: Connection dropped. If connected to College/Campus Wi-Fi, the firewall may be blocking Google Drive uploads. Try switching to Mobile Data or Hotspot.'))
             }
             xhr.onabort = () => {
               activeXhrRef.current = null

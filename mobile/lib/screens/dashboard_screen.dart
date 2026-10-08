@@ -1098,6 +1098,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  String _formatError(dynamic error) {
+    final str = error.toString().toLowerCase();
+    if (str.contains('socketexception') ||
+        str.contains('connection reset') ||
+        str.contains('connection refused') ||
+        str.contains('handshakeexception') ||
+        str.contains('clientexception') ||
+        str.contains('failed host lookup') ||
+        str.contains('connection closed') ||
+        str.contains('network is unreachable')) {
+      return 'Network/Firewall Block: Connection dropped. If you are on College/Campus Wi-Fi, the firewall is blocking Google Drive upload. Please switch to Mobile Data or Personal Hotspot.';
+    }
+    if (str.contains('403') || str.contains('permission') || str.contains('forbidden')) {
+      return 'Access Denied (403): Google Drive upload permission issue or blocked by firewall.';
+    }
+    if (str.contains('cancel')) {
+      return 'Upload cancelled.';
+    }
+    return error.toString().replaceAll('Exception:', '').trim();
+  }
+
   void _handlePreview(SharedFile file) {
     showDialog(
       context: context,
@@ -1445,7 +1466,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ),
-          ),
           if (_isActionLoading)
             Positioned.fill(
               child: BackdropFilter(
