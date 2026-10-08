@@ -309,7 +309,7 @@ app.get('/download-file', async (req, res) => {
           if (linkRecord.max_downloads && linkRecord.download_count >= linkRecord.max_downloads) {
             return res.status(410).json({ error: 'This share link has reached its maximum allowed downloads.' })
           }
-          if (linkRecord.pin_code && linkRecord.pin_code !== pin) {
+          if (linkRecord.pin_code && linkRecord.pin_code.trim() !== (pin || '').trim()) {
             return res.status(401).json({ error: 'PIN protection required to download this file.', requires_pin: true })
           }
 

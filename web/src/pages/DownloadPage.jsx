@@ -208,39 +208,6 @@ export default function DownloadPage() {
       const browser = /chrome/i.test(userAgent) ? 'Chrome' : /firefox/i.test(userAgent) ? 'Firefox' : /safari/i.test(userAgent) ? 'Safari' : /edge/i.test(userAgent) ? 'Edge' : 'Browser'
       const os = /android/i.test(userAgent) ? 'Android' : /windows/i.test(userAgent) ? 'Windows' : /mac/i.test(userAgent) ? 'macOS' : /linux/i.test(userAgent) ? 'Linux' : /ios|iphone|ipad/i.test(userAgent) ? 'iOS' : 'OS'
 
-      if (fileInfo?.id && fileInfo?.user_id) {
-        // Insert download log (which triggers database notification with metadata)
-        supabase
-          .from('file_download_logs')
-          .insert({
-            file_id: fileInfo.id,
-            owner_id: fileInfo.user_id,
-            custom_link_id: customLinkInfo?.id || null,
-            device_type: deviceType,
-            browser: browser,
-            os: os,
-          })
-          .then(() => {}, (err) => console.error('file_download_logs insert error:', err))
-      }
-
-      supabase
-        .rpc('increment_download_count', { file_id: fileInfo.id })
-        .then(() => {}, (rpcErr) => console.error(rpcErr))
-
-      if (customLinkInfo?.id) {
-        supabase
-          .rpc('increment_custom_share_download_count', { link_id: customLinkInfo.id })
-          .then(() => {}, (rpcErr) => console.error(rpcErr))
-
-        if (customLinkInfo.is_one_time) {
-          supabase
-            .from('custom_share_links')
-            .update({ expires_at: new Date().toISOString(), is_active: false })
-            .eq('id', customLinkInfo.id)
-            .then(() => {}, (err) => console.error(err))
-        }
-      }
-
       setTimeout(() => {
         setIsInitiating(false)
         setStatus('completed')

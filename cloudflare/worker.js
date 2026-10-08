@@ -179,6 +179,15 @@ export default {
         }
       }
 
+      // Check PIN if protected
+      const pin = url.searchParams.get("pin") || request.headers.get("x-share-pin")
+      if (customLink && customLink.pin_code && customLink.pin_code.trim() !== (pin || "").trim()) {
+        return new Response(
+          JSON.stringify({ error: "PIN protection required to download this file.", requires_pin: true }),
+          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        )
+      }
+
       if (!file) {
         return new Response(
           JSON.stringify({ error: "File not found or link has expired" }),
@@ -188,7 +197,7 @@ export default {
 
       // If it's a folder, redirect to Render proxy for dynamic ZIP compilation
       if (file.is_folder) {
-        return Response.redirect(`https://api.neofilestransfer.site/download-file?hash=${hash}`, 302)
+        return Response.redirect(`https://api.neofilestransfer.site/download-file?${url.searchParams.toString()}`, 302)
       }
 
       // 2. Fetch Owner's Google Tokens
@@ -232,7 +241,7 @@ export default {
 
       if (!driveRes.ok && driveRes.status !== 206) {
         // Fallback: Redirect to Render proxy if token expired
-        return Response.redirect(`https://api.neofilestransfer.site/download-file?hash=${hash}`, 302)
+        return Response.redirect(`https://api.neofilestransfer.site/download-file?${url.searchParams.toString()}`, 302)
       }
 
       // 4. Build high-performance streaming response headers
@@ -263,7 +272,33 @@ export default {
                 body: JSON.stringify({ file_id: file.id }),
               }).catch(() => {})
 
-              // B. Insert into file_download_logs (which triggers Supabase In-App Notification instantly!)
+              // B. If custom link, increment count & handle one-time expiration
+              if (customLink) {
+                fetch(`${sbUrl}/rest/v1/rpc/increment_custom_share_download_count`, {
+                  method: "POST",
+                  headers: {
+                    apikey: sbKey,
+                    Authorization: `Bearer ${sbKey}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ link_id: customLink.id }),
+                }).catch(() => {})
+
+                if (customLink.is_one_time) {
+                  fetch(`${sbUrl}/rest/v1/custom_share_links?id=eq.${customLink.id}`, {
+                    method: "PATCH",
+                    headers: {
+                      apikey: sbKey,
+                      Authorization: `Bearer ${sbKey}`,
+                      "Content-Type": "application/json",
+                      Prefer: "return=minimal",
+                    },
+                    body: JSON.stringify({ expires_at: new Date().toISOString(), is_active: false }),
+                  }).catch(() => {})
+                }
+              }
+
+              // C. Insert into file_download_logs (triggers notification)
               await fetch(`${sbUrl}/rest/v1/file_download_logs`, {
                 method: "POST",
                 headers: {
