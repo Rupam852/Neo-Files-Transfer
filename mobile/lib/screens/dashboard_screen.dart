@@ -1128,11 +1128,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       String downloadUrl = '';
       final hash = file.uniqueShareHash;
 
-      if (hash != null && hash.isNotEmpty && AppConfig.cfWorkerUrl.isNotEmpty) {
+      if (AppConfig.cfWorkerUrl.isNotEmpty) {
         final cleanWorker = AppConfig.cfWorkerUrl.endsWith('/')
             ? AppConfig.cfWorkerUrl.substring(0, AppConfig.cfWorkerUrl.length - 1)
             : AppConfig.cfWorkerUrl;
-        downloadUrl = '$cleanWorker?hash=$hash';
+        if (hash != null && hash.isNotEmpty) {
+          downloadUrl = '$cleanWorker?hash=$hash';
+        } else {
+          downloadUrl = '$cleanWorker?file_id=${file.id}';
+        }
       } else if (AppConfig.proxyUrl.isNotEmpty) {
         final cleanProxy = AppConfig.proxyUrl.endsWith('/')
             ? AppConfig.proxyUrl.substring(0, AppConfig.proxyUrl.length - 1)
@@ -1142,11 +1146,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         } else {
           downloadUrl = '$cleanProxy/download-file?file_id=${file.id}';
         }
-      } else if (AppConfig.cfWorkerUrl.isNotEmpty) {
-        final cleanWorker = AppConfig.cfWorkerUrl.endsWith('/')
-            ? AppConfig.cfWorkerUrl.substring(0, AppConfig.cfWorkerUrl.length - 1)
-            : AppConfig.cfWorkerUrl;
-        downloadUrl = '$cleanWorker?file_id=${file.id}';
       } else {
         final cleanSb = AppConfig.supabaseUrl.endsWith('/')
             ? AppConfig.supabaseUrl.substring(0, AppConfig.supabaseUrl.length - 1)

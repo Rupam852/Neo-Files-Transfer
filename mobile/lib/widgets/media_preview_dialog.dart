@@ -74,6 +74,9 @@ class _MediaPreviewDialogState extends State<MediaPreviewDialog> {
         return '${AppConfig.proxyUrl}/download-file?hash=$hash&preview=true&inline=true';
       }
     }
+    if (AppConfig.cfWorkerUrl.isNotEmpty && widget.file.id.isNotEmpty) {
+      return '${AppConfig.cfWorkerUrl}?file_id=${widget.file.id}&stream=true';
+    }
     if (AppConfig.proxyUrl.isNotEmpty && widget.file.id.isNotEmpty) {
       return '${AppConfig.proxyUrl}/download-file?file_id=${widget.file.id}&preview=true&inline=true';
     }
