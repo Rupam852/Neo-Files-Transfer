@@ -1241,60 +1241,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             floatingActionButton: _currentTab == 0
-                ? AnimatedSlide(
-                    duration: const Duration(milliseconds: 250),
-                    offset: _isFabVisible ? Offset.zero : const Offset(0, 2),
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 250),
-                      opacity: _isFabVisible ? 1.0 : 0.0,
-                      child: FloatingActionButton(
-                        onPressed: () {
-                          final bottomBg = isLight ? Colors.white : const Color(0xFF0F172A);
-                          final bottomItemColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+                ? FloatingActionButton(
+                    onPressed: () {
+                      final bottomBg = isLight ? Colors.white : const Color(0xFF0F172A);
+                      final bottomItemColor = isLight ? const Color(0xFF0F172A) : Colors.white;
 
-                          showModalBottomSheet(
-                            backgroundColor: bottomBg,
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                            ),
-                            context: context,
-                            builder: (context) => SafeArea(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  ListTile(
-                                    leading: const Icon(LucideIcons.filePlus, color: Color(0xFF4F46E5)),
-                                    title: Text('Upload Files', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _handleUploadFile();
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(LucideIcons.folder, color: Colors.teal),
-                                    title: Text('Upload Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _handleUploadFolder();
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(LucideIcons.folderPlus, color: Colors.amber),
-                                    title: Text('Create Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _handleCreateFolder();
-                                    },
-                                  ),
-                                ],
+                      showModalBottomSheet(
+                        backgroundColor: bottomBg,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                        ),
+                        context: context,
+                        builder: (context) => SafeArea(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                leading: const Icon(LucideIcons.filePlus, color: Color(0xFF4F46E5)),
+                                title: Text('Upload Files', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _handleUploadFile();
+                                },
                               ),
-                            ),
-                          );
-                        },
-                        backgroundColor: const Color(0xFF4F46E5),
-                        child: const Icon(LucideIcons.plus, color: Colors.white),
-                      ),
-                    ),
+                              ListTile(
+                                leading: const Icon(LucideIcons.folder, color: Colors.teal),
+                                title: Text('Upload Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _handleUploadFolder();
+                                },
+                              ),
+                              ListTile(
+                                leading: const Icon(LucideIcons.folderPlus, color: Colors.amber),
+                                title: Text('Create Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _handleCreateFolder();
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    backgroundColor: const Color(0xFF4F46E5),
+                    child: const Icon(LucideIcons.plus, color: Colors.white),
                   )
                 : null,
             body: PopScope(
@@ -1321,7 +1313,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 if (_currentTab != 0) {
                   setState(() {
                     _currentTab = 0;
-                    _isFabVisible = true;
                   });
                   _refreshFiles();
                   return;
@@ -1329,24 +1320,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 SystemNavigator.pop();
               },
-              child: NotificationListener<UserScrollNotification>(
-                onNotification: (notification) {
-                  if (notification.direction == ScrollDirection.reverse) {
-                    if (_isFabVisible) {
-                      setState(() => _isFabVisible = false);
-                    }
-                  } else if (notification.direction == ScrollDirection.forward) {
-                    if (!_isFabVisible) {
-                      setState(() => _isFabVisible = true);
-                    }
-                  }
-                  return true;
-                },
-                child: RefreshIndicator(
-                  onRefresh: _refreshFiles,
-                  color: const Color(0xFF4F46E5),
-                  backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
-                  child: _currentTab == 0
+              child: RefreshIndicator(
+                onRefresh: _refreshFiles,
+                color: const Color(0xFF4F46E5),
+                backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
+                child: _currentTab == 0
                       ? Column(
                           children: [
                             // Search Bar & Info card
