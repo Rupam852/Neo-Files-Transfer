@@ -23,6 +23,7 @@ import 'settings_screen.dart';
 import '../services/update_service.dart';
 import '../widgets/file_list_item.dart';
 import '../widgets/upload_progress.dart';
+import '../widgets/upload_progress_dialog.dart';
 import '../widgets/version_api_dialog.dart';
 import '../widgets/manage_versions_dialog.dart';
 import '../widgets/share_file_dialog.dart';
@@ -150,6 +151,126 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  void _showUploadCompleteDialog({
+    required String title,
+    required String message,
+  }) {
+    if (!mounted) return;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        Timer(const Duration(milliseconds: 2500), () {
+          if (Navigator.canPop(dialogContext)) {
+            Navigator.pop(dialogContext);
+          }
+        });
+
+        return Dialog(
+          backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withValues(alpha: 0.1),
+              width: 1,
+            ),
+          ),
+          elevation: 12,
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: isLight ? 0.12 : 0.18),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF10B981).withValues(alpha: isLight ? 0.25 : 0.35),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          LucideIcons.checkCheck,
+                          color: Color(0xFF10B981),
+                          size: 32,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: isLight ? const Color(0xFF0F172A) : Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isLight ? const Color(0xFF64748B) : Colors.white70,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (Navigator.canPop(dialogContext)) {
+                            Navigator.pop(dialogContext);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4F46E5),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Done',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(
+                top: 10,
+                right: 10,
+                child: IconButton(
+                  icon: Icon(
+                    LucideIcons.x,
+                    color: isLight ? const Color(0xFF94A3B8) : Colors.white54,
+                    size: 18,
+                  ),
+                  onPressed: () {
+                    if (Navigator.canPop(dialogContext)) {
+                      Navigator.pop(dialogContext);
+                    }
+                  },
+                  splashRadius: 18,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _handleUploadFile() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     if (authService.profile?.isFolderVerified != true) {
@@ -162,11 +283,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final blockedExtensions = ['exe', 'bat', 'cmd', 'msi', 'scr'];
 
+    final uploadNotifier = ValueNotifier<UploadProgressState>(
+      const UploadProgressState(fileName: 'Initializing upload...', progress: 0.0),
+    );
+
     setState(() {
       _isUploading = true;
       _uploadingFileName = 'Initializing...';
       _uploadProgress = 0.0;
       _uploadCancelToken = CancelToken();
+    });
+
+    bool dialogOpen = true;
+    UploadProgressDialog.show(
+      context: context,
+      notifier: uploadNotifier,
+      onCancel: _handleCancelUpload,
+    ).then((_) {
+      dialogOpen = false;
     });
 
     try {
@@ -191,9 +325,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         final file = File(picked.path!);
+        final currentFileDesc = result.files.length > 1
+            ? 'Uploading ${i + 1} of ${result.files.length}: ${picked.name}'
+            : 'Uploading ${picked.name}';
+
+        uploadNotifier.value = uploadNotifier.value.copyWith(
+          fileName: currentFileDesc,
+          progress: 0.0,
+          speed: '',
+        );
 
         setState(() {
-          _uploadingFileName = 'Uploading ${i + 1} of ${result.files.length}: ${picked.name}';
+          _uploadingFileName = currentFileDesc;
           _uploadProgress = 0.0;
           _uploadSpeed = '';
         });
@@ -211,6 +354,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 now.difference(_lastUploadProgressUpdate!).inMilliseconds > 100 ||
                 pct == 1.0) {
               _lastUploadProgressUpdate = now;
+              uploadNotifier.value = uploadNotifier.value.copyWith(
+                progress: pct,
+                speed: speed ?? '',
+              );
               setState(() {
                 _uploadProgress = pct;
                 if (speed != null) _uploadSpeed = speed;
@@ -221,11 +368,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
         successCount++;
       }
 
+      if (dialogOpen && Navigator.canPop(context)) {
+        Navigator.pop(context);
+        dialogOpen = false;
+      }
+
       if (mounted && successCount > 0) {
-        _showSuccessSnackBar('Successfully uploaded $successCount files!');
+        _showUploadCompleteDialog(
+          title: 'Upload Successful',
+          message: successCount == 1
+              ? 'File uploaded successfully to your Google Drive!'
+              : '$successCount files uploaded successfully to your Google Drive!',
+        );
       }
       _refreshFiles();
     } catch (e) {
+      if (dialogOpen && Navigator.canPop(context)) {
+        Navigator.pop(context);
+        dialogOpen = false;
+      }
       final errorMsg = _formatError(e);
       if (mounted) {
         if (errorMsg.contains('cancel')) {
@@ -261,11 +422,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final rootName = rootDir.path.split(Platform.pathSeparator).last;
     if (rootName.isEmpty) return;
 
+    final uploadNotifier = ValueNotifier<UploadProgressState>(
+      const UploadProgressState(fileName: 'Analyzing folder structure...', progress: 0.0),
+    );
+
     setState(() {
       _isUploading = true;
       _uploadingFileName = 'Analyzing folder structure...';
       _uploadProgress = 0.0;
       _uploadCancelToken = CancelToken();
+    });
+
+    bool dialogOpen = true;
+    UploadProgressDialog.show(
+      context: context,
+      notifier: uploadNotifier,
+      onCancel: _handleCancelUpload,
+    ).then((_) {
+      dialogOpen = false;
     });
 
     try {
@@ -360,6 +534,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
         }
 
+        uploadNotifier.value = uploadNotifier.value.copyWith(
+          fileName: 'Creating folder: $path',
+          progress: 0.0,
+          speed: '',
+        );
+
         setState(() {
           _uploadingFileName = 'Creating folder: $path';
           _uploadProgress = 0.0;
@@ -406,8 +586,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final parentDbId = parentInfo?['dbId'];
         final parentDriveId = parentInfo?['driveId'];
 
+        final currentFileDesc = 'Uploading ${i + 1} of ${filesToUpload.length}: $fileName';
+        uploadNotifier.value = uploadNotifier.value.copyWith(
+          fileName: currentFileDesc,
+          progress: 0.0,
+          speed: '',
+        );
+
         setState(() {
-          _uploadingFileName = 'Uploading file ${i + 1} of ${filesToUpload.length}: $fileName';
+          _uploadingFileName = currentFileDesc;
           _uploadProgress = 0.0;
           _uploadSpeed = '';
         });
@@ -425,6 +612,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 now.difference(_lastUploadProgressUpdate!).inMilliseconds > 100 ||
                 pct == 1.0) {
               _lastUploadProgressUpdate = now;
+              uploadNotifier.value = uploadNotifier.value.copyWith(
+                progress: pct,
+                speed: speed ?? '',
+              );
               setState(() {
                 _uploadProgress = pct;
                 if (speed != null) _uploadSpeed = speed;
@@ -435,11 +626,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
         successCount++;
       }
 
+      if (dialogOpen && Navigator.canPop(context)) {
+        Navigator.pop(context);
+        dialogOpen = false;
+      }
+
       if (mounted) {
-        _showSuccessSnackBar('Successfully uploaded folder structure with $successCount files!');
+        _showUploadCompleteDialog(
+          title: 'Folder Uploaded Successfully',
+          message: 'Folder structure with $successCount files was uploaded to your Google Drive.',
+        );
       }
       _refreshFiles();
     } catch (e) {
+      if (dialogOpen && Navigator.canPop(context)) {
+        Navigator.pop(context);
+        dialogOpen = false;
+      }
       final errorMsg = _formatError(e);
       if (mounted) {
         if (errorMsg.contains('cancel')) {
@@ -458,6 +661,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _handleCancelUpload() {
     _uploadCancelToken?.cancel('Upload cancelled by user.');
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
     setState(() {
       _isUploading = false;
       _uploadCancelToken = null;
@@ -1241,26 +1447,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: navBorderColor, width: 1)),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_isUploading)
-                    UploadProgressWidget(
-                      fileName: _uploadingFileName,
-                      progress: _uploadProgress,
-                      speed: _uploadSpeed,
-                      onCancel: _handleCancelUpload,
-                    ),
-                  BottomNavigationBar(
-                    currentIndex: _currentTab,
-                    onTap: _onTabTapped,
-                    backgroundColor: navBgColor,
-                    selectedItemColor: const Color(0xFF4F46E5),
-                    unselectedItemColor: isLight ? const Color(0xFF64748B) : Colors.white60,
-                    showSelectedLabels: true,
-                    showUnselectedLabels: true,
-                    type: BottomNavigationBarType.fixed,
-                    items: const [
+              child: BottomNavigationBar(
+                currentIndex: _currentTab,
+                onTap: _onTabTapped,
+                backgroundColor: navBgColor,
+                selectedItemColor: const Color(0xFF4F46E5),
+                unselectedItemColor: isLight ? const Color(0xFF64748B) : Colors.white60,
+                showSelectedLabels: true,
+                showUnselectedLabels: true,
+                type: BottomNavigationBarType.fixed,
+                items: const [
                       BottomNavigationBarItem(
                         icon: Icon(LucideIcons.folder),
                         label: 'My Files',
@@ -1293,42 +1489,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           onPressed: () {
                             final bottomBg = isLight ? Colors.white : const Color(0xFF0F172A);
                             final bottomItemColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+                            final subtitleColor = isLight ? const Color(0xFF64748B) : Colors.white60;
+                            final dragBarColor = isLight ? const Color(0xFFCBD5E1) : Colors.white24;
 
                             showModalBottomSheet(
                               backgroundColor: bottomBg,
                               shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                               ),
                               context: context,
                               builder: (context) => SafeArea(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ListTile(
-                                      leading: const Icon(LucideIcons.filePlus, color: Color(0xFF4F46E5)),
-                                      title: Text('Upload Files', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
-                                      onTap: () {
-                                        Navigator.pop(context);
-                                        _handleUploadFile();
-                                      },
-                                    ),
-                                    ListTile(
-                                      leading: const Icon(LucideIcons.folder, color: Colors.teal),
-                                      title: Text('Upload Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
-                                      onTap: () {
-                                        Navigator.pop(context);
-                                        _handleUploadFolder();
-                                      },
-                                    ),
-                                    ListTile(
-                                      leading: const Icon(LucideIcons.folderPlus, color: Colors.amber),
-                                      title: Text('Create Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
-                                      onTap: () {
-                                        Navigator.pop(context);
-                                        _handleCreateFolder();
-                                      },
-                                    ),
-                                  ],
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 10, bottom: 12),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 38,
+                                        height: 4,
+                                        decoration: BoxDecoration(
+                                          color: dragBarColor,
+                                          borderRadius: BorderRadius.circular(2),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      ListTile(
+                                        leading: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF4F46E5).withValues(alpha: isLight ? 0.12 : 0.2),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: const Icon(LucideIcons.filePlus, color: Color(0xFF4F46E5), size: 20),
+                                        ),
+                                        title: Text('Upload Files', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600, fontSize: 14.5)),
+                                        subtitle: Text('Upload single or multiple files', style: TextStyle(color: subtitleColor, fontSize: 12)),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          _handleUploadFile();
+                                        },
+                                      ),
+                                      ListTile(
+                                        leading: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.teal.withValues(alpha: isLight ? 0.12 : 0.2),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: const Icon(LucideIcons.folderUp, color: Colors.teal, size: 20),
+                                        ),
+                                        title: Text('Upload Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600, fontSize: 14.5)),
+                                        subtitle: Text('Upload an entire folder structure', style: TextStyle(color: subtitleColor, fontSize: 12)),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          _handleUploadFolder();
+                                        },
+                                      ),
+                                      ListTile(
+                                        leading: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.withValues(alpha: isLight ? 0.12 : 0.2),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: const Icon(LucideIcons.folderPlus, color: Colors.amber, size: 20),
+                                        ),
+                                        title: Text('Create Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600, fontSize: 14.5)),
+                                        subtitle: Text('Create a new folder in this directory', style: TextStyle(color: subtitleColor, fontSize: 12)),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          _handleCreateFolder();
+                                        },
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             );
