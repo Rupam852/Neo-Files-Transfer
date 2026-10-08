@@ -1606,11 +1606,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           : _buildTrashTab(isLight),
                 ),
               ),
-              const FloatingTransferBar(),
-            ],
-          ),
+            ),
+            const FloatingTransferBar(),
+          ],
         ),
       ),
+    ),
           if (_isActionLoading)
             Positioned.fill(
               child: BackdropFilter(

@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide Headers;
 import '../config.dart';
 import '../models/shared_file.dart';
 import 'api_service.dart';
@@ -110,7 +110,7 @@ class TransferService with ChangeNotifier {
     try {
       const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
       const initSettings = InitializationSettings(android: androidInit);
-      await _notificationsPlugin.initialize(initSettings);
+      await _notificationsPlugin.initialize(settings: initSettings);
       _isNotifInitialized = true;
     } catch (e) {
       debugPrint('[TransferService] Notification init error: $e');
@@ -143,10 +143,10 @@ class TransferService with ChangeNotifier {
         );
 
         await _notificationsPlugin.show(
-          notifId,
-          title,
-          body,
-          NotificationDetails(android: androidDetails),
+          id: notifId,
+          title: title,
+          body: body,
+          notificationDetails: NotificationDetails(android: androidDetails),
         );
       } else if (task.status == TransferStatus.completed) {
         final isDl = task.type == TransferType.download;
@@ -164,10 +164,10 @@ class TransferService with ChangeNotifier {
         );
 
         await _notificationsPlugin.show(
-          notifId,
-          title,
-          body,
-          NotificationDetails(android: androidDetails),
+          id: notifId,
+          title: title,
+          body: body,
+          notificationDetails: NotificationDetails(android: androidDetails),
         );
       } else if (task.status == TransferStatus.paused) {
         final androidDetails = AndroidNotificationDetails(
@@ -182,13 +182,13 @@ class TransferService with ChangeNotifier {
         );
 
         await _notificationsPlugin.show(
-          notifId,
-          '⏸️ Transfer Paused: ${task.fileName}',
-          'Paused at ${(task.progress * 100).toInt()}% • Tap in app to resume',
-          NotificationDetails(android: androidDetails),
+          id: notifId,
+          title: '⏸️ Transfer Paused: ${task.fileName}',
+          body: 'Paused at ${(task.progress * 100).toInt()}% • Tap in app to resume',
+          notificationDetails: NotificationDetails(android: androidDetails),
         );
       } else if (task.status == TransferStatus.cancelled || task.status == TransferStatus.failed) {
-        await _notificationsPlugin.cancel(notifId);
+        await _notificationsPlugin.cancel(id: notifId);
       }
     } catch (e) {
       debugPrint('[TransferService] Notif update failed: $e');
