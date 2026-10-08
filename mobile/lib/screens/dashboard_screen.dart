@@ -24,6 +24,7 @@ import '../services/update_service.dart';
 import '../widgets/file_list_item.dart';
 import '../widgets/upload_progress.dart';
 import '../widgets/upload_progress_dialog.dart';
+import '../widgets/download_progress_dialog.dart';
 import '../widgets/version_api_dialog.dart';
 import '../widgets/manage_versions_dialog.dart';
 import '../widgets/share_file_dialog.dart';
@@ -1068,9 +1069,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _downloadProgress = 0.0;
     });
 
+    final dio = Dio();
+    final cancelToken = CancelToken();
+    bool dialogOpen = false;
+
     try {
-      final dio = Dio();
-      
       // Request storage permission on Android
       if (Platform.isAndroid) {
         final deviceInfo = DeviceInfoPlugin();
@@ -1110,7 +1113,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         throw Exception('Could not resolve downloads directory.');
       }
 
-      // Check if downloads directory exists, if not create it
       if (!await downloadsDir.exists()) {
         await downloadsDir.create(recursive: true);
       }
@@ -1122,12 +1124,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
         throw Exception('No active session. Please sign in again.');
       }
 
-      final downloadUrl = '${AppConfig.cfWorkerUrl}/download/direct/${file.googleDriveFileId}';
+      // Build proper download URL based on available endpoints
+      String downloadUrl = '';
+      final hash = file.uniqueShareHash;
+
+      if (hash != null && hash.isNotEmpty && AppConfig.cfWorkerUrl.isNotEmpty) {
+        final cleanWorker = AppConfig.cfWorkerUrl.endsWith('/')
+            ? AppConfig.cfWorkerUrl.substring(0, AppConfig.cfWorkerUrl.length - 1)
+            : AppConfig.cfWorkerUrl;
+        downloadUrl = '$cleanWorker?hash=$hash';
+      } else if (AppConfig.proxyUrl.isNotEmpty) {
+        final cleanProxy = AppConfig.proxyUrl.endsWith('/')
+            ? AppConfig.proxyUrl.substring(0, AppConfig.proxyUrl.length - 1)
+            : AppConfig.proxyUrl;
+        if (hash != null && hash.isNotEmpty) {
+          downloadUrl = '$cleanProxy/download-file?hash=$hash';
+        } else {
+          downloadUrl = '$cleanProxy/download-file?file_id=${file.id}';
+        }
+      } else if (AppConfig.cfWorkerUrl.isNotEmpty) {
+        final cleanWorker = AppConfig.cfWorkerUrl.endsWith('/')
+            ? AppConfig.cfWorkerUrl.substring(0, AppConfig.cfWorkerUrl.length - 1)
+            : AppConfig.cfWorkerUrl;
+        downloadUrl = '$cleanWorker?file_id=${file.id}';
+      } else {
+        final cleanSb = AppConfig.supabaseUrl.endsWith('/')
+            ? AppConfig.supabaseUrl.substring(0, AppConfig.supabaseUrl.length - 1)
+            : AppConfig.supabaseUrl;
+        if (hash != null && hash.isNotEmpty) {
+          downloadUrl = '$cleanSb/functions/v1/download-file?hash=$hash';
+        } else {
+          downloadUrl = '$cleanSb/functions/v1/download-file?file_id=${file.id}';
+        }
+      }
+
+      final downloadNotifier = ValueNotifier<DownloadProgressState>(
+        DownloadProgressState(
+          fileName: file.fileName,
+          progress: 0.0,
+          downloadedSize: 'Connecting...',
+        ),
+      );
+
+      dialogOpen = true;
+      DownloadProgressDialog.show(
+        context: context,
+        notifier: downloadNotifier,
+        onCancel: () {
+          cancelToken.cancel('Download cancelled by user.');
+          if (dialogOpen && Navigator.canPop(context)) {
+            Navigator.pop(context);
+            dialogOpen = false;
+          }
+        },
+      ).then((_) {
+        dialogOpen = false;
+      });
 
       DateTime? lastUpdate;
+      int lastBytes = 0;
+      DateTime lastSpeedTime = DateTime.now();
+
       await dio.download(
         downloadUrl,
         savePath,
+        cancelToken: cancelToken,
         options: Options(
           headers: {
             'Authorization': 'Bearer $tokenVal',
@@ -1137,11 +1198,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (total > 0) {
             final now = DateTime.now();
             if (lastUpdate == null ||
-                now.difference(lastUpdate!).inMilliseconds > 100 ||
+                now.difference(lastUpdate!).inMilliseconds > 80 ||
                 received == total) {
               lastUpdate = now;
+              final pct = (received / total).clamp(0.0, 1.0);
+              final receivedMB = (received / (1024 * 1024)).toStringAsFixed(1);
+              final totalMB = (total / (1024 * 1024)).toStringAsFixed(1);
+
+              String speedStr = '';
+              final timeDiff = now.difference(lastSpeedTime).inMilliseconds;
+              if (timeDiff >= 400) {
+                final bytesDiff = received - lastBytes;
+                final speedBps = (bytesDiff / (timeDiff / 1000));
+                if (speedBps > 1024 * 1024) {
+                  speedStr = '${(speedBps / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+                } else if (speedBps > 1024) {
+                  speedStr = '${(speedBps / 1024).toStringAsFixed(0)} KB/s';
+                }
+                lastBytes = received;
+                lastSpeedTime = now;
+              }
+
+              downloadNotifier.value = downloadNotifier.value.copyWith(
+                progress: pct,
+                downloadedSize: '$receivedMB MB / $totalMB MB',
+                speed: speedStr.isNotEmpty ? speedStr : downloadNotifier.value.speed,
+              );
+
               setState(() {
-                _downloadProgress = received / total;
+                _downloadProgress = pct;
               });
             }
           }
@@ -1151,6 +1236,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _downloadingFileName = '';
       });
+
+      if (dialogOpen && Navigator.canPop(context)) {
+        Navigator.pop(context);
+        dialogOpen = false;
+      }
 
       // Scan the file so it shows up in system downloads list / gallery
       if (Platform.isAndroid) {
@@ -1176,8 +1266,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           context: context,
           barrierDismissible: true,
           builder: (dialogContext) {
-            // Auto close after 1.5 seconds (1500 ms)
-            Timer(const Duration(milliseconds: 1500), () {
+            Timer(const Duration(milliseconds: 2500), () {
               if (Navigator.canPop(dialogContext)) {
                 Navigator.pop(dialogContext);
               }
@@ -1185,25 +1274,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             return Dialog(
               backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withValues(alpha: 0.1),
+                  width: 1,
+                ),
+              ),
+              elevation: 12,
               child: Stack(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
-                          Icons.check_circle_outline,
-                          color: Color(0xFF10B981),
-                          size: 48,
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: isLight ? 0.12 : 0.18),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFF10B981).withValues(alpha: isLight ? 0.25 : 0.35),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              LucideIcons.checkCheck,
+                              color: Color(0xFF10B981),
+                              size: 32,
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 18),
                         Text(
                           'Download Complete',
                           style: TextStyle(
                             color: isLight ? const Color(0xFF0F172A) : Colors.white,
-                            fontSize: 16,
+                            fontSize: 17,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -1212,30 +1322,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           '${file.fileName} has been saved to your Downloads folder.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: isLight ? const Color(0xFF475569) : Colors.white70,
+                            color: isLight ? const Color(0xFF64748B) : Colors.white70,
                             fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (Navigator.canPop(dialogContext)) {
+                                Navigator.pop(dialogContext);
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4F46E5),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              'Done',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
                   Positioned(
-                    top: 8,
-                    right: 8,
-                    child: GestureDetector(
-                      onTap: () {
+                    top: 10,
+                    right: 10,
+                    child: IconButton(
+                      icon: Icon(
+                        LucideIcons.x,
+                        color: isLight ? const Color(0xFF94A3B8) : Colors.white54,
+                        size: 18,
+                      ),
+                      onPressed: () {
                         if (Navigator.canPop(dialogContext)) {
                           Navigator.pop(dialogContext);
                         }
                       },
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Icon(
-                          Icons.close,
-                          color: isLight ? const Color(0xFF94A3B8) : Colors.white60,
-                          size: 20,
-                        ),
-                      ),
+                      splashRadius: 18,
                     ),
                   ),
                 ],
@@ -1245,11 +1376,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
     } catch (e) {
+      if (dialogOpen && Navigator.canPop(context)) {
+        Navigator.pop(context);
+        dialogOpen = false;
+      }
       setState(() {
         _downloadingFileName = '';
       });
-      if (mounted) {
-        _showErrorSnackBar('Download failed: $e');
+      final errorMsg = _formatError(e);
+      if (mounted && !errorMsg.contains('cancel')) {
+        _showErrorSnackBar('Download failed: $errorMsg');
       }
     }
   }
@@ -1457,19 +1593,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 showUnselectedLabels: true,
                 type: BottomNavigationBarType.fixed,
                 items: const [
-                      BottomNavigationBarItem(
-                        icon: Icon(LucideIcons.folder),
-                        label: 'My Files',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(LucideIcons.share2),
-                        label: 'Shared Links',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(LucideIcons.trash2),
-                        label: 'Recycle Bin',
-                      ),
-                    ],
+                  BottomNavigationBarItem(
+                    icon: Icon(LucideIcons.folder),
+                    label: 'My Files',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(LucideIcons.share2),
+                    label: 'Shared Links',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(LucideIcons.trash2),
+                    label: 'Recycle Bin',
                   ),
                 ],
               ),

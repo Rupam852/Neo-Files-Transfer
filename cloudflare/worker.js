@@ -86,30 +86,54 @@ export default {
       }
     }
 
-    if (!hash) {
+    const fileId = url.searchParams.get("file_id")
+
+    if (!hash && !fileId) {
       return new Response(
-        JSON.stringify({ error: "File Hash is required" }),
+        JSON.stringify({ error: "File Hash or File ID is required" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       )
     }
 
     try {
-      // 1. Fetch file record from Supabase
-      const fileRes = await fetch(
-        `${sbUrl}/rest/v1/shared_files?unique_share_hash=eq.${hash}&select=id,file_name,mime_type,file_size,sharing_status,google_drive_file_id,user_id,is_folder`,
-        {
-          headers: {
-            apikey: sbKey,
-            Authorization: `Bearer ${sbKey}`,
-          },
-        }
-      )
-
       let file = null
-      if (fileRes.ok) {
-        const list = await fileRes.json()
-        if (list && list.length > 0) {
-          file = list[0]
+
+      // 0. Direct lookup by file_id
+      if (fileId) {
+        const fileByIdRes = await fetch(
+          `${sbUrl}/rest/v1/shared_files?id=eq.${fileId}&select=id,file_name,mime_type,file_size,sharing_status,google_drive_file_id,user_id,is_folder`,
+          {
+            headers: {
+              apikey: sbKey,
+              Authorization: `Bearer ${sbKey}`,
+            },
+          }
+        )
+        if (fileByIdRes.ok) {
+          const list = await fileByIdRes.json()
+          if (list && list.length > 0) {
+            file = list[0]
+          }
+        }
+      }
+
+      // 1. Fetch file record by unique_share_hash
+      if (!file && hash) {
+        const fileRes = await fetch(
+          `${sbUrl}/rest/v1/shared_files?unique_share_hash=eq.${hash}&select=id,file_name,mime_type,file_size,sharing_status,google_drive_file_id,user_id,is_folder`,
+          {
+            headers: {
+              apikey: sbKey,
+              Authorization: `Bearer ${sbKey}`,
+            },
+          }
+        )
+
+        if (fileRes.ok) {
+          const list = await fileRes.json()
+          if (list && list.length > 0) {
+            file = list[0]
+          }
         }
       }
 
