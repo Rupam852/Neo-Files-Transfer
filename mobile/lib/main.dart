@@ -12,6 +12,7 @@ import 'services/notification_service.dart';
 import 'services/theme_service.dart';
 import 'services/security_service.dart';
 import 'services/share_receiver_service.dart';
+import 'services/transfer_service.dart';
 import 'widgets/app_lock_screen.dart';
 import 'widgets/share_upload_dialog.dart';
 import 'screens/login_screen.dart';
@@ -81,6 +82,20 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<UpdateService>(
           create: (_) => UpdateService()..initialize(),
+        ),
+        ChangeNotifierProxyProvider3<AuthService, ApiService, FileService, TransferService>(
+          create: (context) => TransferService(
+            Provider.of<AuthService>(context, listen: false),
+            Provider.of<ApiService>(context, listen: false),
+            Provider.of<FileService>(context, listen: false),
+          ),
+          update: (_, auth, api, fileService, transferService) {
+            if (transferService == null) {
+              return TransferService(auth, api, fileService);
+            }
+            transferService.update(auth, api, fileService);
+            return transferService;
+          },
         ),
       ],
       child: Consumer<ThemeService>(

@@ -30,6 +30,9 @@ import '../widgets/manage_versions_dialog.dart';
 import '../widgets/share_file_dialog.dart';
 import '../widgets/media_preview_dialog.dart';
 import '../widgets/notification_bell.dart';
+import '../services/transfer_service.dart';
+import '../widgets/transfer_manager_sheet.dart';
+import '../widgets/floating_transfer_bar.dart';
 
 
 class DashboardScreen extends StatefulWidget {
@@ -1064,327 +1067,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _handleDownload(SharedFile file) async {
     if (file.isFolder) return;
 
-    setState(() {
-      _downloadingFileName = file.fileName;
-      _downloadProgress = 0.0;
-    });
-
-    final dio = Dio();
-    final cancelToken = CancelToken();
-    bool dialogOpen = false;
-
+  Future<void> _handleDownload(SharedFile file) async {
     try {
-      // Request storage permission on Android
-      if (Platform.isAndroid) {
-        final deviceInfo = DeviceInfoPlugin();
-        final androidInfo = await deviceInfo.androidInfo;
-        final sdkInt = androidInfo.version.sdkInt;
-
-        if (sdkInt >= 30) {
-          var status = await Permission.manageExternalStorage.status;
-          if (!status.isGranted) {
-            status = await Permission.manageExternalStorage.request();
-          }
-          if (!status.isGranted) {
-            throw Exception('All files access permission is required to save downloads on this Android version.');
-          }
-        } else {
-          var status = await Permission.storage.status;
-          if (!status.isGranted) {
-            status = await Permission.storage.request();
-          }
-          if (!status.isGranted) {
-            throw Exception('Storage permission is required to save downloads.');
-          }
-        }
-      }
-
-      Directory? downloadsDir;
-      if (Platform.isAndroid) {
-        downloadsDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadsDir.exists()) {
-          downloadsDir = await getDownloadsDirectory();
-        }
-      } else {
-        downloadsDir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
-      }
-
-      if (downloadsDir == null) {
-        throw Exception('Could not resolve downloads directory.');
-      }
-
-      if (!await downloadsDir.exists()) {
-        await downloadsDir.create(recursive: true);
-      }
-
-      final savePath = '${downloadsDir.path}/${file.fileName}';
-
-      final tokenVal = Supabase.instance.client.auth.currentSession?.accessToken;
-      if (tokenVal == null) {
-        throw Exception('No active session. Please sign in again.');
-      }
-
-      // Build proper download URL based on available endpoints
-      String downloadUrl = '';
-      final hash = file.uniqueShareHash;
-
-      if (AppConfig.cfWorkerUrl.isNotEmpty) {
-        final cleanWorker = AppConfig.cfWorkerUrl.endsWith('/')
-            ? AppConfig.cfWorkerUrl.substring(0, AppConfig.cfWorkerUrl.length - 1)
-            : AppConfig.cfWorkerUrl;
-        if (hash != null && hash.isNotEmpty) {
-          downloadUrl = '$cleanWorker?hash=$hash&skip_increment=true';
-        } else {
-          downloadUrl = '$cleanWorker?file_id=${file.id}&skip_increment=true';
-        }
-      } else if (AppConfig.proxyUrl.isNotEmpty) {
-        final cleanProxy = AppConfig.proxyUrl.endsWith('/')
-            ? AppConfig.proxyUrl.substring(0, AppConfig.proxyUrl.length - 1)
-            : AppConfig.proxyUrl;
-        if (hash != null && hash.isNotEmpty) {
-          downloadUrl = '$cleanProxy/download-file?hash=$hash&skip_increment=true';
-        } else {
-          downloadUrl = '$cleanProxy/download-file?file_id=${file.id}&skip_increment=true';
-        }
-      } else {
-        final cleanSb = AppConfig.supabaseUrl.endsWith('/')
-            ? AppConfig.supabaseUrl.substring(0, AppConfig.supabaseUrl.length - 1)
-            : AppConfig.supabaseUrl;
-        if (hash != null && hash.isNotEmpty) {
-          downloadUrl = '$cleanSb/functions/v1/download-file?hash=$hash&skip_increment=true';
-        } else {
-          downloadUrl = '$cleanSb/functions/v1/download-file?file_id=${file.id}&skip_increment=true';
-        }
-      }
-
-      final downloadNotifier = ValueNotifier<DownloadProgressState>(
-        DownloadProgressState(
-          fileName: file.fileName,
-          progress: 0.0,
-          downloadedSize: 'Connecting...',
-        ),
-      );
-
-      dialogOpen = true;
-      DownloadProgressDialog.show(
-        context: context,
-        notifier: downloadNotifier,
-        onCancel: () {
-          cancelToken.cancel('Download cancelled by user.');
-          if (dialogOpen && Navigator.canPop(context)) {
-            Navigator.pop(context);
-            dialogOpen = false;
-          }
-        },
-      ).then((_) {
-        dialogOpen = false;
-      });
-
-      DateTime? lastUpdate;
-      int lastBytes = 0;
-      DateTime lastSpeedTime = DateTime.now();
-
-      await dio.download(
-        downloadUrl,
-        savePath,
-        cancelToken: cancelToken,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $tokenVal',
-          },
-        ),
-        onReceiveProgress: (received, total) {
-          if (total > 0) {
-            final now = DateTime.now();
-            if (lastUpdate == null ||
-                now.difference(lastUpdate!).inMilliseconds > 80 ||
-                received == total) {
-              lastUpdate = now;
-              final pct = (received / total).clamp(0.0, 1.0);
-              final receivedMB = (received / (1024 * 1024)).toStringAsFixed(1);
-              final totalMB = (total / (1024 * 1024)).toStringAsFixed(1);
-
-              String speedStr = '';
-              final timeDiff = now.difference(lastSpeedTime).inMilliseconds;
-              if (timeDiff >= 400) {
-                final bytesDiff = received - lastBytes;
-                final speedBps = (bytesDiff / (timeDiff / 1000));
-                if (speedBps > 1024 * 1024) {
-                  speedStr = '${(speedBps / (1024 * 1024)).toStringAsFixed(1)} MB/s';
-                } else if (speedBps > 1024) {
-                  speedStr = '${(speedBps / 1024).toStringAsFixed(0)} KB/s';
-                }
-                lastBytes = received;
-                lastSpeedTime = now;
-              }
-
-              downloadNotifier.value = downloadNotifier.value.copyWith(
-                progress: pct,
-                downloadedSize: '$receivedMB MB / $totalMB MB',
-                speed: speedStr.isNotEmpty ? speedStr : downloadNotifier.value.speed,
-              );
-
-              setState(() {
-                _downloadProgress = pct;
-              });
-            }
-          }
-        },
-      );
-
-      setState(() {
-        _downloadingFileName = '';
-      });
-
-      if (dialogOpen && Navigator.canPop(context)) {
-        Navigator.pop(context);
-        dialogOpen = false;
-      }
-
-      // Scan the file so it shows up in system downloads list / gallery
-      if (Platform.isAndroid) {
-        try {
-          const platform = MethodChannel('com.neofiles.transfer/media_scanner');
-          await platform.invokeMethod('scanFile', {'path': savePath});
-        } catch (scanError) {
-          debugPrint('Media scan failed: $scanError');
-        }
-      }
-
-      // Increment download count locally
-      await Supabase.instance.client
-          .from('shared_files')
-          .update({'download_count': file.downloadCount + 1})
-          .eq('id', file.id);
-
-      _refreshFiles();
-
+      final transferService = Provider.of<TransferService>(context, listen: false);
+      await transferService.startDownload(file);
       if (mounted) {
-        final isLight = Theme.of(context).brightness == Brightness.light;
-        showDialog(
-          context: context,
-          barrierDismissible: true,
-          builder: (dialogContext) {
-            Timer(const Duration(milliseconds: 2500), () {
-              if (Navigator.canPop(dialogContext)) {
-                Navigator.pop(dialogContext);
-              }
-            });
-
-            return Dialog(
-              backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withValues(alpha: 0.1),
-                  width: 1,
-                ),
-              ),
-              elevation: 12,
-              child: Stack(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: isLight ? 0.12 : 0.18),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFF10B981).withValues(alpha: isLight ? 0.25 : 0.35),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              LucideIcons.checkCheck,
-                              color: Color(0xFF10B981),
-                              size: 32,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        Text(
-                          'Download Complete',
-                          style: TextStyle(
-                            color: isLight ? const Color(0xFF0F172A) : Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${file.fileName} has been saved to your Downloads folder.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: isLight ? const Color(0xFF64748B) : Colors.white70,
-                            fontSize: 13,
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              if (Navigator.canPop(dialogContext)) {
-                                Navigator.pop(dialogContext);
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4F46E5),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              elevation: 0,
-                            ),
-                            child: const Text(
-                              'Done',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: IconButton(
-                      icon: Icon(
-                        LucideIcons.x,
-                        color: isLight ? const Color(0xFF94A3B8) : Colors.white54,
-                        size: 18,
-                      ),
-                      onPressed: () {
-                        if (Navigator.canPop(dialogContext)) {
-                          Navigator.pop(dialogContext);
-                        }
-                      },
-                      splashRadius: 18,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
+        TransferManagerSheet.show(context);
       }
     } catch (e) {
-      if (dialogOpen && Navigator.canPop(context)) {
-        Navigator.pop(context);
-        dialogOpen = false;
-      }
-      setState(() {
-        _downloadingFileName = '';
-      });
-      final errorMsg = _formatError(e);
-      if (mounted && !errorMsg.contains('cancel')) {
-        _showErrorSnackBar('Download failed: $errorMsg');
+      if (mounted) {
+        _showErrorSnackBar('Download failed: ${_formatError(e)}');
       }
     }
   }
@@ -1543,6 +1235,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
               actions: [
+                Consumer<TransferService>(
+                  builder: (context, transferService, _) {
+                    final activeCount = transferService.activeTasks.length;
+                    return IconButton(
+                      tooltip: 'Background Transfers',
+                      icon: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Icon(LucideIcons.arrowUpDown, color: iconColor, size: 20),
+                          if (activeCount > 0)
+                            Positioned(
+                              top: -4,
+                              right: -4,
+                              child: Container(
+                                padding: const EdgeInsets.all(3.5),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF4F46E5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '$activeCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      onPressed: () => TransferManagerSheet.show(context),
+                    );
+                  },
+                ),
                 const NotificationBellButton(),
                 Consumer<UpdateService>(
                   builder: (context, updateService, _) {
@@ -1739,7 +1466,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 SystemNavigator.pop();
               },
-              child: NotificationListener<UserScrollNotification>(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: NotificationListener<UserScrollNotification>(
                 onNotification: (notification) {
                   if (notification.direction == ScrollDirection.reverse) {
                     if (_isFabVisible) {
@@ -1876,8 +1606,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           : _buildTrashTab(isLight),
                 ),
               ),
-            ),
+              const FloatingTransferBar(),
+            ],
           ),
+        ),
+      ),
           if (_isActionLoading)
             Positioned.fill(
               child: BackdropFilter(
