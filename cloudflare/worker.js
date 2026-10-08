@@ -32,9 +32,59 @@ export default {
     }
 
     const url = new URL(request.url)
+    const pathname = url.pathname.replace(/\/+$/, "")
     const hash = url.searchParams.get("hash")
     const isStream = url.searchParams.get("stream") === "true"
     const skipIncrement = url.searchParams.get("skip_increment") === "true"
+
+    const sbUrl = env?.SUPABASE_URL || SUPABASE_URL
+    const sbKey = env?.SUPABASE_SERVICE_ROLE_KEY || env?.SUPABASE_KEY || SUPABASE_KEY
+
+    // Health / Ping / Keep-Alive Endpoint (keeps Supabase PostgreSQL awake & active)
+    if (pathname === "/ping" || pathname === "/health" || pathname === "/keep-alive" || (!hash && (pathname === "" || pathname === "/"))) {
+      try {
+        const pingDb = await fetch(
+          `${sbUrl}/rest/v1/shared_files?select=id&limit=1`,
+          {
+            headers: {
+              apikey: sbKey,
+              Authorization: `Bearer ${sbKey}`,
+            },
+          }
+        )
+        const dbStatus = pingDb.ok ? "healthy" : `status ${pingDb.status}`
+        return new Response(
+          JSON.stringify({
+            status: "ok",
+            message: "Neo Files Edge Worker & Supabase DB are active!",
+            database: dbStatus,
+            timestamp: new Date().toISOString()
+          }, null, 2),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders
+            }
+          }
+        )
+      } catch (err) {
+        return new Response(
+          JSON.stringify({
+            status: "error",
+            message: "Ping failed to reach Supabase",
+            error: err.message
+          }),
+          {
+            status: 500,
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders
+            }
+          }
+        )
+      }
+    }
 
     if (!hash) {
       return new Response(
@@ -42,9 +92,6 @@ export default {
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       )
     }
-
-    const sbUrl = env?.SUPABASE_URL || SUPABASE_URL
-    const sbKey = env?.SUPABASE_SERVICE_ROLE_KEY || env?.SUPABASE_KEY || SUPABASE_KEY
 
     try {
       // 1. Fetch file record from Supabase
