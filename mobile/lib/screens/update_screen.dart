@@ -93,30 +93,50 @@ class _UpdateScreenState extends State<UpdateScreen> {
     final isChecking = updateService.isChecking;
     final fileName = updateService.fileName ?? 'NeoFiles-release.apk';
     final formattedSize = _formatFileSize(updateService.fileSize);
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
+    final bgColor = isLight ? const Color(0xFFF8FAFC) : const Color(0xFF030712);
+    final cardBg = isLight ? Colors.white : const Color(0xFF0F172A).withOpacity(0.6);
+    final cardBorder = isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.06);
+    final titleColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+    final subtitleColor = isLight ? const Color(0xFF475569) : Colors.white70;
+    final cardShadow = isLight
+        ? [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ]
+        : null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF030712),
+      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: isLight ? Colors.white : Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
+          icon: Icon(LucideIcons.arrowLeft, color: titleColor),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'App Updater',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(color: titleColor, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         actions: [
           IconButton(
             tooltip: 'Check Again',
             icon: isChecking
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: isLight ? const Color(0xFF0F172A) : Colors.white70,
+                    ),
                   )
-                : const Icon(LucideIcons.refreshCw, color: Colors.white70, size: 19),
+                : Icon(LucideIcons.refreshCw, color: isLight ? const Color(0xFF475569) : Colors.white70, size: 19),
             onPressed: isChecking
                 ? null
                 : () => updateService.checkForUpdates(context: context),
@@ -136,21 +156,26 @@ class _UpdateScreenState extends State<UpdateScreen> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: hasUpdate
-                      ? [
-                          const Color(0xFF4338CA).withOpacity(0.35),
-                          const Color(0xFF1E1B4B).withOpacity(0.6),
-                        ]
-                      : [
-                          const Color(0xFF065F46).withOpacity(0.35),
-                          const Color(0xFF064E3B).withOpacity(0.5),
-                        ],
+                      ? (isLight
+                          ? [const Color(0xFFEEF2FF), const Color(0xFFE0E7FF)]
+                          : [
+                              const Color(0xFF4338CA).withOpacity(0.35),
+                              const Color(0xFF1E1B4B).withOpacity(0.6),
+                            ])
+                      : (isLight
+                          ? [const Color(0xFFECFDF5), const Color(0xFFD1FAE5)]
+                          : [
+                              const Color(0xFF065F46).withOpacity(0.35),
+                              const Color(0xFF064E3B).withOpacity(0.5),
+                            ]),
                 ),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: hasUpdate
-                      ? Colors.indigoAccent.withOpacity(0.3)
-                      : Colors.green.withOpacity(0.3),
+                      ? (isLight ? const Color(0xFFC7D2FE) : Colors.indigoAccent.withOpacity(0.3))
+                      : (isLight ? const Color(0xFFA7F3D0) : Colors.green.withOpacity(0.3)),
                 ),
+                boxShadow: cardShadow,
               ),
               child: Column(
                 children: [
@@ -158,23 +183,27 @@ class _UpdateScreenState extends State<UpdateScreen> {
                     width: 60,
                     height: 60,
                     decoration: BoxDecoration(
-                      color: (hasUpdate ? Colors.indigoAccent : Colors.green).withOpacity(0.15),
+                      color: (hasUpdate ? Colors.indigoAccent : Colors.green)
+                          .withOpacity(isLight ? 0.2 : 0.15),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: (hasUpdate ? Colors.indigoAccent : Colors.green).withOpacity(0.4),
+                        color: (hasUpdate ? Colors.indigoAccent : Colors.green)
+                            .withOpacity(0.4),
                       ),
                     ),
                     child: Icon(
                       hasUpdate ? LucideIcons.sparkles : LucideIcons.checkCircle2,
-                      color: hasUpdate ? Colors.indigoAccent : Colors.greenAccent,
+                      color: hasUpdate
+                          ? (isLight ? const Color(0xFF4338CA) : Colors.indigoAccent)
+                          : (isLight ? const Color(0xFF059669) : Colors.greenAccent),
                       size: 30,
                     ),
                   ),
                   const SizedBox(height: 14),
                   Text(
                     hasUpdate ? 'New Update Available!' : 'Your App is Up to Date',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: titleColor,
                       fontSize: 19,
                       fontWeight: FontWeight.bold,
                     ),
@@ -185,26 +214,27 @@ class _UpdateScreenState extends State<UpdateScreen> {
                         ? 'A new version of Neo Files Transfer is ready for install.'
                         : 'You are currently running the latest version.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                    style: TextStyle(color: subtitleColor, fontSize: 12.5),
                   ),
                   const SizedBox(height: 18),
                   // Version Pills Row
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.35),
+                      color: isLight ? Colors.white : Colors.black.withOpacity(0.35),
                       borderRadius: BorderRadius.circular(14),
+                      border: isLight ? Border.all(color: const Color(0xFFCBD5E1)) : null,
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildVersionPill('Installed', currentVer, Colors.grey.shade400),
+                        _buildVersionPill('Installed', currentVer, isLight ? const Color(0xFF1E293B) : Colors.grey.shade400, isLight: isLight),
                         if (hasUpdate) ...[
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 10),
-                            child: Icon(LucideIcons.arrowRight, color: Colors.white38, size: 16),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Icon(LucideIcons.arrowRight, color: isLight ? const Color(0xFF94A3B8) : Colors.white38, size: 16),
                           ),
-                          _buildVersionPill('Latest', latestVer, Colors.indigoAccent, isNew: true),
+                          _buildVersionPill('Latest', latestVer, const Color(0xFF4F46E5), isNew: true, isLight: isLight),
                         ],
                       ],
                     ),
@@ -219,9 +249,10 @@ class _UpdateScreenState extends State<UpdateScreen> {
               Container(
                 padding: const EdgeInsets.all(16.0),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A).withOpacity(0.6),
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withOpacity(0.06)),
+                  border: Border.all(color: cardBorder),
+                  boxShadow: cardShadow,
                 ),
                 child: Row(
                   children: [
@@ -242,8 +273,8 @@ class _UpdateScreenState extends State<UpdateScreen> {
                             fileName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: titleColor,
                               fontSize: 13.5,
                               fontWeight: FontWeight.bold,
                             ),
@@ -253,7 +284,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
                             formattedSize.isNotEmpty
                                 ? 'Android Universal APK • $formattedSize'
                                 : 'Android Universal APK Package',
-                            style: TextStyle(color: Colors.grey.shade400, fontSize: 11.5),
+                            style: TextStyle(color: isLight ? const Color(0xFF64748B) : Colors.grey.shade400, fontSize: 11.5),
                           ),
                         ],
                       ),
@@ -268,9 +299,10 @@ class _UpdateScreenState extends State<UpdateScreen> {
             Container(
               padding: const EdgeInsets.all(20.0),
               decoration: BoxDecoration(
-                color: const Color(0xFF0F172A).withOpacity(0.6),
+                color: cardBg,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withOpacity(0.06)),
+                border: Border.all(color: cardBorder),
+                boxShadow: cardShadow,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,10 +311,10 @@ class _UpdateScreenState extends State<UpdateScreen> {
                     children: [
                       const Icon(LucideIcons.fileText, color: Colors.indigoAccent, size: 18),
                       const SizedBox(width: 10),
-                      const Text(
+                      Text(
                         'What\'s New & Release Notes',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: titleColor,
                           fontSize: 14.5,
                           fontWeight: FontWeight.bold,
                         ),
@@ -307,16 +339,20 @@ class _UpdateScreenState extends State<UpdateScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  const Divider(color: Colors.white12, height: 1),
+                  Divider(color: isLight ? const Color(0xFFE2E8F0) : Colors.white12, height: 1),
                   const SizedBox(height: 14),
                   if (description.trim().isNotEmpty)
-                    _buildFormattedDescription(description)
+                    _buildFormattedDescription(description, isLight: isLight)
                   else
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12.0),
                       child: Text(
                         'No feature notes provided for this version.',
-                        style: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontStyle: FontStyle.italic),
+                        style: TextStyle(
+                          color: isLight ? const Color(0xFF94A3B8) : Colors.grey.shade500,
+                          fontSize: 13,
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                     ),
                 ],
@@ -359,8 +395,8 @@ class _UpdateScreenState extends State<UpdateScreen> {
                   ? null
                   : () => updateService.checkForUpdates(context: context),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white70,
-                side: BorderSide(color: Colors.white.withOpacity(0.12)),
+                foregroundColor: isLight ? const Color(0xFF334155) : Colors.white70,
+                side: BorderSide(color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.12)),
                 minimumSize: const Size(double.infinity, 48),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -380,13 +416,16 @@ class _UpdateScreenState extends State<UpdateScreen> {
     );
   }
 
-  Widget _buildVersionPill(String label, String version, Color color, {bool isNew = false}) {
+  Widget _buildVersionPill(String label, String version, Color color, {bool isNew = false, bool isLight = false}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           '$label: ',
-          style: const TextStyle(color: Colors.white54, fontSize: 11.5),
+          style: TextStyle(
+            color: isLight ? const Color(0xFF64748B) : Colors.white54,
+            fontSize: 11.5,
+          ),
         ),
         Text(
           version,
@@ -419,7 +458,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
     );
   }
 
-  Widget _buildFormattedDescription(String text) {
+  Widget _buildFormattedDescription(String text, {bool isLight = false}) {
     final lines = text.split('\n');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,15 +486,15 @@ class _UpdateScreenState extends State<UpdateScreen> {
                   width: 6,
                   height: 6,
                   decoration: const BoxDecoration(
-                    color: Color(0xFF34D399), // Emerald bullet point
+                    color: Color(0xFF10B981), // Emerald bullet point
                     shape: BoxShape.circle,
                   ),
                 ),
                 Expanded(
                   child: SelectableText(
                     cleanText,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: isLight ? const Color(0xFF1E293B) : Colors.white,
                       fontSize: 13,
                       height: 1.45,
                     ),
@@ -473,8 +512,8 @@ class _UpdateScreenState extends State<UpdateScreen> {
             padding: const EdgeInsets.only(top: 8.0, bottom: 6.0),
             child: Text(
               cleanTitle,
-              style: const TextStyle(
-                color: Color(0xFF818CF8), // Indigo accent header
+              style: TextStyle(
+                color: isLight ? const Color(0xFF4F46E5) : const Color(0xFF818CF8), // Indigo accent header
                 fontSize: 13.5,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.3,
@@ -489,7 +528,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
           child: SelectableText(
             line,
             style: TextStyle(
-              color: Colors.grey.shade200,
+              color: isLight ? const Color(0xFF334155) : Colors.grey.shade200,
               fontSize: 13,
               height: 1.5,
             ),

@@ -97,6 +97,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _refreshFiles() async {
     final fileService = Provider.of<FileService>(context, listen: false);
+    if (mounted && !_isFabVisible) {
+      setState(() => _isFabVisible = true);
+    }
     if (_currentTab == 0) {
       await fileService.loadFiles(_currentFolder?.id);
     } else if (_currentTab == 1) {
@@ -109,6 +112,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _onTabTapped(int index) {
     setState(() {
       _currentTab = index;
+      _isFabVisible = true;
     });
     _refreshFiles();
   }
@@ -577,26 +581,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _handleCreateFolder() async {
     _folderNameController.clear();
+    final isLight = Theme.of(context).brightness == Brightness.light;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Create Folder', style: TextStyle(color: Colors.white)),
+        title: Text(
+          'Create Folder',
+          style: TextStyle(
+            color: isLight ? const Color(0xFF0F172A) : Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: TextField(
           controller: _folderNameController,
-          style: const TextStyle(color: Colors.white),
+          autofocus: true,
+          style: TextStyle(color: isLight ? const Color(0xFF0F172A) : Colors.white),
           decoration: InputDecoration(
             hintText: 'Enter folder name...',
-            hintStyle: const TextStyle(color: Colors.white24),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
-            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.indigoAccent)),
+            hintStyle: TextStyle(color: isLight ? const Color(0xFF94A3B8) : Colors.white24),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.1)),
+            ),
+            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF4F46E5))),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+            child: Text('Cancel', style: TextStyle(color: isLight ? const Color(0xFF64748B) : Colors.white60)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -618,7 +632,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.indigo.shade600,
+              backgroundColor: const Color(0xFF4F46E5),
               foregroundColor: Colors.white,
             ),
             child: const Text('Create', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -630,26 +644,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _handleRename(SharedFile file) async {
     _renameController.text = file.fileName;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Rename Item', style: TextStyle(color: Colors.white)),
+        title: Text(
+          'Rename Item',
+          style: TextStyle(
+            color: isLight ? const Color(0xFF0F172A) : Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: TextField(
           controller: _renameController,
-          style: const TextStyle(color: Colors.white),
+          autofocus: true,
+          style: TextStyle(color: isLight ? const Color(0xFF0F172A) : Colors.white),
           decoration: InputDecoration(
             hintText: 'Enter new name...',
-            hintStyle: const TextStyle(color: Colors.white24),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
-            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.indigoAccent)),
+            hintStyle: TextStyle(color: isLight ? const Color(0xFF94A3B8) : Colors.white24),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.1)),
+            ),
+            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF4F46E5))),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+            child: Text('Cancel', style: TextStyle(color: isLight ? const Color(0xFF64748B) : Colors.white60)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -681,7 +705,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.indigo.shade600,
+              backgroundColor: const Color(0xFF4F46E5),
               foregroundColor: Colors.white,
             ),
             child: const Text('Rename', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -941,6 +965,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _refreshFiles();
 
       if (mounted) {
+        final isLight = Theme.of(context).brightness == Brightness.light;
         showDialog(
           context: context,
           barrierDismissible: true,
@@ -953,7 +978,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             });
 
             return Dialog(
-              backgroundColor: const Color(0xFF0F172A),
+              backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Stack(
                 children: [
@@ -968,10 +993,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           size: 48,
                         ),
                         const SizedBox(height: 16),
-                        const Text(
+                        Text(
                           'Download Complete',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: isLight ? const Color(0xFF0F172A) : Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -980,8 +1005,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Text(
                           '${file.fileName} has been saved to your Downloads folder.',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white70,
+                          style: TextStyle(
+                            color: isLight ? const Color(0xFF475569) : Colors.white70,
                             fontSize: 13,
                           ),
                         ),
@@ -997,11 +1022,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Navigator.pop(dialogContext);
                         }
                       },
-                      child: const Padding(
-                        padding: EdgeInsets.all(8.0),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
                         child: Icon(
                           Icons.close,
-                          color: Colors.white60,
+                          color: isLight ? const Color(0xFF94A3B8) : Colors.white60,
                           size: 20,
                         ),
                       ),
@@ -1024,20 +1049,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _handleDelete(SharedFile file) async {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Delete ${file.isFolder ? "Folder" : "File"}?', style: const TextStyle(color: Colors.white)),
+        title: Text(
+          'Delete ${file.isFolder ? "Folder" : "File"}?',
+          style: TextStyle(
+            color: isLight ? const Color(0xFF0F172A) : Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: Text(
           'Are you sure you want to delete ${file.fileName}? This action is irreversible.',
-          style: const TextStyle(color: Colors.white70, fontSize: 13),
+          style: TextStyle(
+            color: isLight ? const Color(0xFF475569) : Colors.white70,
+            fontSize: 13,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+            child: Text('Cancel', style: TextStyle(color: isLight ? const Color(0xFF64748B) : Colors.white60)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1244,52 +1279,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             floatingActionButton: _currentTab == 0
-                ? FloatingActionButton(
-                    onPressed: () {
-                      final bottomBg = isLight ? Colors.white : const Color(0xFF0F172A);
-                      final bottomItemColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+                ? AnimatedSlide(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeInOut,
+                    offset: _isFabVisible ? Offset.zero : const Offset(0, 2),
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                      opacity: _isFabVisible ? 1.0 : 0.0,
+                      child: IgnorePointer(
+                        ignoring: !_isFabVisible,
+                        child: FloatingActionButton(
+                          onPressed: () {
+                            final bottomBg = isLight ? Colors.white : const Color(0xFF0F172A);
+                            final bottomItemColor = isLight ? const Color(0xFF0F172A) : Colors.white;
 
-                      showModalBottomSheet(
-                        backgroundColor: bottomBg,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                            showModalBottomSheet(
+                              backgroundColor: bottomBg,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                              ),
+                              context: context,
+                              builder: (context) => SafeArea(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ListTile(
+                                      leading: const Icon(LucideIcons.filePlus, color: Color(0xFF4F46E5)),
+                                      title: Text('Upload Files', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _handleUploadFile();
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(LucideIcons.folder, color: Colors.teal),
+                                      title: Text('Upload Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _handleUploadFolder();
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(LucideIcons.folderPlus, color: Colors.amber),
+                                      title: Text('Create Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _handleCreateFolder();
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                          backgroundColor: const Color(0xFF4F46E5),
+                          child: const Icon(LucideIcons.plus, color: Colors.white),
                         ),
-                        context: context,
-                        builder: (context) => SafeArea(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ListTile(
-                                leading: const Icon(LucideIcons.filePlus, color: Color(0xFF4F46E5)),
-                                title: Text('Upload Files', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  _handleUploadFile();
-                                },
-                              ),
-                              ListTile(
-                                leading: const Icon(LucideIcons.folder, color: Colors.teal),
-                                title: Text('Upload Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  _handleUploadFolder();
-                                },
-                              ),
-                              ListTile(
-                                leading: const Icon(LucideIcons.folderPlus, color: Colors.amber),
-                                title: Text('Create Folder', style: TextStyle(color: bottomItemColor, fontWeight: FontWeight.w600)),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  _handleCreateFolder();
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                    backgroundColor: const Color(0xFF4F46E5),
-                    child: const Icon(LucideIcons.plus, color: Colors.white),
+                      ),
+                    ),
                   )
                 : null,
             body: PopScope(
@@ -1303,6 +1351,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     setState(() {
                       _searchController.clear();
                       _searchQuery = '';
+                      _isFabVisible = true;
                     });
                   }
                   return;
@@ -1316,6 +1365,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 if (_currentTab != 0) {
                   setState(() {
                     _currentTab = 0;
+                    _isFabVisible = true;
                   });
                   _refreshFiles();
                   return;
@@ -1323,11 +1373,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 SystemNavigator.pop();
               },
-              child: RefreshIndicator(
-                onRefresh: _refreshFiles,
-                color: const Color(0xFF4F46E5),
-                backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
-                child: _currentTab == 0
+              child: NotificationListener<UserScrollNotification>(
+                onNotification: (notification) {
+                  if (notification.direction == ScrollDirection.reverse) {
+                    if (_isFabVisible) {
+                      setState(() => _isFabVisible = false);
+                    }
+                  } else if (notification.direction == ScrollDirection.forward) {
+                    if (!_isFabVisible) {
+                      setState(() => _isFabVisible = true);
+                    }
+                  }
+                  return false;
+                },
+                child: RefreshIndicator(
+                  onRefresh: _refreshFiles,
+                  color: const Color(0xFF4F46E5),
+                  backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
+                  child: _currentTab == 0
                       ? Column(
                           children: [
                             // Search Bar & Info card
