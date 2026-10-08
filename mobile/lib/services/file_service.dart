@@ -200,7 +200,7 @@ class FileService extends ChangeNotifier {
   }
 
   // Upload file (resumable connection with progress callback)
-  Future<void> uploadFile({
+  Future<SharedFile> uploadFile({
     required File file,
     required String fileName,
     required String? parentDbFolderId,
@@ -352,12 +352,11 @@ class FileService extends ChangeNotifier {
     }
 
     // Step 3: Insert shared_files and file_versions
-    final insertResponse = await _client.from('shared_files').insert(insertPayload).select('id').single();
-
-    final dbFileId = insertResponse['id'] as String;
+    final insertResponse = await _client.from('shared_files').insert(insertPayload).select().single();
+    final newFile = SharedFile.fromJson(insertResponse);
 
     await _client.from('file_versions').insert({
-      'file_id': dbFileId,
+      'file_id': newFile.id,
       'google_drive_file_id': driveFileId,
       'version_number': 1,
     });
@@ -367,6 +366,11 @@ class FileService extends ChangeNotifier {
       'action': 'upload',
       'details': 'Uploaded file: $finalFileName',
     });
+
+    _files.insert(0, newFile);
+    notifyListeners();
+
+    return newFile;
   }
 
   String _generateApiKey() {

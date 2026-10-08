@@ -1,15 +1,14 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
+import '../config.dart';
 import '../models/shared_file.dart';
 import '../services/auth_service.dart';
 import '../services/file_service.dart';
 import '../services/share_receiver_service.dart';
-import '../utils/constants.dart';
-import '../utils/helpers.dart';
 
 class ShareUploadDialog extends StatefulWidget {
   final List<IncomingSharedFile> files;
@@ -50,14 +49,8 @@ class _ShareUploadDialogState extends State<ShareUploadDialog> {
   String _statusText = 'Ready to upload';
   String _generatedShareUrl = '';
   String? _selectedFolderId;
-  String _selectedFolderName = 'Root Directory';
   bool _autoMakePublic = true;
-  String _uploadedFileName = '';
-
-  @override
-  void initState() {
-    super.initState();
-  }
+  CancelToken? _cancelToken;
 
   String _formatSize(int bytes) {
     if (bytes <= 0) return '0 B';
@@ -102,6 +95,7 @@ class _ShareUploadDialogState extends State<ShareUploadDialog> {
       return;
     }
 
+    _cancelToken = CancelToken();
     setState(() {
       _isUploading = true;
       _statusText = 'Preparing files...';
@@ -121,22 +115,24 @@ class _ShareUploadDialogState extends State<ShareUploadDialog> {
         }
 
         setState(() {
-          _uploadedFileName = incoming.name;
           _statusText = 'Uploading ${i + 1} of $totalFiles: ${incoming.name}';
         });
 
         final uploadedFile = await fileService.uploadFile(
           file: ioFile,
-          folderId: _selectedFolderId,
-          onProgress: (p, speed) {
+          fileName: incoming.name,
+          parentDbFolderId: _selectedFolderId,
+          parentDriveFolderId: null,
+          onProgress: (double p, [String? speed]) {
             setState(() {
               _progress = ((i + p) / totalFiles).clamp(0.0, 1.0);
-              _uploadSpeed = speed;
+              _uploadSpeed = speed ?? '';
             });
           },
+          cancelToken: _cancelToken!,
         );
 
-        if (_autoMakePublic && uploadedFile != null) {
+        if (_autoMakePublic) {
           SharedFile targetFile = uploadedFile;
           if (targetFile.sharingStatus != 'public' || targetFile.uniqueShareHash == null) {
             targetFile = await fileService.generateShareLink(targetFile);
@@ -160,8 +156,9 @@ class _ShareUploadDialogState extends State<ShareUploadDialog> {
         HapticFeedback.mediumImpact();
       }
 
-      // Clear the temporary cache
-      Provider.of<ShareReceiverService>(context, listen: false).clearPendingFiles();
+      if (mounted) {
+        Provider.of<ShareReceiverService>(context, listen: false).clearPendingFiles();
+      }
 
     } catch (e) {
       setState(() {
@@ -303,7 +300,7 @@ class _ShareUploadDialogState extends State<ShareUploadDialog> {
                 shrinkWrap: true,
                 padding: const EdgeInsets.all(12),
                 itemCount: widget.files.length,
-                separatorBuilder: (_, __) => Divider(
+                separatorBuilder: (context, index) => Divider(
                   color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withValues(alpha: 0.06),
                   height: 12,
                 ),
@@ -371,11 +368,11 @@ class _ShareUploadDialogState extends State<ShareUploadDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
-                          const Icon(LucideIcons.checkCircle2, color: Color(0xFF10B981), size: 18),
-                          const SizedBox(width: 8),
-                          const Text(
+                          Icon(LucideIcons.checkCircle2, color: Color(0xFF10B981), size: 18),
+                          SizedBox(width: 8),
+                          Text(
                             'Share Link Ready & Copied!',
                             style: TextStyle(
                               color: Color(0xFF10B981),
