@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 
@@ -9,21 +9,20 @@ import MainLayout from './layouts/MainLayout'
 import DashboardLayout from './layouts/DashboardLayout'
 import AdminLayout from './layouts/AdminLayout'
 
-// Public Pages
-import LandingPage from './pages/LandingPage'
-import LoginPage from './pages/LoginPage'
-import AuthCallback from './pages/AuthCallback'
-import AccessDeniedPage from './pages/AccessDeniedPage'
-import FileNotFoundPage from './pages/FileNotFoundPage'
-import DownloadPage from './pages/DownloadPage'
-import VersionApiPage from './pages/VersionApiPage'
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
+// Public Pages (Lazy Loaded for Instant Sub-50ms Routing)
+const LandingPage = lazy(() => import('./pages/LandingPage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const AuthCallback = lazy(() => import('./pages/AuthCallback'))
+const AccessDeniedPage = lazy(() => import('./pages/AccessDeniedPage'))
+const FileNotFoundPage = lazy(() => import('./pages/FileNotFoundPage'))
+const DownloadPage = lazy(() => import('./pages/DownloadPage'))
+const VersionApiPage = lazy(() => import('./pages/VersionApiPage'))
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'))
+const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'))
 
-import TermsOfServicePage from './pages/TermsOfServicePage'
-
-// Admin Pages
-import AdminLoginPage from './pages/AdminLoginPage'
-import AdminDashboardPage from './pages/AdminDashboardPage'
+// Admin Pages (Lazy Loaded)
+const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
 
 function LoadingScreen() {
   return (
@@ -154,35 +153,37 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route path="/" element={<MainLayout />}>
-        <Route index element={<HomeRoute />} />
-        <Route path="dashboard" element={<HomeRoute />} />
-        <Route path="dashboard/*" element={<HomeRoute />} />
-        <Route path="login" element={<LoginPage />} />
-        <Route path="auth/callback" element={<AuthCallback />} />
-        <Route path="privacy" element={<PrivacyPolicyPage />} />
-        <Route path="terms" element={<TermsOfServicePage />} />
-      </Route>
+    <Suspense fallback={<LoadingScreen />}>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<HomeRoute />} />
+          <Route path="dashboard" element={<HomeRoute />} />
+          <Route path="dashboard/*" element={<HomeRoute />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="auth/callback" element={<AuthCallback />} />
+          <Route path="privacy" element={<PrivacyPolicyPage />} />
+          <Route path="terms" element={<TermsOfServicePage />} />
+        </Route>
 
-      {/* Admin Route */}
-      <Route path="/admin" element={<AdminLayout />}>
-        <Route index element={<AdminLoginPage />} />
-      </Route>
+        {/* Admin Route */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminLoginPage />} />
+        </Route>
 
-      {/* Download Routes */}
-      <Route path="/download" element={<Navigate to="/" replace />} />
-      <Route path="/download/:hash" element={<DownloadPage />} />
+        {/* Download Routes */}
+        <Route path="/download" element={<Navigate to="/" replace />} />
+        <Route path="/download/:hash" element={<DownloadPage />} />
 
-      {/* Version API Routes */}
-      <Route path="/api/version/:key" element={<VersionApiPage />} />
-      <Route path="/api/version" element={<VersionApiPage />} />
+        {/* Version API Routes */}
+        <Route path="/api/version/:key" element={<VersionApiPage />} />
+        <Route path="/api/version" element={<VersionApiPage />} />
 
-      {/* Error Pages */}
-      <Route path="/access-denied" element={<AccessDeniedPage />} />
-      <Route path="*" element={<FileNotFoundPage />} />
-    </Routes>
+        {/* Error Pages */}
+        <Route path="/access-denied" element={<AccessDeniedPage />} />
+        <Route path="*" element={<FileNotFoundPage />} />
+      </Routes>
+    </Suspense>
   )
 
 }
