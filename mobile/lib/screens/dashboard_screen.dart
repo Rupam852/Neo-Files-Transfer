@@ -119,6 +119,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _folderPath.add(folder);
       _searchQuery = '';
       _searchController.clear();
+      _isFabVisible = true;
     });
     _refreshFiles();
   }
@@ -134,6 +135,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
       _searchQuery = '';
       _searchController.clear();
+      _isFabVisible = true;
     });
     _refreshFiles();
   }
@@ -1609,16 +1611,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(LucideIcons.folderOpen, color: subColor, size: 48),
-          const SizedBox(height: 12),
-          Text(
-            'This folder is empty',
-            style: TextStyle(color: subColor, fontSize: 13.5),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(LucideIcons.folderOpen, color: subColor, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              _currentFolder != null ? 'This folder is empty' : 'No files found',
+              style: TextStyle(color: titleColor, fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _currentFolder != null
+                  ? 'Upload files or create subfolders inside "${_currentFolder!.fileName}"'
+                  : 'Start by uploading your first file or creating a folder',
+              style: TextStyle(color: subColor, fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _handleUploadFile,
+                  icon: const Icon(LucideIcons.filePlus, size: 14),
+                  label: const Text('Upload Files', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _handleCreateFolder,
+                  icon: const Icon(LucideIcons.folderPlus, size: 14),
+                  label: const Text('New Folder', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF4F46E5),
+                    side: const BorderSide(color: Color(0xFF4F46E5)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
