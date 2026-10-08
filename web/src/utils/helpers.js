@@ -47,15 +47,13 @@ export function generateDirectDownloadUrl(hash, isFolder, fileSize, skipIncremen
   const proxyUrl = import.meta.env.VITE_PROXY_URL
   
   const incrementParam = skipIncrement ? '&skip_increment=true' : ''
-  const isCustomLink = typeof hash === 'string' && hash.startsWith('sec_')
-
-  // Folders and PIN-protected custom links route through Render Proxy
-  if ((isCustomLink || isFolder) && proxyUrl) {
+  // Folders (dynamic ZIP archives) route through Render Proxy
+  if (isFolder && proxyUrl) {
     const cleanProxy = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl
     return `${cleanProxy}/download-file?hash=${hash}${incrementParam}`
   }
 
-  // 1. Standard single files route through ultra high-speed Cloudflare Worker
+  // 1. All files (Standard + Protected Links) route through ultra high-speed Cloudflare Worker
   if (cfWorkerUrl) {
     const cleanWorker = cfWorkerUrl.endsWith('/') ? cfWorkerUrl.slice(0, -1) : cfWorkerUrl
     return `${cleanWorker}?hash=${hash}${incrementParam}`
