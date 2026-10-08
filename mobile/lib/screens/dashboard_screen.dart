@@ -1133,27 +1133,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ? AppConfig.cfWorkerUrl.substring(0, AppConfig.cfWorkerUrl.length - 1)
             : AppConfig.cfWorkerUrl;
         if (hash != null && hash.isNotEmpty) {
-          downloadUrl = '$cleanWorker?hash=$hash';
+          downloadUrl = '$cleanWorker?hash=$hash&skip_increment=true';
         } else {
-          downloadUrl = '$cleanWorker?file_id=${file.id}';
+          downloadUrl = '$cleanWorker?file_id=${file.id}&skip_increment=true';
         }
       } else if (AppConfig.proxyUrl.isNotEmpty) {
         final cleanProxy = AppConfig.proxyUrl.endsWith('/')
             ? AppConfig.proxyUrl.substring(0, AppConfig.proxyUrl.length - 1)
             : AppConfig.proxyUrl;
         if (hash != null && hash.isNotEmpty) {
-          downloadUrl = '$cleanProxy/download-file?hash=$hash';
+          downloadUrl = '$cleanProxy/download-file?hash=$hash&skip_increment=true';
         } else {
-          downloadUrl = '$cleanProxy/download-file?file_id=${file.id}';
+          downloadUrl = '$cleanProxy/download-file?file_id=${file.id}&skip_increment=true';
         }
       } else {
         final cleanSb = AppConfig.supabaseUrl.endsWith('/')
             ? AppConfig.supabaseUrl.substring(0, AppConfig.supabaseUrl.length - 1)
             : AppConfig.supabaseUrl;
         if (hash != null && hash.isNotEmpty) {
-          downloadUrl = '$cleanSb/functions/v1/download-file?hash=$hash';
+          downloadUrl = '$cleanSb/functions/v1/download-file?hash=$hash&skip_increment=true';
         } else {
-          downloadUrl = '$cleanSb/functions/v1/download-file?file_id=${file.id}';
+          downloadUrl = '$cleanSb/functions/v1/download-file?file_id=${file.id}&skip_increment=true';
         }
       }
 

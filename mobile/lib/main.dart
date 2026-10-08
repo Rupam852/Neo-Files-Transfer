@@ -10,6 +10,8 @@ import 'services/file_service.dart';
 import 'services/update_service.dart';
 import 'services/notification_service.dart';
 import 'services/theme_service.dart';
+import 'services/security_service.dart';
+import 'widgets/app_lock_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/pending_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -37,6 +39,9 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider<ThemeService>(
           create: (_) => ThemeService(),
+        ),
+        ChangeNotifierProvider<SecurityService>(
+          create: (_) => SecurityService(),
         ),
         ChangeNotifierProvider<AuthService>(
           create: (_) => AuthService(),
@@ -160,6 +165,12 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthService>(context);
+    final security = Provider.of<SecurityService>(context);
+
+    // If app lock is enabled and currently locked, show AppLockScreen
+    if (security.isLocked && auth.currentUser != null) {
+      return const AppLockScreen();
+    }
 
     if (auth.isLoading) {
       return const Scaffold(

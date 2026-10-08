@@ -22,7 +22,7 @@ export default function MediaPreviewModal({ file, onClose }) {
   // Use owner preview url (supports private files and files without public hash)
   const mediaStreamUrl = generateMediaPreviewUrl(file)
   const downloadUrl = file?.unique_share_hash 
-    ? generateDirectDownloadUrl(file.unique_share_hash, file.is_folder, file.file_size)
+    ? generateDirectDownloadUrl(file.unique_share_hash, file.is_folder, file.file_size, true)
     : mediaStreamUrl
 
   useEffect(() => {

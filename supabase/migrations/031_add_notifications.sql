@@ -91,20 +91,32 @@ BEGIN
     FROM shared_files
     WHERE id = NEW.file_id;
 
-    INSERT INTO notifications (user_id, title, message, type, metadata)
-    VALUES (
-      NEW.owner_id,
-      'File Downloaded 📥',
-      'Someone downloaded your file: ' || COALESCE(v_file_name, 'Shared file'),
-      'download',
-      jsonb_build_object(
-        'file_id', NEW.file_id,
-        'file_name', v_file_name,
-        'device_type', NEW.device_type,
-        'browser', NEW.browser,
-        'os', NEW.os
-      )
-    );
+    DECLARE
+      v_details TEXT := '';
+    BEGIN
+      IF NEW.browser IS NOT NULL AND NEW.os IS NOT NULL THEN
+        v_details := ' via ' || NEW.browser || ' on ' || NEW.os;
+      ELSIF NEW.browser IS NOT NULL THEN
+        v_details := ' via ' || NEW.browser;
+      ELSIF NEW.device_type IS NOT NULL THEN
+        v_details := ' via ' || NEW.device_type;
+      END IF;
+
+      INSERT INTO notifications (user_id, title, message, type, metadata)
+      VALUES (
+        NEW.owner_id,
+        'File Downloaded 📥',
+        'Someone downloaded "' || COALESCE(v_file_name, 'Shared file') || '"' || v_details,
+        'download',
+        jsonb_build_object(
+          'file_id', NEW.file_id,
+          'file_name', v_file_name,
+          'device_type', NEW.device_type,
+          'browser', NEW.browser,
+          'os', NEW.os
+        )
+      );
+    END;
   END IF;
 
   RETURN NEW;

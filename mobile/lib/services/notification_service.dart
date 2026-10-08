@@ -1,10 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/in_app_notification.dart';
 import 'auth_service.dart';
 
 class NotificationService extends ChangeNotifier {
+  static const String _keyDownloadAlerts = 'neo_notif_download_alerts';
+  static const String _keyUploadAlerts = 'neo_notif_upload_alerts';
+  static const String _keySecurityAlerts = 'neo_notif_security_alerts';
+  static const String _keyUpdateAlerts = 'neo_notif_update_alerts';
+
   final SupabaseClient _client = Supabase.instance.client;
   AuthService? _authService;
 
@@ -13,10 +19,16 @@ class NotificationService extends ChangeNotifier {
   RealtimeChannel? _notificationChannel;
   Timer? _pollingTimer;
 
+  bool _downloadAlertsEnabled = true;
+  bool _uploadAlertsEnabled = true;
+  bool _securityAlertsEnabled = true;
+  bool _updateAlertsEnabled = true;
+
   // Callback to display real-time in-app notification toasts/snackbars
   void Function(InAppNotification notification)? onNewNotification;
 
   NotificationService([AuthService? authService]) {
+    _loadNotificationPreferences();
     if (authService != null) {
       update(authService);
     }
@@ -25,6 +37,52 @@ class NotificationService extends ChangeNotifier {
   List<InAppNotification> get notifications => _notifications;
   bool get isLoading => _isLoading;
   int get unreadCount => _notifications.where((n) => !n.isRead).length;
+
+  bool get downloadAlertsEnabled => _downloadAlertsEnabled;
+  bool get uploadAlertsEnabled => _uploadAlertsEnabled;
+  bool get securityAlertsEnabled => _securityAlertsEnabled;
+  bool get updateAlertsEnabled => _updateAlertsEnabled;
+
+  Future<void> _loadNotificationPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _downloadAlertsEnabled = prefs.getBool(_keyDownloadAlerts) ?? true;
+      _uploadAlertsEnabled = prefs.getBool(_keyUploadAlerts) ?? true;
+      _securityAlertsEnabled = prefs.getBool(_keySecurityAlerts) ?? true;
+      _updateAlertsEnabled = prefs.getBool(_keyUpdateAlerts) ?? true;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[NotificationService] Error loading preferences: $e');
+    }
+  }
+
+  Future<void> setDownloadAlerts(bool enabled) async {
+    _downloadAlertsEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyDownloadAlerts, enabled);
+    notifyListeners();
+  }
+
+  Future<void> setUploadAlerts(bool enabled) async {
+    _uploadAlertsEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyUploadAlerts, enabled);
+    notifyListeners();
+  }
+
+  Future<void> setSecurityAlerts(bool enabled) async {
+    _securityAlertsEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keySecurityAlerts, enabled);
+    notifyListeners();
+  }
+
+  Future<void> setUpdateAlerts(bool enabled) async {
+    _updateAlertsEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyUpdateAlerts, enabled);
+    notifyListeners();
+  }
 
   void update(AuthService authService) {
     final previousUserId = _authService?.currentUser?.id;
@@ -120,7 +178,23 @@ class NotificationService extends ChangeNotifier {
         if (!_notifications.any((n) => n.id == notif.id)) {
           _notifications.insert(0, notif);
           notifyListeners();
-          onNewNotification?.call(notif);
+
+          // Check if user has enabled alerts for this notification category
+          final type = notif.type.toLowerCase();
+          final isDownload = type == 'download' || notif.title.toLowerCase().contains('download');
+          final isUpload = type == 'upload' || notif.title.toLowerCase().contains('upload');
+          final isSecurity = type == 'security' || type == 'approval' || notif.title.toLowerCase().contains('security') || notif.title.toLowerCase().contains('access');
+          final isUpdate = type == 'update' || notif.title.toLowerCase().contains('update') || notif.title.toLowerCase().contains('version');
+
+          bool shouldAlert = true;
+          if (isDownload && !_downloadAlertsEnabled) shouldAlert = false;
+          if (isUpload && !_uploadAlertsEnabled) shouldAlert = false;
+          if (isSecurity && !_securityAlertsEnabled) shouldAlert = false;
+          if (isUpdate && !_updateAlertsEnabled) shouldAlert = false;
+
+          if (shouldAlert) {
+            onNewNotification?.call(notif);
+          }
         }
       }
     } else if (payload.eventType == PostgresChangeEvent.update) {

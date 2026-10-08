@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import {
   Bell, CheckCheck, Trash2, Download, CheckCircle2,
-  ShieldAlert, Info, Sparkles, X, ExternalLink
+  ShieldAlert, Info, Sparkles, X, ExternalLink, Settings, Sliders
 } from 'lucide-react'
 
 export default function NotificationBell() {
@@ -13,7 +13,31 @@ export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [showPreferences, setShowPreferences] = useState(false)
   const dropdownRef = useRef(null)
+
+  const [preferences, setPreferences] = useState(() => {
+    try {
+      return {
+        downloadAlerts: localStorage.getItem('neo_notif_download_alerts') !== 'false',
+        uploadAlerts: localStorage.getItem('neo_notif_upload_alerts') !== 'false',
+        securityAlerts: localStorage.getItem('neo_notif_security_alerts') !== 'false',
+        updateAlerts: localStorage.getItem('neo_notif_update_alerts') !== 'false',
+      }
+    } catch (_) {
+      return { downloadAlerts: true, uploadAlerts: true, securityAlerts: true, updateAlerts: true }
+    }
+  })
+
+  const togglePref = (key) => {
+    setPreferences(prev => {
+      const newVal = !prev[key]
+      try {
+        localStorage.setItem(`neo_notif_${key.replace('Alerts', '_alerts')}`, newVal.toString())
+      } catch (_) {}
+      return { ...prev, [key]: newVal }
+    })
+  }
 
   useEffect(() => {
     if (!user?.id) return
@@ -40,40 +64,56 @@ export default function NotificationBell() {
               })
               setUnreadCount(prev => prev + 1)
 
-              // Instant high-visibility in-app toast notification
-              toast(
-                (t) => (
-                  <div className="flex items-start gap-3 py-0.5">
-                    <div className="w-8 h-8 rounded-full bg-primary-500/20 text-primary-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Bell size={16} />
+              // Check category preferences before showing popup toast
+              const type = (newNotif.type || '').toLowerCase()
+              const isDownload = type === 'download' || (newNotif.title || '').toLowerCase().includes('download')
+              const isUpload = type === 'upload' || (newNotif.title || '').toLowerCase().includes('upload')
+              const isSecurity = type === 'security' || type === 'approval' || (newNotif.title || '').toLowerCase().includes('security')
+              const isUpdate = type === 'update' || (newNotif.title || '').toLowerCase().includes('update')
+
+              let shouldToast = true
+              if (isDownload && !preferences.downloadAlerts) shouldToast = false
+              if (isUpload && !preferences.uploadAlerts) shouldToast = false
+              if (isSecurity && !preferences.securityAlerts) shouldToast = false
+              if (isUpdate && !preferences.updateAlerts) shouldToast = false
+
+              if (shouldToast) {
+                // Instant high-visibility in-app toast notification
+                toast(
+                  (t) => (
+                    <div className="flex items-start gap-3 py-0.5">
+                      <div className="w-8 h-8 rounded-full bg-primary-500/20 text-primary-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Bell size={16} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gray-100">{newNotif.title || 'Notification'}</p>
+                        <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">{newNotif.message}</p>
+                      </div>
+                      <button
+                        onClick={() => toast.dismiss(t.id)}
+                        className="text-gray-500 hover:text-gray-300 p-1"
+                      >
+                        <X size={14} />
+                      </button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-gray-100">{newNotif.title || 'Notification'}</p>
-                      <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">{newNotif.message}</p>
-                    </div>
-                    <button
-                      onClick={() => toast.dismiss(t.id)}
-                      className="text-gray-500 hover:text-gray-300 p-1"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ),
-                {
-                  duration: 5000,
-                  position: 'top-right',
-                  style: {
-                    background: '#0f172a',
-                    color: '#fff',
-                    border: '1px solid rgba(99, 102, 241, 0.3)',
-                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
-                    borderRadius: '1rem',
-                    padding: '12px 16px',
+                  ),
+                  {
+                    duration: 5000,
+                    position: 'top-right',
+                    style: {
+                      background: '#0f172a',
+                      color: '#fff',
+                      border: '1px solid rgba(99, 102, 241, 0.3)',
+                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+                      borderRadius: '1rem',
+                      padding: '12px 16px',
+                    }
                   }
-                }
-              )
+                )
+              }
             }
-          } else if (payload.eventType === 'UPDATE') {
+          }
+ else if (payload.eventType === 'UPDATE') {
             const updated = payload.new
             if (updated && updated.user_id === user.id) {
               setNotifications(prev => prev.map(n => n.id === updated.id ? updated : n))
@@ -256,6 +296,13 @@ export default function NotificationBell() {
             </div>
 
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowPreferences(true)}
+                className="p-1.5 text-gray-400 hover:text-gray-200 hover:bg-dark-400 rounded-lg text-xs font-medium transition-colors"
+                title="Notification Preferences"
+              >
+                <Sliders size={14} />
+              </button>
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
@@ -347,6 +394,97 @@ export default function NotificationBell() {
                 </div>
               ))
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Notification Preferences Modal */}
+      {showPreferences && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-dark-600 border border-dark-400/90 rounded-2xl max-w-md w-full p-6 space-y-6 shadow-2xl animate-scale-in">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-primary-500/15 border border-primary-500/30 flex items-center justify-center text-primary-400">
+                  <Sliders size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-100 font-['Space_Grotesk']">Notification Settings</h3>
+                  <p className="text-xs text-gray-400">Choose which alerts appear as in-app notifications</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPreferences(false)}
+                className="text-gray-400 hover:text-gray-200 p-1.5 rounded-lg hover:bg-dark-500"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 divide-y divide-dark-500/60">
+              <div className="flex items-center justify-between pt-2">
+                <div className="space-y-0.5 pr-4">
+                  <p className="text-xs font-semibold text-gray-200">Download Alerts</p>
+                  <p className="text-[11px] text-gray-400">Notify when external users download your shared files</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={preferences.downloadAlerts}
+                  onChange={() => togglePref('downloadAlerts')}
+                  className="w-4 h-4 accent-primary-600 rounded cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-3">
+                <div className="space-y-0.5 pr-4">
+                  <p className="text-xs font-semibold text-gray-200">Upload Completion</p>
+                  <p className="text-[11px] text-gray-400">Notify when files finish uploading to Google Drive</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={preferences.uploadAlerts}
+                  onChange={() => togglePref('uploadAlerts')}
+                  className="w-4 h-4 accent-primary-600 rounded cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-3">
+                <div className="space-y-0.5 pr-4">
+                  <p className="text-xs font-semibold text-gray-200">Security & Account Alerts</p>
+                  <p className="text-[11px] text-gray-400">Notify on login, approval, and administrative events</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={preferences.securityAlerts}
+                  onChange={() => togglePref('securityAlerts')}
+                  className="w-4 h-4 accent-primary-600 rounded cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-3">
+                <div className="space-y-0.5 pr-4">
+                  <p className="text-xs font-semibold text-gray-200">System & Update Alerts</p>
+                  <p className="text-[11px] text-gray-400">Notify when new features and versions are published</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={preferences.updateAlerts}
+                  onChange={() => togglePref('updateAlerts')}
+                  className="w-4 h-4 accent-primary-600 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => {
+                  setShowPreferences(false)
+                  toast.success('Notification preferences saved!')
+                }}
+                className="w-full bg-primary-600 hover:bg-primary-500 text-white font-bold py-2.5 rounded-xl text-xs transition-colors"
+              >
+                Save & Close
+              </button>
+            </div>
           </div>
         </div>
       )}

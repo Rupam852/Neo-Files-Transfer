@@ -8,6 +8,7 @@
 
 #include <app_links/app_links_plugin_c_api.h>
 #include <desktop_webview_window/desktop_webview_window_plugin.h>
+#include <local_auth_windows/local_auth_plugin.h>
 #include <passkeys_windows/passkeys_windows_plugin.h>
 #include <permission_handler_windows/permission_handler_windows_plugin.h>
 #include <share_plus/share_plus_windows_plugin_c_api.h>
@@ -19,6 +20,8 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("AppLinksPluginCApi"));
   DesktopWebviewWindowPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("DesktopWebviewWindowPlugin"));
+  LocalAuthPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("LocalAuthPlugin"));
   PasskeysWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("PasskeysWindowsPlugin"));
   PermissionHandlerWindowsPluginRegisterWithRegistrar(

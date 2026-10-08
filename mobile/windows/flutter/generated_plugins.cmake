@@ -5,6 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   desktop_webview_window
+  local_auth_windows
   passkeys_windows
   permission_handler_windows
   share_plus

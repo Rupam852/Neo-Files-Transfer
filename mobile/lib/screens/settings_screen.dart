@@ -6,6 +6,8 @@ import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../services/update_service.dart';
 import '../services/theme_service.dart';
+import '../services/security_service.dart';
+import '../services/notification_service.dart';
 import 'update_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -539,6 +541,206 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 28),
 
+              // App Security / Biometric Lock section
+              Text(
+                'APP SECURITY & PRIVACY',
+                style: TextStyle(
+                  color: sectionHeaderColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Consumer<SecurityService>(
+                builder: (context, securityService, _) {
+                  return Container(
+                    padding: const EdgeInsets.all(18.0),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(16.0),
+                      border: Border.all(color: cardBorder),
+                      boxShadow: cardShadow,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF6366F1).withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(LucideIcons.shieldCheck, color: Color(0xFF6366F1), size: 18),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Biometric & PIN Lock',
+                                    style: TextStyle(
+                                      color: titleTextColor,
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Require Fingerprint, Face ID, or PIN to open app',
+                                    style: TextStyle(
+                                      color: subtitleTextColor,
+                                      fontSize: 11.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: securityService.isAppLockEnabled,
+                              activeColor: const Color(0xFF6366F1),
+                              onChanged: (val) async {
+                                final ok = await securityService.setAppLockEnabled(val);
+                                if (!ok && mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Authentication cancelled. Lock unchanged.'),
+                                      backgroundColor: Colors.amber,
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+
+                        if (securityService.isAppLockEnabled) ...[
+                          const SizedBox(height: 16),
+                          const Divider(height: 1),
+                          const SizedBox(height: 14),
+                          Text(
+                            'LOCK TIMEOUT',
+                            style: TextStyle(
+                              color: sectionHeaderColor,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _buildTimeoutChip(
+                                label: 'Immediately',
+                                seconds: 0,
+                                isSelected: securityService.lockTimeoutSeconds == 0,
+                                onSelected: () => securityService.setLockTimeout(0),
+                                isLight: isLight,
+                              ),
+                              _buildTimeoutChip(
+                                label: 'After 1 Min',
+                                seconds: 60,
+                                isSelected: securityService.lockTimeoutSeconds == 60,
+                                onSelected: () => securityService.setLockTimeout(60),
+                                isLight: isLight,
+                              ),
+                              _buildTimeoutChip(
+                                label: 'After 5 Mins',
+                                seconds: 300,
+                                isSelected: securityService.lockTimeoutSeconds == 300,
+                                onSelected: () => securityService.setLockTimeout(300),
+                                isLight: isLight,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 28),
+
+              // Notification Preferences section
+              Text(
+                'NOTIFICATION PREFERENCES',
+                style: TextStyle(
+                  color: sectionHeaderColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Consumer<NotificationService>(
+                builder: (context, notifService, _) {
+                  return Container(
+                    padding: const EdgeInsets.all(18.0),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(16.0),
+                      border: Border.all(color: cardBorder),
+                      boxShadow: cardShadow,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildNotifToggleRow(
+                          icon: LucideIcons.download,
+                          iconColor: const Color(0xFF10B981),
+                          title: 'Download Alerts',
+                          subtitle: 'Notify when someone downloads your shared files via link',
+                          value: notifService.downloadAlertsEnabled,
+                          onChanged: (val) => notifService.setDownloadAlerts(val),
+                          titleTextColor: titleTextColor,
+                          subtitleTextColor: subtitleTextColor,
+                        ),
+                        const Divider(height: 20),
+                        _buildNotifToggleRow(
+                          icon: LucideIcons.uploadCloud,
+                          iconColor: const Color(0xFF6366F1),
+                          title: 'Upload Completion',
+                          subtitle: 'Notify when files finish uploading to Google Drive',
+                          value: notifService.uploadAlertsEnabled,
+                          onChanged: (val) => notifService.setUploadAlerts(val),
+                          titleTextColor: titleTextColor,
+                          subtitleTextColor: subtitleTextColor,
+                        ),
+                        const Divider(height: 20),
+                        _buildNotifToggleRow(
+                          icon: LucideIcons.shieldAlert,
+                          iconColor: const Color(0xFFF59E0B),
+                          title: 'Security & System Alerts',
+                          subtitle: 'Notify on new logins, session pause, or admin changes',
+                          value: notifService.securityAlertsEnabled,
+                          onChanged: (val) => notifService.setSecurityAlerts(val),
+                          titleTextColor: titleTextColor,
+                          subtitleTextColor: subtitleTextColor,
+                        ),
+                        const Divider(height: 20),
+                        _buildNotifToggleRow(
+                          icon: LucideIcons.sparkles,
+                          iconColor: const Color(0xFFEC4899),
+                          title: 'App Updates & Releases',
+                          subtitle: 'Notify when a new version of Neo Files is ready',
+                          value: notifService.updateAlertsEnabled,
+                          onChanged: (val) => notifService.setUpdateAlerts(val),
+                          titleTextColor: titleTextColor,
+                          subtitleTextColor: subtitleTextColor,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 28),
+
               // Token / Connection section
               Text(
                 'ACCOUNT & SESSION',
@@ -953,6 +1155,93 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTimeoutChip({
+    required String label,
+    required int seconds,
+    required bool isSelected,
+    required VoidCallback onSelected,
+    required bool isLight,
+  }) {
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected
+              ? Colors.white
+              : (isLight ? const Color(0xFF334155) : Colors.grey.shade400),
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (_) => onSelected(),
+      selectedColor: const Color(0xFF6366F1),
+      backgroundColor: isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
+      side: BorderSide(
+        color: isSelected
+            ? const Color(0xFF6366F1)
+            : (isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.06)),
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+    );
+  }
+
+  Widget _buildNotifToggleRow({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required Color titleTextColor,
+    required Color subtitleTextColor,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Icon(icon, color: iconColor, size: 16),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: titleTextColor,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: subtitleTextColor,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Switch(
+          value: value,
+          activeColor: iconColor,
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 }
