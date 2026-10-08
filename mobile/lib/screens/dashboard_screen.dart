@@ -1066,8 +1066,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _handleDownload(SharedFile file) async {
     if (file.isFolder) return;
-
-  Future<void> _handleDownload(SharedFile file) async {
     try {
       final transferService = Provider.of<TransferService>(context, listen: false);
       await transferService.startDownload(file);

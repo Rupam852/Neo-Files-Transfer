@@ -309,7 +309,7 @@ class TransferService with ChangeNotifier {
       int received = existingBytes;
       int total = task.totalBytes;
 
-      final contentLengthHeader = response.headers.value(Headers.contentLengthHeader);
+      final contentLengthHeader = response.headers.value('content-length');
       if (contentLengthHeader != null) {
         final incomingLength = int.tryParse(contentLengthHeader) ?? 0;
         if (total <= 0 || !isPartial) {
