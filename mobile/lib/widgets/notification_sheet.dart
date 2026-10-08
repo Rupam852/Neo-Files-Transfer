@@ -54,6 +54,10 @@ class NotificationSheet extends StatelessWidget {
     final unreadCount = notifService.unreadCount;
     final isLight = Theme.of(context).brightness == Brightness.light;
 
+    final titleColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+    final subColor = isLight ? const Color(0xFF64748B) : Colors.grey.shade400;
+    final dividerColor = isLight ? const Color(0xFFE2E8F0) : Colors.white10;
+
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.75,
@@ -80,7 +84,7 @@ class NotificationSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -94,16 +98,16 @@ class NotificationSheet extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4F46E5).withOpacity(0.2),
+                    color: const Color(0xFF4F46E5).withOpacity(isLight ? 0.12 : 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(LucideIcons.bell, size: 18, color: Color(0xFF818CF8)),
+                  child: const Icon(LucideIcons.bell, size: 18, color: Color(0xFF4F46E5)),
                 ),
                 const SizedBox(width: 12),
-                const Text(
+                Text(
                   'Notifications',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: titleColor,
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
                   ),
@@ -130,10 +134,10 @@ class NotificationSheet extends StatelessWidget {
                 if (unreadCount > 0)
                   TextButton.icon(
                     onPressed: () => notifService.markAllAsRead(),
-                    icon: const Icon(LucideIcons.checkCheck, size: 14, color: Color(0xFF818CF8)),
+                    icon: const Icon(LucideIcons.checkCheck, size: 14, color: Color(0xFF4F46E5)),
                     label: const Text(
                       'Mark all read',
-                      style: TextStyle(color: Color(0xFF818CF8), fontSize: 12),
+                      style: TextStyle(color: Color(0xFF4F46E5), fontSize: 12),
                     ),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -144,7 +148,7 @@ class NotificationSheet extends StatelessWidget {
                 if (notifications.isNotEmpty)
                   IconButton(
                     tooltip: 'Clear all',
-                    icon: const Icon(LucideIcons.trash2, size: 16, color: Colors.white38),
+                    icon: Icon(LucideIcons.trash2, size: 16, color: isLight ? const Color(0xFF94A3B8) : Colors.white38),
                     onPressed: () => notifService.clearAll(),
                     visualDensity: VisualDensity.compact,
                   ),
@@ -152,7 +156,7 @@ class NotificationSheet extends StatelessWidget {
             ),
           ),
 
-          const Divider(color: Colors.white10, height: 1),
+          Divider(color: dividerColor, height: 1),
 
           // Content
           Flexible(
@@ -173,20 +177,20 @@ class NotificationSheet extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.03),
+                                  color: isLight ? const Color(0xFFF1F5F9) : Colors.white.withOpacity(0.03),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   LucideIcons.bellOff,
                                   size: 36,
-                                  color: Colors.white30,
+                                  color: isLight ? const Color(0xFF94A3B8) : Colors.white30,
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              const Text(
+                              Text(
                                 "You're all caught up!",
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: titleColor,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -195,7 +199,7 @@ class NotificationSheet extends StatelessWidget {
                               Text(
                                 "No new notifications at this moment.",
                                 style: TextStyle(
-                                  color: Colors.grey.shade400,
+                                  color: subColor,
                                   fontSize: 12,
                                 ),
                               ),
@@ -207,7 +211,7 @@ class NotificationSheet extends StatelessWidget {
                         shrinkWrap: true,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         itemCount: notifications.length,
-                        separatorBuilder: (_, __) => const Divider(color: Colors.white10, height: 1),
+                        separatorBuilder: (_, __) => Divider(color: dividerColor, height: 1),
                         itemBuilder: (ctx, index) {
                           final notif = notifications[index];
                           final iconColor = _getColorForType(notif.type);
@@ -222,7 +226,9 @@ class NotificationSheet extends StatelessWidget {
                             child: Container(
                               color: notif.isRead
                                   ? Colors.transparent
-                                  : const Color(0xFF4F46E5).withOpacity(0.08),
+                                  : (isLight
+                                      ? const Color(0xFFEEF2FF)
+                                      : const Color(0xFF4F46E5).withOpacity(0.08)),
                               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,7 +256,7 @@ class NotificationSheet extends StatelessWidget {
                                               child: Text(
                                                 notif.title,
                                                 style: TextStyle(
-                                                  color: Colors.white,
+                                                  color: titleColor,
                                                   fontSize: 13.5,
                                                   fontWeight: notif.isRead
                                                       ? FontWeight.w500
@@ -261,7 +267,7 @@ class NotificationSheet extends StatelessWidget {
                                             Text(
                                               _formatTimeAgo(notif.createdAt),
                                               style: TextStyle(
-                                                color: Colors.grey.shade500,
+                                                color: isLight ? const Color(0xFF94A3B8) : Colors.grey.shade500,
                                                 fontSize: 11,
                                               ),
                                             ),
@@ -272,8 +278,8 @@ class NotificationSheet extends StatelessWidget {
                                           notif.message,
                                           style: TextStyle(
                                             color: notif.isRead
-                                                ? Colors.grey.shade400
-                                                : Colors.grey.shade200,
+                                                ? (isLight ? const Color(0xFF64748B) : Colors.grey.shade400)
+                                                : (isLight ? const Color(0xFF334155) : Colors.grey.shade200),
                                             fontSize: 12.5,
                                             height: 1.3,
                                           ),

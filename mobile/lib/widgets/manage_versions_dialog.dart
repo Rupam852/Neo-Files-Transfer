@@ -103,8 +103,12 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final titleColor = isLight ? const Color(0xFF0F172A) : Colors.white;
+    final subColor = isLight ? const Color(0xFF64748B) : Colors.grey.shade400;
+
     return Dialog(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -119,15 +123,15 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.indigo.shade500.withOpacity(0.15),
+                    color: const Color(0xFF4F46E5).withOpacity(isLight ? 0.12 : 0.15),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: Colors.indigo.shade500.withOpacity(0.3),
+                      color: const Color(0xFF4F46E5).withOpacity(isLight ? 0.25 : 0.3),
                     ),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     LucideIcons.history,
-                    color: Colors.indigo.shade300,
+                    color: Color(0xFF4F46E5),
                     size: 20,
                   ),
                 ),
@@ -136,10 +140,10 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Manage Versions',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: titleColor,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
@@ -150,7 +154,7 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.grey.shade400,
+                          color: subColor,
                           fontSize: 11.5,
                         ),
                       ),
@@ -159,7 +163,7 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: Icon(LucideIcons.x, color: Colors.grey.shade400, size: 20),
+                  icon: Icon(LucideIcons.x, color: isLight ? const Color(0xFF94A3B8) : Colors.grey.shade400, size: 20),
                 ),
               ],
             ),
@@ -170,9 +174,9 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.indigo.shade500.withOpacity(0.1),
+                  color: isLight ? const Color(0xFFEEF2FF) : Colors.indigo.shade500.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.indigo.shade500.withOpacity(0.2)),
+                  border: Border.all(color: const Color(0xFF4F46E5).withOpacity(isLight ? 0.25 : 0.2)),
                 ),
                 child: Column(
                   children: [
@@ -182,7 +186,7 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                         Text(
                           'Uploading New Version...',
                           style: TextStyle(
-                            color: Colors.indigo.shade200,
+                            color: isLight ? const Color(0xFF4338CA) : Colors.indigo.shade200,
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
@@ -190,7 +194,7 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                         Text(
                           '${(_uploadProgress * 100).toStringAsFixed(0)}%',
                           style: TextStyle(
-                            color: Colors.indigo.shade300,
+                            color: isLight ? const Color(0xFF4F46E5) : Colors.indigo.shade300,
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
@@ -200,8 +204,8 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                     const SizedBox(height: 8),
                     LinearProgressIndicator(
                       value: _uploadProgress,
-                      backgroundColor: Colors.white.withOpacity(0.1),
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.indigo.shade400),
+                      backgroundColor: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4F46E5)),
                     ),
                   ],
                 ),
@@ -216,7 +220,7 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                   label: const Text('Upload New Version',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo.shade600,
+                    backgroundColor: const Color(0xFF4F46E5),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -231,7 +235,7 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
             Text(
               'VERSION HISTORY',
               style: TextStyle(
-                color: Colors.grey.shade400,
+                color: isLight ? const Color(0xFF475569) : Colors.grey.shade400,
                 fontSize: 10.5,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
@@ -246,7 +250,7 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                   ? const Center(
                       child: Padding(
                         padding: EdgeInsets.all(20),
-                        child: CircularProgressIndicator(),
+                        child: CircularProgressIndicator(color: Color(0xFF4F46E5)),
                       ),
                     )
                   : _versions.isEmpty
@@ -255,7 +259,7 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                             padding: const EdgeInsets.all(20),
                             child: Text(
                               'No past versions available',
-                              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                              style: TextStyle(color: isLight ? const Color(0xFF94A3B8) : Colors.grey.shade500, fontSize: 12),
                             ),
                           ),
                         )
@@ -276,12 +280,12 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1E293B),
+                                color: isLight ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: isLatest
-                                      ? Colors.indigo.shade500.withOpacity(0.3)
-                                      : Colors.white.withOpacity(0.04),
+                                      ? const Color(0xFF4F46E5).withOpacity(isLight ? 0.35 : 0.3)
+                                      : (isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.04)),
                                 ),
                               ),
                               child: Row(
@@ -291,8 +295,8 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                                     height: 32,
                                     decoration: BoxDecoration(
                                       color: isLatest
-                                          ? Colors.indigo.shade500.withOpacity(0.2)
-                                          : Colors.grey.shade800,
+                                          ? const Color(0xFF4F46E5).withOpacity(isLight ? 0.12 : 0.2)
+                                          : (isLight ? const Color(0xFFE2E8F0) : Colors.grey.shade800),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Center(
@@ -300,8 +304,8 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                                         'v$verNum',
                                         style: TextStyle(
                                           color: isLatest
-                                              ? Colors.indigo.shade300
-                                              : Colors.grey.shade400,
+                                              ? const Color(0xFF4F46E5)
+                                              : (isLight ? const Color(0xFF64748B) : Colors.grey.shade400),
                                           fontWeight: FontWeight.bold,
                                           fontSize: 11,
                                         ),
@@ -317,8 +321,8 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                                           children: [
                                             Text(
                                               'Version $verNum',
-                                              style: const TextStyle(
-                                                color: Colors.white,
+                                              style: TextStyle(
+                                                color: titleColor,
                                                 fontWeight: FontWeight.w600,
                                                 fontSize: 12.5,
                                               ),
@@ -329,13 +333,13 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                                                 padding: const EdgeInsets.symmetric(
                                                     horizontal: 5, vertical: 1),
                                                 decoration: BoxDecoration(
-                                                  color: const Color(0xFF10B981).withOpacity(0.2),
+                                                  color: const Color(0xFF10B981).withOpacity(isLight ? 0.15 : 0.2),
                                                   borderRadius: BorderRadius.circular(4),
                                                 ),
-                                                child: const Text(
+                                                child: Text(
                                                   'LATEST',
                                                   style: TextStyle(
-                                                    color: Color(0xFF6EE7B7),
+                                                    color: isLight ? const Color(0xFF059669) : const Color(0xFF6EE7B7),
                                                     fontSize: 8.5,
                                                     fontWeight: FontWeight.bold,
                                                   ),
@@ -349,7 +353,7 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
                                           Text(
                                             dateStr,
                                             style: TextStyle(
-                                              color: Colors.grey.shade400,
+                                              color: subColor,
                                               fontSize: 10.5,
                                             ),
                                           ),
@@ -368,7 +372,7 @@ class _ManageVersionsDialogState extends State<ManageVersionsDialog> {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: Text('Close', style: TextStyle(color: Colors.grey.shade400)),
+                child: Text('Close', style: TextStyle(color: subColor)),
               ),
             ),
           ],
