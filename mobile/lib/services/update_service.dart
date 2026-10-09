@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../config.dart';
 import '../screens/update_screen.dart';
+import '../widgets/transfer_manager_sheet.dart';
 
 class UpdateService extends ChangeNotifier {
   static final UpdateService _instance = UpdateService._internal();
@@ -86,7 +87,16 @@ class UpdateService extends ChangeNotifier {
         settings: initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           debugPrint('[UpdateService] Notification clicked with payload: ${response.payload}');
-          _navigateToUpdateScreen();
+          if (response.payload == 'update_screen' || response.payload == 'app_update') {
+            _navigateToUpdateScreen();
+          } else if (response.payload == 'transfer_manager') {
+            final context = navigatorKey.currentContext;
+            if (context != null) {
+              try {
+                TransferManagerSheet.show(context);
+              } catch (_) {}
+            }
+          }
         },
       );
 

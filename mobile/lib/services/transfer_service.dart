@@ -153,6 +153,7 @@ class TransferService with ChangeNotifier {
           title: title,
           body: body,
           notificationDetails: NotificationDetails(android: androidDetails),
+          payload: 'transfer_manager',
         );
       } else if (task.status == TransferStatus.completed) {
         final isDl = task.type == TransferType.download;
@@ -174,6 +175,7 @@ class TransferService with ChangeNotifier {
           title: title,
           body: body,
           notificationDetails: NotificationDetails(android: androidDetails),
+          payload: 'transfer_manager',
         );
       } else if (task.status == TransferStatus.paused) {
         final androidDetails = AndroidNotificationDetails(
@@ -192,6 +194,7 @@ class TransferService with ChangeNotifier {
           title: '⏸️ Transfer Paused: ${task.fileName}',
           body: 'Paused at ${(task.progress * 100).toInt()}% • Tap in app to resume',
           notificationDetails: NotificationDetails(android: androidDetails),
+          payload: 'transfer_manager',
         );
       } else if (task.status == TransferStatus.cancelled || task.status == TransferStatus.failed) {
         await _notificationsPlugin.cancel(id: notifId);
