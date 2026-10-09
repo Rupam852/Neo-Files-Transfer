@@ -13,6 +13,7 @@ import 'services/theme_service.dart';
 import 'services/security_service.dart';
 import 'services/share_receiver_service.dart';
 import 'services/transfer_service.dart';
+import 'services/fcm_service.dart';
 import 'widgets/app_lock_screen.dart';
 import 'widgets/share_upload_dialog.dart';
 import 'screens/login_screen.dart';
@@ -33,6 +34,13 @@ void main() async {
       autoRefreshToken: true,
     ),
   );
+
+  // Initialize Firebase Cloud Messaging (FCM)
+  try {
+    await FcmService().init();
+  } catch (e) {
+    debugPrint('[main] FCM initialization error: $e');
+  }
 
   runApp(const MyApp());
 }

@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import '../models/user_profile.dart';
+import 'fcm_service.dart';
 
 class AuthService extends ChangeNotifier {
   final SupabaseClient _client = Supabase.instance.client;
@@ -270,9 +271,10 @@ class AuthService extends ChangeNotifier {
             profileData = UserProfile.fromJson(updated);
           }
         }
-      }
-
       _profile = profileData;
+
+      // Sync FCM device token with authenticated user in Supabase
+      FcmService().syncUserToken(authUser.id);
 
       // Check if user is Admin (check by user_id and fallback to email)
       Map<String, dynamic>? adminResponse;
@@ -421,7 +423,13 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> signOut({bool clearError = true}) async {
+    final oldUserId = _user?.id;
     _clearRealtimeListeners();
+    try {
+      await FcmService().unbindUserToken(oldUserId);
+    } catch (e) {
+      debugPrint('[AuthService] Error unbinding FCM token on signOut: $e');
+    }
     await _client.auth.signOut();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('google_provider_token');
