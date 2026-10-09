@@ -316,6 +316,25 @@ export default {
                   os: os,
                 }),
               })
+
+              // D. Dispatch instant Owner Push Notification via FCM
+              fetch(`${sbUrl}/functions/v1/broadcast-notification`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${sbKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  title: "📥 File Downloaded",
+                  body: `Someone just downloaded "${file.file_name}" (${deviceType} • ${os}).`,
+                  targetType: "user",
+                  target: file.user_id,
+                  dataPayload: {
+                    type: "download_alert",
+                    file_id: file.id,
+                  },
+                }),
+              }).catch(() => {})
             } catch (bgErr) {
               console.error("Cloudflare background log error:", bgErr)
             }
