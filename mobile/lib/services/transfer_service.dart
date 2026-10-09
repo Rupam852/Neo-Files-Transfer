@@ -111,6 +111,43 @@ class TransferService with ChangeNotifier {
       _tasks.where((t) => t.status == TransferStatus.running || t.status == TransferStatus.queued).toList();
   bool get hasActiveTransfers => activeTasks.isNotEmpty;
 
+  static const _wakeLockChannel = MethodChannel('com.neofiles.transfer/wakelock');
+  bool _isWakeLockHeld = false;
+
+  Future<void> _acquireWakeLock() async {
+    if (!Platform.isAndroid || _isWakeLockHeld) return;
+    try {
+      await _wakeLockChannel.invokeMethod('acquire');
+      _isWakeLockHeld = true;
+    } catch (e) {
+      debugPrint('[TransferService] WakeLock acquire error: $e');
+    }
+  }
+
+  Future<void> _releaseWakeLock() async {
+    if (!Platform.isAndroid || !_isWakeLockHeld) return;
+    try {
+      await _wakeLockChannel.invokeMethod('release');
+      _isWakeLockHeld = false;
+    } catch (e) {
+      debugPrint('[TransferService] WakeLock release error: $e');
+    }
+  }
+
+  void _syncWakeLockState() {
+    if (activeTasks.isNotEmpty) {
+      _acquireWakeLock();
+    } else {
+      _releaseWakeLock();
+    }
+  }
+
+  @override
+  void notifyListeners() {
+    _syncWakeLockState();
+    super.notifyListeners();
+  }
+
   Future<void> _initNotifications() async {
     if (_isNotifInitialized) return;
     try {

@@ -14,9 +14,13 @@ import java.io.FileOutputStream
 class MainActivity : FlutterFragmentActivity() {
     private val MEDIA_CHANNEL = "com.neofiles.transfer/media_scanner"
     private val SHARE_CHANNEL = "com.neofiles.transfer/share_receiver"
+    private val WAKELOCK_CHANNEL = "com.neofiles.transfer/wakelock"
 
     private var shareMethodChannel: MethodChannel? = null
     private val pendingSharedFiles = mutableListOf<Map<String, Any>>()
+
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,8 +33,64 @@ class MainActivity : FlutterFragmentActivity() {
         handleIntent(intent)
     }
 
+    private fun acquireLocks() {
+        try {
+            if (wakeLock == null) {
+                val powerManager = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+                wakeLock = powerManager.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "NeoFiles:TransferWakeLock")
+            }
+            if (wakeLock?.isHeld == false) {
+                wakeLock?.acquire(24 * 60 * 60 * 1000L)
+            }
+
+            if (wifiLock == null) {
+                val wifiManager = applicationContext.getSystemService(android.content.Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+                @Suppress("DEPRECATION")
+                wifiLock = wifiManager.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "NeoFiles:TransferWifiLock")
+            }
+            if (wifiLock?.isHeld == false) {
+                wifiLock?.acquire()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun releaseLocks() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+            if (wifiLock?.isHeld == true) {
+                wifiLock?.release()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    override fun onDestroy() {
+        releaseLocks()
+        super.onDestroy()
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // WakeLock Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WAKELOCK_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "acquire" -> {
+                    acquireLocks()
+                    result.success(true)
+                }
+                "release" -> {
+                    releaseLocks()
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         // Media Scanner Channel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, MEDIA_CHANNEL).setMethodCallHandler { call, result ->
