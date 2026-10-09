@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../services/supabase'
 import toast from 'react-hot-toast'
 import { QRCodeCanvas } from 'qrcode.react'
@@ -206,8 +207,8 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
   const webShareUrl = file?.unique_share_hash ? generateShareUrl(file.unique_share_hash) : ''
   const directDownloadUrl = file?.unique_share_hash ? generateDirectDownloadUrl(file.unique_share_hash, file.is_folder, file.file_size) : ''
 
-  return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+  return createPortal(
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-4 animate-fade-in">
       <div className="bg-dark-700/95 border border-dark-400/80 rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] w-full max-w-xl h-[600px] max-h-[90vh] flex flex-col overflow-hidden backdrop-blur-xl transition-all">
         
         {/* Modern Header (Sticky / Shrink-0) */}
@@ -725,6 +726,7 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
