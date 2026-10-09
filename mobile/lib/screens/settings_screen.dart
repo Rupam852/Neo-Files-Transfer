@@ -10,6 +10,7 @@ import '../services/security_service.dart';
 import '../services/notification_service.dart';
 import 'update_screen.dart';
 import 'notification_settings_screen.dart';
+import 'about_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -1118,6 +1119,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ],
+                ),
+              ),
+              // About & Developer Section
+              Text(
+                'ABOUT & DEVELOPER',
+                style: TextStyle(
+                  color: sectionHeaderColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16.0),
+                  border: Border.all(color: cardBorder),
+                  boxShadow: cardShadow,
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16.0),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AboutScreen()),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(18.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withOpacity(isLight ? 0.15 : 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            LucideIcons.info,
+                            color: Color(0xFF10B981),
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'About Neo Files Transfer',
+                                style: TextStyle(
+                                  color: titleTextColor,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'App version, website, developer info & support',
+                                style: TextStyle(
+                                  color: subtitleTextColor,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          LucideIcons.chevronRight,
+                          color: isLight ? const Color(0xFF94A3B8) : Colors.white38,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 48),
