@@ -531,32 +531,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     if (mounted && queuedCount > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(LucideIcons.uploadCloud, color: Colors.white, size: 18),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  queuedCount == 1
-                      ? 'Upload started in background!'
-                      : '$queuedCount files queued for background upload!',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: const Color(0xFF4F46E5),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          action: SnackBarAction(
-            label: 'View',
-            textColor: Colors.amberAccent,
-            onPressed: () => TransferManagerSheet.show(context),
-          ),
-        ),
-      );
+      if (mounted) {
+        TransferManagerSheet.show(context);
+      }
     }
   }
 
