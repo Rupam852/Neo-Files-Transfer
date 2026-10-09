@@ -620,149 +620,45 @@ class TransferService with ChangeNotifier {
     notifyListeners();
     _updateNotification(task);
 
-    final auth = _authService;
-    final api = _apiService;
+    final fileService = _fileService;
     final file = File(task.localPath!);
 
-    if (auth == null || api == null || !await file.exists()) {
+    if (fileService == null || !await file.exists()) {
       task.status = TransferStatus.failed;
-      task.error = 'Upload dependencies or local file missing';
+      task.error = 'Upload service or local file missing';
       notifyListeners();
+      _updateNotification(task);
       return;
     }
 
     try {
-      final targetDriveFolderId = task.parentDriveFolderId ?? auth.profile?.driveFolderId;
-      if (targetDriveFolderId == null || targetDriveFolderId.isEmpty) {
-        throw Exception('Google Drive folder is not connected.');
-      }
-
-      String googleToken = await auth.getGoogleAccessToken() ?? '';
-      if (googleToken.isEmpty) {
-        googleToken = await api.refreshGoogleAccessToken();
-      }
-
-      final dio = Dio();
-
-      // Step 1: Create or resume session URL
-      if (task.resumableSessionUrl == null || task.resumableSessionUrl!.isEmpty) {
-        final sessionRes = await dio.post(
-          'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
-          data: {
-            'name': task.fileName,
-            'parents': [targetDriveFolderId]
-          },
-          options: Options(
-            headers: {
-              'Authorization': 'Bearer $googleToken',
-              'Content-Type': 'application/json; charset=UTF-8',
-              'X-Upload-Content-Type': 'application/octet-stream',
-            },
-          ),
-        );
-
-        task.resumableSessionUrl = sessionRes.headers.value('Location') ?? '';
-        if (task.resumableSessionUrl!.isEmpty) {
-          throw Exception('Google Drive did not return resumable upload session');
-        }
-      }
-
-      // Step 2: Upload Stream
-      final totalLength = task.totalBytes;
-      task.lastTime = DateTime.now();
-      task.lastBytes = 0;
-
-      final uploadResponse = await dio.put(
-        task.resumableSessionUrl!,
-        data: file.openRead(),
-        cancelToken: task.cancelToken,
-        options: Options(
-          headers: {
-            'Content-Length': totalLength,
-          },
-        ),
-        onSendProgress: (sent, total) {
-          task.transferredBytes = sent;
-          if (total > 0) {
-            task.progress = (sent / total).clamp(0.0, 1.0);
-          }
+      final createdFile = await fileService.uploadFile(
+        file: file,
+        fileName: task.fileName,
+        parentDbFolderId: task.parentDbFolderId,
+        parentDriveFolderId: task.parentDriveFolderId,
+        cancelToken: task.cancelToken!,
+        onProgress: (pct, [speed]) {
+          task.progress = pct;
+          task.transferredBytes = (pct * task.totalBytes).toInt();
+          if (speed != null) task.speed = speed;
 
           final now = DateTime.now();
-          final ms = now.difference(task.lastTime).inMilliseconds;
-          if (ms >= 400 || sent == total) {
-            final diff = sent - task.lastBytes;
-            if (ms > 0 && diff > 0) {
-              final bps = diff / (ms / 1000.0);
-              if (bps >= 1024 * 1024) {
-                task.speed = '${(bps / (1024 * 1024)).toStringAsFixed(1)} MB/s';
-              } else if (bps >= 1024) {
-                task.speed = '${(bps / 1024).toStringAsFixed(0)} KB/s';
-              }
-
-              if (total > sent && bps > 0) {
-                final remainingSec = (total - sent) / bps;
-                if (remainingSec < 60) {
-                  task.eta = '${remainingSec.toInt()}s remaining';
-                } else {
-                  task.eta = '${(remainingSec / 60).toInt()}m remaining';
-                }
-              }
-            }
+          if (now.difference(task.lastTime).inMilliseconds >= 400 || pct == 1.0) {
             task.lastTime = now;
-            task.lastBytes = sent;
             _updateNotification(task);
             notifyListeners();
           }
         },
       );
 
-      if (uploadResponse.statusCode == 200 || uploadResponse.statusCode == 201) {
-        final driveData = uploadResponse.data;
-        final driveFileId = driveData['id'] as String;
-
-        // Insert database record
-        final userId = auth.currentUser?.id;
-        if (userId != null) {
-          final insertPayload = <String, dynamic>{
-            'user_id': userId,
-            'google_drive_file_id': driveFileId,
-            'file_name': task.fileName,
-            'file_size': totalLength,
-            'mime_type': driveData['mimeType'] ?? '',
-            'current_version_num': 1,
-            'sharing_status': 'private',
-            'parent_folder_id': task.parentDbFolderId,
-          };
-
-          final isApk = task.fileName.toLowerCase().endsWith('.apk');
-          if (isApk) {
-            insertPayload['apk_version'] = 'v1.0.1';
-            insertPayload['version_api_key'] = 'apk_${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
-          }
-
-          final insertRes = await Supabase.instance.client.from('shared_files').insert(insertPayload).select().single();
-          var createdFile = SharedFile.fromJson(insertRes);
-
-          await Supabase.instance.client.from('file_versions').insert({
-            'file_id': createdFile.id,
-            'google_drive_file_id': driveFileId,
-            'version_number': 1,
-          });
-
-          if (task.autoMakePublic && _fileService != null) {
-            createdFile = await _fileService!.generateShareHash(createdFile);
-          }
-
-          task.fileRecord = createdFile;
-        }
-
-        task.status = TransferStatus.completed;
-        task.progress = 1.0;
-        task.speed = '';
-        task.eta = '';
-        notifyListeners();
-        _updateNotification(task);
-      }
+      task.fileRecord = createdFile;
+      task.status = TransferStatus.completed;
+      task.progress = 1.0;
+      task.speed = '';
+      task.eta = '';
+      notifyListeners();
+      _updateNotification(task);
     } on DioException catch (e) {
       if (CancelToken.isCancel(e) || task.status == TransferStatus.paused) {
         task.status = TransferStatus.paused;
