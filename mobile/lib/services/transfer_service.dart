@@ -657,6 +657,7 @@ class TransferService with ChangeNotifier {
     task.status = TransferStatus.running;
     task.cancelToken = CancelToken();
     task.error = null;
+    task.speed = 'Connecting to Drive...';
     notifyListeners();
     _updateNotification(task);
 

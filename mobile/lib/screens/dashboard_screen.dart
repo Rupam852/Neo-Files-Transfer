@@ -499,9 +499,101 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final result = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (result == null || result.files.isEmpty) return;
 
-    if (mounted) {
-      TransferManagerSheet.show(context);
-    }
+    if (!mounted) return;
+
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.65),
+      builder: (dialogCtx) => PopScope(
+        canPop: false,
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+            decoration: BoxDecoration(
+              color: isLight ? Colors.white : const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withValues(alpha: 0.12),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.4),
+                          blurRadius: 16,
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.6,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Preparing ${result.files.length == 1 ? "File" : "${result.files.length} Files"}...',
+                    style: TextStyle(
+                      color: isLight ? const Color(0xFF0F172A) : Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    result.files.first.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isLight ? const Color(0xFF64748B) : Colors.white60,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Initializing transfer queue & connecting to Drive...',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isLight ? const Color(0xFF94A3B8) : Colors.white38,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await Future.delayed(const Duration(milliseconds: 250));
 
     final blockedExtensions = ['exe', 'bat', 'cmd', 'msi', 'scr'];
     final transferService = Provider.of<TransferService>(context, listen: false);
@@ -523,6 +615,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         parentDbFolderId: _currentFolder?.id,
         parentDriveFolderId: _currentFolder?.googleDriveFileId,
       );
+    }
+
+    if (mounted && Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+
+    if (mounted) {
+      TransferManagerSheet.show(context);
     }
   }
 

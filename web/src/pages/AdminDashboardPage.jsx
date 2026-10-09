@@ -6,7 +6,8 @@ import toast from 'react-hot-toast'
 import {
   Search, Check, X, Trash2, Phone, Mail,
   LogOut, Users, UserCheck, Clock, ShieldCheck,
-  Settings, Activity, Pause, Play,
+  Settings, Activity, Pause, Play, Bell, Send,
+  Radio, Smartphone, AlertTriangle, Sparkles,
 } from 'lucide-react'
 import { formatDate } from '../utils/helpers'
 import ThemeToggle from '../components/ThemeToggle'
@@ -25,6 +26,14 @@ export default function AdminDashboardPage() {
   const [newAdminEmail, setNewAdminEmail] = useState('')
   const [addingAdmin, setAddingAdmin] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+
+  // Broadcast & Push Notification State
+  const [broadcastTitle, setBroadcastTitle] = useState('')
+  const [broadcastBody, setBroadcastBody] = useState('')
+  const [broadcastTargetType, setBroadcastTargetType] = useState('topic') // 'topic' | 'user'
+  const [broadcastTopic, setBroadcastTopic] = useState('all_users') // 'all_users' | 'app_updates'
+  const [broadcastUserId, setBroadcastUserId] = useState('')
+  const [sendingBroadcast, setSendingBroadcast] = useState(false)
 
   useBodyScrollLock(showLogoutConfirm)
 
@@ -429,6 +438,44 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function handleSendBroadcast(e) {
+    if (e) e.preventDefault()
+    if (!broadcastTitle.trim() || !broadcastBody.trim()) {
+      toast.error('Please fill in both Title and Message.')
+      return
+    }
+
+    if (broadcastTargetType === 'user' && !broadcastUserId) {
+      toast.error('Please select a target user.')
+      return
+    }
+
+    setSendingBroadcast(true)
+    try {
+      const target = broadcastTargetType === 'topic' ? broadcastTopic : broadcastUserId
+      const { data, error } = await supabase.functions.invoke('broadcast-notification', {
+        body: {
+          title: broadcastTitle.trim(),
+          body: broadcastBody.trim(),
+          targetType: broadcastTargetType,
+          target,
+        },
+      })
+
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+
+      toast.success(`Push notification sent successfully! (${data?.sentCount ?? 1} sent)`)
+      setBroadcastTitle('')
+      setBroadcastBody('')
+    } catch (err) {
+      console.error('Broadcast error:', err)
+      toast.error(`Failed to send broadcast: ${err.message || 'Unknown error'}`)
+    } finally {
+      setSendingBroadcast(false)
+    }
+  }
+
   async function toggleSetting(key) {
     let currentVal
     if (key === 'maintenance_mode') {
@@ -452,6 +499,24 @@ export default function AdminDashboardPage() {
         action,
         details: `Toggled ${key}: ${newVal}`,
       })
+
+      // Auto broadcast FCM notification for maintenance mode
+      if (key === 'maintenance_mode') {
+        try {
+          await supabase.functions.invoke('broadcast-notification', {
+            body: {
+              title: newVal ? '⚠️ Neo Files Maintenance Mode' : '✅ Neo Files is Back Online',
+              body: newVal
+                ? 'App is currently undergoing scheduled maintenance. Services will resume shortly.'
+                : 'Maintenance is complete! You can now upload and share files normally.',
+              targetType: 'topic',
+              target: 'all_users',
+            },
+          })
+        } catch (fcmErr) {
+          console.error('Maintenance FCM broadcast error:', fcmErr)
+        }
+      }
 
       toast.success(`${key.replaceAll('_', ' ')} ${newVal ? 'enabled' : 'disabled'}`)
     } catch (err) {
@@ -560,6 +625,15 @@ export default function AdminDashboardPage() {
             Admins ({adminsList.length})
           </button>
           <button
+            onClick={() => navigateTab('broadcast')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'broadcast' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
+            }`}
+          >
+            <Radio size={16} className="inline mr-1" />
+            Broadcast
+          </button>
+          <button
             onClick={() => navigateTab('settings')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === 'settings' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-dark-500'
@@ -571,7 +645,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Search */}
-        {activeTab !== 'settings' && activeTab !== 'admins' && (
+        {activeTab !== 'settings' && activeTab !== 'admins' && activeTab !== 'broadcast' && (
           <div className="mb-4">
             <div className="relative max-w-md">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -896,6 +970,222 @@ export default function AdminDashboardPage() {
                   checked={systemSettings.sharing_enabled !== false}
                   onChange={() => toggleSetting('sharing_enabled')}
                 />
+              </div>
+            )}
+
+            {/* Broadcast & Push Notifications Tab */}
+            {activeTab === 'broadcast' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Compose Form */}
+                <div className="lg:col-span-2 card space-y-5">
+                  <div className="flex items-center justify-between border-b border-dark-400 pb-4">
+                    <div>
+                      <h3 className="font-semibold text-lg text-gray-100 flex items-center gap-2">
+                        <Radio size={20} className="text-primary-400" /> Push Broadcast Console
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Send real-time push notifications to Android devices even when the app is completely closed.
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 bg-green-500/10 border border-green-500/20 text-green-400 rounded-full text-xs font-semibold flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /> FCM Live
+                    </span>
+                  </div>
+
+                  <form onSubmit={handleSendBroadcast} className="space-y-4">
+                    {/* Target Selector */}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                        Broadcast Target
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setBroadcastTargetType('topic'); setBroadcastTopic('all_users'); }}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            broadcastTargetType === 'topic' && broadcastTopic === 'all_users'
+                              ? 'bg-primary-600/15 border-primary-500 text-white'
+                              : 'bg-dark-500/50 border-dark-400 text-gray-400 hover:bg-dark-500'
+                          }`}
+                        >
+                          <div className="font-semibold text-sm flex items-center gap-2">
+                            <Users size={16} /> All Active Users
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">/topics/all_users</div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { setBroadcastTargetType('topic'); setBroadcastTopic('app_updates'); }}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            broadcastTargetType === 'topic' && broadcastTopic === 'app_updates'
+                              ? 'bg-primary-600/15 border-primary-500 text-white'
+                              : 'bg-dark-500/50 border-dark-400 text-gray-400 hover:bg-dark-500'
+                          }`}
+                        >
+                          <div className="font-semibold text-sm flex items-center gap-2">
+                            <Smartphone size={16} /> App Updates
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">/topics/app_updates</div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setBroadcastTargetType('user')}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            broadcastTargetType === 'user'
+                              ? 'bg-primary-600/15 border-primary-500 text-white'
+                              : 'bg-dark-500/50 border-dark-400 text-gray-400 hover:bg-dark-500'
+                          }`}
+                        >
+                          <div className="font-semibold text-sm flex items-center gap-2">
+                            <UserCheck size={16} /> Specific User
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">Target individual device</div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Specific User Dropdown */}
+                    {broadcastTargetType === 'user' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
+                          Select User
+                        </label>
+                        <select
+                          className="input-field"
+                          value={broadcastUserId}
+                          onChange={(e) => setBroadcastUserId(e.target.value)}
+                        >
+                          <option value="">-- Choose User --</option>
+                          {approvedUsers.map((u) => (
+                            <option key={u.id} value={u.user_id || u.id}>
+                              {u.email} ({u.name || 'User'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Notification Title */}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
+                        Notification Title
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. ⚠️ Scheduled Maintenance Notice"
+                        className="input-field"
+                        value={broadcastTitle}
+                        onChange={(e) => setBroadcastTitle(e.target.value)}
+                        maxLength={100}
+                      />
+                    </div>
+
+                    {/* Notification Message */}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
+                        Notification Message Body
+                      </label>
+                      <textarea
+                        rows={4}
+                        placeholder="Enter the notification description that users will see in their phone status bar..."
+                        className="input-field resize-none"
+                        value={broadcastBody}
+                        onChange={(e) => setBroadcastBody(e.target.value)}
+                        maxLength={300}
+                      />
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      disabled={sendingBroadcast}
+                      className="w-full py-3 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-500 hover:to-indigo-500 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary-600/25 disabled:opacity-50"
+                    >
+                      {sendingBroadcast ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Send size={16} /> Send Push Broadcast
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+
+                {/* Quick Presets & Tips */}
+                <div className="space-y-4">
+                  <div className="card space-y-3">
+                    <h4 className="font-semibold text-gray-100 flex items-center gap-2 text-sm">
+                      <Sparkles size={16} className="text-amber-400" /> Quick Notification Templates
+                    </h4>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBroadcastTitle('⚠️ Scheduled System Maintenance')
+                          setBroadcastBody('Neo Files will undergo routine server updates today. Please complete critical uploads.')
+                          setBroadcastTargetType('topic')
+                          setBroadcastTopic('all_users')
+                        }}
+                        className="w-full text-left p-3 rounded-lg bg-dark-500/50 hover:bg-dark-500 border border-dark-400 transition-colors"
+                      >
+                        <div className="text-xs font-semibold text-amber-400 flex items-center gap-1.5">
+                          <AlertTriangle size={13} /> Maintenance Notice
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          Scheduled system maintenance announcement template
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBroadcastTitle('🚀 New App Update Available!')
+                          setBroadcastBody('A new update with improved upload speed and background transfer is now available. Tap to update!')
+                          setBroadcastTargetType('topic')
+                          setBroadcastTopic('app_updates')
+                        }}
+                        className="w-full text-left p-3 rounded-lg bg-dark-500/50 hover:bg-dark-500 border border-dark-400 transition-colors"
+                      >
+                        <div className="text-xs font-semibold text-primary-400 flex items-center gap-1.5">
+                          <Smartphone size={13} /> App Update Notice
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          Notify users of a newly released version build
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBroadcastTitle('✅ System Online & Operational')
+                          setBroadcastBody('All Neo Files services are running smoothly at peak performance. Enjoy fast file sharing!')
+                          setBroadcastTargetType('topic')
+                          setBroadcastTopic('all_users')
+                        }}
+                        className="w-full text-left p-3 rounded-lg bg-dark-500/50 hover:bg-dark-500 border border-dark-400 transition-colors"
+                      >
+                        <div className="text-xs font-semibold text-green-400 flex items-center gap-1.5">
+                          <Check size={13} /> All Systems Normal
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          Post-maintenance recovery announcement
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="card space-y-2 bg-dark-600/60">
+                    <h4 className="font-semibold text-gray-100 flex items-center gap-2 text-xs uppercase tracking-wider">
+                      <Bell size={14} className="text-primary-400" /> How Closed-App Push Works
+                    </h4>
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                      Android devices maintain an OS-level connection to Google Play Services. Even if the user swipes away Neo Files or the phone screen is locked, these push broadcasts will instantly pop up in the status bar tray.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </>

@@ -287,6 +287,7 @@ class FileService extends ChangeNotifier {
     }
 
     if (uploadUrl.isEmpty) {
+      onProgress(0.0, 'Connecting to Drive...');
       // Step 1: Request resumable session from Google Drive
       String googleToken = await _authService.getGoogleAccessToken() ?? '';
 
