@@ -762,8 +762,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
               const SizedBox(height: 6),
               Container(
                 width: double.infinity,
-                height: 140,
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: isLight ? const Color(0xFFF8FAFC) : const Color(0xFF030712),
                   borderRadius: BorderRadius.circular(10),
@@ -771,33 +770,27 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                     color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.06),
                   ),
                 ),
-                child: Scrollbar(
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: SelectableText(
-                        const JsonEncoder.withIndent('  ').convert({
-                          "status": "success",
-                          "version": _currentFile.apkVersion ?? 'v1.0.1',
-                          "description": _currentFile.apkDescription ?? '',
-                          "file_name": _currentFile.fileName,
-                          "file_size": _currentFile.fileSize,
-                          "download_url": "${AppConfig.cfWorkerUrl}?hash=${_currentFile.uniqueShareHash ?? 'apk_share_link'}",
-                          "web_url": "${AppConfig.appUrl}/download/${_currentFile.uniqueShareHash ?? ''}",
-                          "sharing_status": _currentFile.sharingStatus,
-                          "created_at": _currentFile.createdAt.toIso8601String(),
-                          "updated_at": (_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String(),
-                        }),
-                        style: TextStyle(
-                          color: isLight ? const Color(0xFF059669) : const Color(0xFF34D399).withOpacity(0.9),
-                          fontSize: 10.5,
-                          fontFamily: 'monospace',
-                          height: 1.4,
-                        ),
-                      ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: SelectableText(
+                    const JsonEncoder.withIndent('  ').convert({
+                      "status": "success",
+                      "version": _currentFile.apkVersion ?? 'v1.0.1',
+                      "description": _currentFile.apkDescription ?? '',
+                      "file_name": _currentFile.fileName,
+                      "file_size": _currentFile.fileSize,
+                      "download_url": "${AppConfig.cfWorkerUrl}?hash=${_currentFile.uniqueShareHash ?? 'apk_share_link'}",
+                      "web_url": "${AppConfig.appUrl}/download/${_currentFile.uniqueShareHash ?? ''}",
+                      "sharing_status": _currentFile.sharingStatus,
+                      "created_at": _currentFile.createdAt.toIso8601String(),
+                      "updated_at": (_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String(),
+                    }),
+                    style: TextStyle(
+                      color: isLight ? const Color(0xFF059669) : const Color(0xFF34D399).withOpacity(0.9),
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                      height: 1.45,
                     ),
                   ),
                 ),
