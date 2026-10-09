@@ -38,6 +38,10 @@ void main() async {
   // Initialize Firebase Cloud Messaging (FCM)
   try {
     await FcmService().init();
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid != null) {
+      unawaited(FcmService().syncUserToken(uid));
+    }
   } catch (e) {
     debugPrint('[main] FCM initialization error: $e');
   }

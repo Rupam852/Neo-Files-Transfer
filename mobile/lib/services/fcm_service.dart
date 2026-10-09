@@ -124,16 +124,50 @@ class FcmService {
 
       final deviceId = await _getUniqueDeviceId();
       final deviceName = await _getDeviceName();
-      final token = await _fcm.getToken();
+      final supabase = Supabase.instance.client;
+
+      // 1. Immediately listen to token refresh in background
+      _tokenRefreshSub?.cancel();
+      _tokenRefreshSub = _fcm.onTokenRefresh.listen((newToken) async {
+        debugPrint('[FCM] Token refreshed: $newToken');
+        if (_currentUserId == userId && newToken.isNotEmpty) {
+          try {
+            await supabase.from('user_fcm_tokens').upsert({
+              'user_id': userId,
+              'device_id': deviceId,
+              'fcm_token': newToken,
+              'device_name': deviceName,
+              'platform': Platform.isAndroid ? 'android' : (Platform.isIOS ? 'ios' : 'other'),
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+            }, onConflict: 'user_id,device_id');
+            debugPrint('[FCM] Refreshed token saved to Supabase');
+          } catch (e) {
+            debugPrint('[FCM] Error updating refreshed token: $e');
+          }
+        }
+      });
+
+      // 2. Retry loop for getToken() in case Google Play Services is initializing on first launch
+      String? token;
+      for (int attempt = 1; attempt <= 5; attempt++) {
+        try {
+          token = await _fcm.getToken();
+          if (token != null && token.isNotEmpty) {
+            break;
+          }
+        } catch (e) {
+          debugPrint('[FCM] getToken attempt $attempt error: $e');
+        }
+        await Future.delayed(const Duration(milliseconds: 1200));
+      }
 
       if (token == null || token.isEmpty) {
-        debugPrint('[FCM] No token obtained');
+        debugPrint('[FCM] No token obtained after retries');
         return;
       }
 
       debugPrint('[FCM] Syncing token for user $userId on device $deviceId');
 
-      final supabase = Supabase.instance.client;
       await supabase.from('user_fcm_tokens').upsert({
         'user_id': userId,
         'device_id': deviceId,
@@ -143,28 +177,12 @@ class FcmService {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }, onConflict: 'user_id,device_id');
 
-      // Subscribe to user personal topic
-      await _fcm.subscribeToTopic('user_$userId');
+      debugPrint('[FCM] Token successfully saved in user_fcm_tokens');
 
-      // Listen to token refresh
-      _tokenRefreshSub?.cancel();
-      _tokenRefreshSub = _fcm.onTokenRefresh.listen((newToken) async {
-        debugPrint('[FCM] Token refreshed: $newToken');
-        if (_currentUserId == userId) {
-          try {
-            await supabase.from('user_fcm_tokens').upsert({
-              'user_id': userId,
-              'device_id': deviceId,
-              'fcm_token': newToken,
-              'device_name': deviceName,
-              'platform': Platform.isAndroid ? 'android' : 'other',
-              'updated_at': DateTime.now().toUtc().toIso8601String(),
-            }, onConflict: 'user_id,device_id');
-          } catch (e) {
-            debugPrint('[FCM] Error updating refreshed token: $e');
-          }
-        }
-      });
+      // Subscribe to user personal topic
+      try {
+        await _fcm.subscribeToTopic('user_$userId');
+      } catch (_) {}
     } catch (e) {
       debugPrint('[FCM] Error syncing user token: $e');
     }
