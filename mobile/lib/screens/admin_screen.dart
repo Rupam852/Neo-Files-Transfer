@@ -425,6 +425,25 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
         'details': 'Toggled $key: $newVal',
       });
 
+      // Auto broadcast FCM notification for maintenance mode
+      if (key == 'maintenance_mode') {
+        try {
+          await _client.functions.invoke(
+            'broadcast-notification',
+            body: {
+              'title': newVal ? '⚠️ Neo Files Maintenance Mode' : '✅ Neo Files is Back Online',
+              'body': newVal
+                  ? 'App is currently undergoing scheduled maintenance. Services will resume shortly.'
+                  : 'Maintenance is complete! You can now upload and share files normally.',
+              'targetType': 'topic',
+              'target': 'all_users',
+            },
+          );
+        } catch (fcmErr) {
+          debugPrint('Maintenance FCM broadcast error: $fcmErr');
+        }
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -670,6 +689,15 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               },
             ),
             ListTile(
+              leading: const Icon(LucideIcons.radio, color: Colors.amberAccent),
+              title: const Text('Push Broadcast', style: TextStyle(color: Colors.white, fontSize: 14)),
+              subtitle: const Text('Send instant push alerts to closed devices', style: TextStyle(color: Colors.white30, fontSize: 11)),
+              onTap: () {
+                Navigator.pop(context);
+                _showBroadcastBottomSheet();
+              },
+            ),
+            ListTile(
               leading: const Icon(LucideIcons.activity, color: Colors.tealAccent),
               title: const Text('Audit Logs', style: TextStyle(color: Colors.white, fontSize: 14)),
               subtitle: const Text('View and clear administration activity history', style: TextStyle(color: Colors.white30, fontSize: 11)),
@@ -833,6 +861,334 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                     ),
                   ),
                 ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showBroadcastBottomSheet() {
+    String title = '';
+    String body = '';
+    String targetType = 'topic';
+    String topic = 'all_users';
+    String? selectedUserId;
+    bool isSending = false;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.amberAccent.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(LucideIcons.radio, color: Colors.amberAccent, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Push Broadcast',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(LucideIcons.x, color: Colors.white60),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('TARGET AUDIENCE', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setSheetState(() { targetType = 'topic'; topic = 'all_users'; }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: targetType == 'topic' && topic == 'all_users'
+                                    ? Colors.indigoAccent.withValues(alpha: 0.2)
+                                    : const Color(0xFF030712).withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: targetType == 'topic' && topic == 'all_users'
+                                      ? Colors.indigoAccent
+                                      : Colors.white.withValues(alpha: 0.08),
+                                ),
+                              ),
+                              child: Column(
+                                children: const [
+                                  Icon(LucideIcons.users, color: Colors.indigoAccent, size: 16),
+                                  SizedBox(height: 4),
+                                  Text('All Users', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setSheetState(() { targetType = 'topic'; topic = 'app_updates'; }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: targetType == 'topic' && topic == 'app_updates'
+                                    ? Colors.purpleAccent.withValues(alpha: 0.2)
+                                    : const Color(0xFF030712).withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: targetType == 'topic' && topic == 'app_updates'
+                                      ? Colors.purpleAccent
+                                      : Colors.white.withValues(alpha: 0.08),
+                                ),
+                              ),
+                              child: Column(
+                                children: const [
+                                  Icon(LucideIcons.smartphone, color: Colors.purpleAccent, size: 16),
+                                  SizedBox(height: 4),
+                                  Text('Updates', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setSheetState(() { targetType = 'user'; }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: targetType == 'user'
+                                    ? Colors.tealAccent.withValues(alpha: 0.2)
+                                    : const Color(0xFF030712).withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: targetType == 'user'
+                                      ? Colors.tealAccent
+                                      : Colors.white.withValues(alpha: 0.08),
+                                ),
+                              ),
+                              child: Column(
+                                children: const [
+                                  Icon(LucideIcons.userCheck, color: Colors.tealAccent, size: 16),
+                                  SizedBox(height: 4),
+                                  Text('Specific User', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (targetType == 'user') ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF030712).withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            dropdownColor: const Color(0xFF0F172A),
+                            value: selectedUserId,
+                            hint: const Text('Select a user to target', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                            items: _approvedUsers.map((u) {
+                              final uid = (u['user_id'] ?? u['id']) as String;
+                              final email = (u['email'] ?? 'User') as String;
+                              return DropdownMenuItem<String>(
+                                value: uid,
+                                child: Text(email, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                              );
+                            }).toList(),
+                            onChanged: (v) => setSheetState(() => selectedUserId = v),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        ActionChip(
+                          backgroundColor: Colors.amberAccent.withValues(alpha: 0.12),
+                          side: BorderSide(color: Colors.amberAccent.withValues(alpha: 0.3)),
+                          label: const Text('⚠️ Maintenance Alert', style: TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                          onPressed: () => setSheetState(() {
+                            title = '⚠️ System Maintenance Notice';
+                            body = 'Neo Files is undergoing scheduled maintenance. Services will resume shortly.';
+                            targetType = 'topic';
+                            topic = 'all_users';
+                          }),
+                        ),
+                        ActionChip(
+                          backgroundColor: Colors.purpleAccent.withValues(alpha: 0.12),
+                          side: BorderSide(color: Colors.purpleAccent.withValues(alpha: 0.3)),
+                          label: const Text('🚀 New Version Update', style: TextStyle(color: Colors.purpleAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                          onPressed: () => setSheetState(() {
+                            title = '🚀 New Update Available!';
+                            body = 'A new version of Neo Files Transfer is available with improved transfer speed. Tap to update!';
+                            targetType = 'topic';
+                            topic = 'app_updates';
+                          }),
+                        ),
+                        ActionChip(
+                          backgroundColor: Colors.greenAccent.withValues(alpha: 0.12),
+                          side: BorderSide(color: Colors.greenAccent.withValues(alpha: 0.3)),
+                          label: const Text('✅ System Online', style: TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                          onPressed: () => setSheetState(() {
+                            title = '✅ System Online & Operational';
+                            body = 'Maintenance is complete! You can now upload and share files smoothly.';
+                            targetType = 'topic';
+                            topic = 'all_users';
+                          }),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: TextEditingController(text: title)..selection = TextSelection.collapsed(offset: title.length),
+                      onChanged: (v) => title = v,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: InputDecoration(
+                        labelText: 'Notification Title',
+                        labelStyle: const TextStyle(color: Colors.white60, fontSize: 12),
+                        filled: true,
+                        fillColor: const Color(0xFF030712).withValues(alpha: 0.5),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.indigoAccent)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: TextEditingController(text: body)..selection = TextSelection.collapsed(offset: body.length),
+                      onChanged: (v) => body = v,
+                      maxLines: 3,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: InputDecoration(
+                        labelText: 'Notification Message',
+                        labelStyle: const TextStyle(color: Colors.white60, fontSize: 12),
+                        filled: true,
+                        fillColor: const Color(0xFF030712).withValues(alpha: 0.5),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.indigoAccent)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: isSending
+                            ? null
+                            : () async {
+                                if (title.trim().isEmpty || body.trim().isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter both title and message'), backgroundColor: Colors.redAccent),
+                                  );
+                                  return;
+                                }
+                                if (targetType == 'user' && (selectedUserId == null || selectedUserId!.isEmpty)) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please select a target user'), backgroundColor: Colors.redAccent),
+                                  );
+                                  return;
+                                }
+
+                                setSheetState(() => isSending = true);
+                                try {
+                                  final target = targetType == 'topic' ? topic : selectedUserId!;
+                                  final res = await _client.functions.invoke(
+                                    'broadcast-notification',
+                                    body: {
+                                      'title': title.trim(),
+                                      'body': body.trim(),
+                                      'targetType': targetType,
+                                      'target': target,
+                                    },
+                                  );
+                                  if (res.status == 200) {
+                                    if (mounted) {
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('🚀 Push Notification Broadcast sent successfully!'),
+                                          backgroundColor: Color(0xFF10B981),
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    throw Exception(res.data?['error'] ?? 'Server error ${res.status}');
+                                  }
+                                } catch (e) {
+                                  setSheetState(() => isSending = false);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Failed to broadcast: $e'), backgroundColor: Colors.redAccent),
+                                    );
+                                  }
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigoAccent,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: isSending
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(LucideIcons.send, size: 16),
+                                  SizedBox(width: 8),
+                                  Text('Send Push Broadcast', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
