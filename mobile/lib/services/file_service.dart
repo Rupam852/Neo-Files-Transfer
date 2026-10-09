@@ -782,7 +782,7 @@ class FileService extends ChangeNotifier {
   // Bulk move files to another folder
   Future<void> bulkMove(List<String> fileIds, String? targetFolderId) async {
     final userId = _authService.currentUser?.id;
-    if (userId == null) return;
+    if (userId == null || fileIds.isEmpty) return;
 
     await _client
         .from('shared_files')
@@ -794,6 +794,34 @@ class FileService extends ChangeNotifier {
       'action': 'bulk_move',
       'details': 'Moved ${fileIds.length} items',
     });
+
+    await loadFiles(_files.isNotEmpty ? _files.first.parentFolderId : null);
+    notifyListeners();
+  }
+
+  // Bulk move files to Recycle Bin / Trash
+  Future<void> bulkMoveToTrash(List<SharedFile> filesToTrash) async {
+    final userId = _authService.currentUser?.id;
+    if (userId == null || filesToTrash.isEmpty) return;
+
+    final fileIds = filesToTrash.map((f) => f.id).toList();
+    final nowIso = DateTime.now().toIso8601String();
+
+    await _client
+        .from('shared_files')
+        .update({'deleted_at': nowIso})
+        .filter('id', 'in', fileIds);
+
+    await _client.from('activity_logs').insert({
+      'user_id': userId,
+      'action': 'bulk_trash',
+      'details': 'Moved ${filesToTrash.length} items to Trash',
+    });
+
+    final idSet = fileIds.toSet();
+    _files.removeWhere((f) => idSet.contains(f.id));
+    _sharedFiles.removeWhere((f) => idSet.contains(f.id));
+    notifyListeners();
   }
 
   // Move a file to Recycle Bin / Trash

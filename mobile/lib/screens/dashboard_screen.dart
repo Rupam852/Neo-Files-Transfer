@@ -33,7 +33,8 @@ import '../widgets/notification_bell.dart';
 import '../services/transfer_service.dart';
 import '../widgets/transfer_manager_sheet.dart';
 import '../widgets/floating_transfer_bar.dart';
-
+import '../widgets/folder_picker_dialog.dart';
+import '../widgets/batch_action_bar.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -53,6 +54,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _currentTab = 0;
   bool _isFabVisible = true;
 
+  // Multi-Selection state
+  bool _isSelectionMode = false;
+  final Set<String> _selectedFileIds = {};
+  final Map<String, SharedFile> _selectedFilesMap = {};
 
   // Upload state
   bool _isUploading = false;
@@ -114,7 +119,188 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  void _exitSelectionMode() {
+    if (!_isSelectionMode && _selectedFileIds.isEmpty) return;
+    setState(() {
+      _isSelectionMode = false;
+      _selectedFileIds.clear();
+      _selectedFilesMap.clear();
+    });
+  }
+
+  void _enterSelectionMode(SharedFile file) {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _isSelectionMode = true;
+      _selectedFileIds.add(file.id);
+      _selectedFilesMap[file.id] = file;
+    });
+  }
+
+  void _toggleFileSelection(SharedFile file) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_selectedFileIds.contains(file.id)) {
+        _selectedFileIds.remove(file.id);
+        _selectedFilesMap.remove(file.id);
+        if (_selectedFileIds.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedFileIds.add(file.id);
+        _selectedFilesMap[file.id] = file;
+      }
+    });
+  }
+
+  void _selectAll(List<SharedFile> files) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_selectedFileIds.length == files.length) {
+        _selectedFileIds.clear();
+        _selectedFilesMap.clear();
+        _isSelectionMode = false;
+      } else {
+        _isSelectionMode = true;
+        for (final f in files) {
+          _selectedFileIds.add(f.id);
+          _selectedFilesMap[f.id] = f;
+        }
+      }
+    });
+  }
+
+  Future<void> _handleBatchMove() async {
+    final selectedFiles = _selectedFilesMap.values.toList();
+    if (selectedFiles.isEmpty) return;
+
+    final fileService = Provider.of<FileService>(context, listen: false);
+    final excludedIds = selectedFiles.where((f) => f.isFolder).map((f) => f.id).toList();
+
+    final targetFolderId = await FolderPickerDialog.show(
+      context,
+      excludedFolderIds: excludedIds,
+      currentFolderId: _currentFolder?.id,
+    );
+
+    if (targetFolderId == null) return;
+    final realTargetId = targetFolderId == '__ROOT__' ? null : targetFolderId;
+
+    if (realTargetId == _currentFolder?.id) {
+      _showWarningSnackBar('Selected items are already in this folder.');
+      return;
+    }
+
+    setState(() => _isActionLoading = true);
+
+    try {
+      final fileIds = selectedFiles.map((f) => f.id).toList();
+      await fileService.bulkMove(fileIds, realTargetId);
+      final count = selectedFiles.length;
+      _exitSelectionMode();
+      await _refreshFiles();
+      if (mounted) {
+        _showSuccessSnackBar('$count ${count == 1 ? "item" : "items"} moved successfully.');
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('Failed to move items: ${_formatError(e)}');
+      }
+    } finally {
+      if (mounted) setState(() => _isActionLoading = false);
+    }
+  }
+
+  Future<void> _handleBatchTrash() async {
+    final selectedFiles = _selectedFilesMap.values.toList();
+    if (selectedFiles.isEmpty) return;
+    final count = selectedFiles.length;
+
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Move $count ${count == 1 ? "item" : "items"} to Trash?',
+          style: TextStyle(
+            color: isLight ? const Color(0xFF0F172A) : Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'Selected $count ${count == 1 ? "item" : "items"} will be moved to the Recycle Bin.',
+          style: TextStyle(
+            color: isLight ? const Color(0xFF475569) : Colors.white70,
+            fontSize: 13,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: TextStyle(color: isLight ? const Color(0xFF64748B) : Colors.white60)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Move to Trash', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isActionLoading = true);
+
+    try {
+      final fileService = Provider.of<FileService>(context, listen: false);
+      await fileService.bulkMoveToTrash(selectedFiles);
+      _exitSelectionMode();
+      if (mounted) {
+        _showSuccessSnackBar('$count ${count == 1 ? "item" : "items"} moved to Recycle Bin.');
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('Failed to trash items: ${_formatError(e)}');
+      }
+    } finally {
+      if (mounted) setState(() => _isActionLoading = false);
+    }
+  }
+
+  Future<void> _handleBatchDownloadZip() async {
+    final selectedFiles = _selectedFilesMap.values.toList();
+    if (selectedFiles.isEmpty) return;
+
+    final downloadable = selectedFiles.where((f) => !f.isFolder).toList();
+    if (downloadable.isEmpty) {
+      _showWarningSnackBar('Please select files to download (folders cannot be downloaded directly).');
+      return;
+    }
+
+    try {
+      final transferService = Provider.of<TransferService>(context, listen: false);
+      final count = downloadable.length;
+      await transferService.startBatchDownloadZip(files: downloadable);
+      _exitSelectionMode();
+      if (mounted) {
+        _showSuccessSnackBar('Creating ZIP archive with $count ${count == 1 ? "file" : "files"}...');
+        TransferManagerSheet.show(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('ZIP Download failed: ${_formatError(e)}');
+      }
+    }
+  }
+
   void _onTabTapped(int index) {
+    _exitSelectionMode();
     setState(() {
       _currentTab = index;
       _isFabVisible = true;
@@ -123,6 +309,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _navigateToFolder(SharedFile folder) {
+    _exitSelectionMode();
     setState(() {
       _currentFolder = folder;
       _folderPath.add(folder);
@@ -134,6 +321,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _navigateBackTo(int index) {
+    _exitSelectionMode();
     setState(() {
       if (index == -1) {
         _currentFolder = null;
@@ -150,6 +338,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _navigateBackOneLevel() {
+    _exitSelectionMode();
     if (_folderPath.isNotEmpty) {
       _navigateBackTo(_folderPath.length - 2);
     }
@@ -1212,126 +1401,174 @@ class _DashboardScreenState extends State<DashboardScreen> {
               backgroundColor: isLight ? Colors.white : Colors.transparent,
               elevation: 0,
               scrolledUnderElevation: 0,
-              title: Row(
-                children: [
-                  Text(
-                    'Neo',
-                    style: TextStyle(
-                      color: titleTextColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+              leading: _isSelectionMode
+                  ? IconButton(
+                      icon: Icon(LucideIcons.x, color: titleTextColor, size: 20),
+                      tooltip: 'Exit Selection',
+                      onPressed: _exitSelectionMode,
+                    )
+                  : null,
+              title: _isSelectionMode
+                  ? Text(
+                      '${_selectedFileIds.length} Selected',
+                      style: TextStyle(
+                        color: titleTextColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        fontFamily: 'Space_Grotesk',
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        Text(
+                          'Neo',
+                          style: TextStyle(
+                            color: titleTextColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const Text(
+                          'Files',
+                          style: TextStyle(
+                            color: Color(0xFF4F46E5),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const Text(
-                    'Files',
-                    style: TextStyle(
-                      color: Color(0xFF4F46E5),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                Consumer<TransferService>(
-                  builder: (context, transferService, _) {
-                    final activeCount = transferService.activeTasks.length;
-                    return IconButton(
-                      tooltip: 'Background Transfers',
-                      icon: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Icon(LucideIcons.arrowUpDown, color: iconColor, size: 20),
-                          if (activeCount > 0)
-                            Positioned(
-                              top: -4,
-                              right: -4,
-                              child: Container(
-                                padding: const EdgeInsets.all(3.5),
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF4F46E5),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Text(
-                                  '$activeCount',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
+              actions: _isSelectionMode
+                  ? [
+                      TextButton.icon(
+                        onPressed: () => _selectAll(filteredFiles),
+                        icon: Icon(
+                          _selectedFileIds.length == filteredFiles.length && filteredFiles.isNotEmpty
+                              ? LucideIcons.checkSquare
+                              : LucideIcons.square,
+                          size: 16,
+                          color: const Color(0xFF4F46E5),
+                        ),
+                        label: Text(
+                          _selectedFileIds.length == filteredFiles.length && filteredFiles.isNotEmpty
+                              ? 'Deselect All'
+                              : 'Select All',
+                          style: const TextStyle(
+                            color: Color(0xFF4F46E5),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ]
+                  : [
+                      Consumer<TransferService>(
+                        builder: (context, transferService, _) {
+                          final activeCount = transferService.activeTasks.length;
+                          return IconButton(
+                            tooltip: 'Background Transfers',
+                            icon: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(LucideIcons.arrowUpDown, color: iconColor, size: 20),
+                                if (activeCount > 0)
+                                  Positioned(
+                                    top: -4,
+                                    right: -4,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3.5),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF4F46E5),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(
+                                        '$activeCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
+                              ],
                             ),
-                        ],
+                            onPressed: () => TransferManagerSheet.show(context),
+                          );
+                        },
                       ),
-                      onPressed: () => TransferManagerSheet.show(context),
-                    );
-                  },
-                ),
-                const NotificationBellButton(),
-                Consumer<UpdateService>(
-                  builder: (context, updateService, _) {
-                    return IconButton(
-                      tooltip: updateService.hasUpdate ? 'Update Available!' : 'Settings',
-                      icon: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Icon(LucideIcons.settings, color: iconColor, size: 20),
-                          if (updateService.hasUpdate)
-                            Positioned(
-                              top: -2,
-                              right: -2,
-                              child: Container(
-                                width: 9,
-                                height: 9,
-                                decoration: BoxDecoration(
-                                  color: Colors.redAccent,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: bgColor, width: 1.5),
-                                ),
-                              ),
+                      const NotificationBellButton(),
+                      Consumer<UpdateService>(
+                        builder: (context, updateService, _) {
+                          return IconButton(
+                            tooltip: updateService.hasUpdate ? 'Update Available!' : 'Settings',
+                            icon: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(LucideIcons.settings, color: iconColor, size: 20),
+                                if (updateService.hasUpdate)
+                                  Positioned(
+                                    top: -2,
+                                    right: -2,
+                                    child: Container(
+                                      width: 9,
+                                      height: 9,
+                                      decoration: BoxDecoration(
+                                        color: Colors.redAccent,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: bgColor, width: 1.5),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
-                        ],
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                            ),
+                          );
+                        },
                       ),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const SettingsScreen()),
-                      ),
-                    );
-                  },
-                ),
-              ],
+                    ],
             ),
-            bottomNavigationBar: Container(
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: navBorderColor, width: 1)),
-              ),
-              child: BottomNavigationBar(
-                currentIndex: _currentTab,
-                onTap: _onTabTapped,
-                backgroundColor: navBgColor,
-                selectedItemColor: const Color(0xFF4F46E5),
-                unselectedItemColor: isLight ? const Color(0xFF64748B) : Colors.white60,
-                showSelectedLabels: true,
-                showUnselectedLabels: true,
-                type: BottomNavigationBarType.fixed,
-                items: const [
-                  BottomNavigationBarItem(
-                    icon: Icon(LucideIcons.folder),
-                    label: 'My Files',
+            bottomNavigationBar: _isSelectionMode
+                ? BatchActionBar(
+                    selectedCount: _selectedFileIds.length,
+                    onMove: _handleBatchMove,
+                    onTrash: _handleBatchTrash,
+                    onDownloadZip: _handleBatchDownloadZip,
+                    onCancel: _exitSelectionMode,
+                  )
+                : Container(
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: navBorderColor, width: 1)),
+                    ),
+                    child: BottomNavigationBar(
+                      currentIndex: _currentTab,
+                      onTap: _onTabTapped,
+                      backgroundColor: navBgColor,
+                      selectedItemColor: const Color(0xFF4F46E5),
+                      unselectedItemColor: isLight ? const Color(0xFF64748B) : Colors.white60,
+                      showSelectedLabels: true,
+                      showUnselectedLabels: true,
+                      type: BottomNavigationBarType.fixed,
+                      items: const [
+                        BottomNavigationBarItem(
+                          icon: Icon(LucideIcons.folder),
+                          label: 'My Files',
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(LucideIcons.share2),
+                          label: 'Shared Links',
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(LucideIcons.trash2),
+                          label: 'Recycle Bin',
+                        ),
+                      ],
+                    ),
                   ),
-                  BottomNavigationBarItem(
-                    icon: Icon(LucideIcons.share2),
-                    label: 'Shared Links',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(LucideIcons.trash2),
-                    label: 'Recycle Bin',
-                  ),
-                ],
-              ),
-            ),
-            floatingActionButton: _currentTab == 0
+            floatingActionButton: (_currentTab == 0 && !_isSelectionMode)
                 ? AnimatedSlide(
                     duration: const Duration(milliseconds: 250),
                     curve: Curves.easeInOut,
@@ -1435,6 +1672,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               canPop: false,
               onPopInvokedWithResult: (didPop, result) {
                 if (didPop) return;
+
+                if (_isSelectionMode) {
+                  _exitSelectionMode();
+                  return;
+                }
 
                 if (_searchQuery.isNotEmpty || _searchFocusNode.hasFocus) {
                   _searchFocusNode.unfocus();
@@ -1574,13 +1816,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           itemCount: filteredFiles.length,
                                           itemBuilder: (context, index) {
                                             final file = filteredFiles[index];
+                                            final isSelected = _selectedFileIds.contains(file.id);
                                             return FileListItem(
                                               file: file,
-                                              onTap: () {
-                                                if (file.isFolder) {
-                                                  _navigateToFolder(file);
+                                              isSelectionMode: _isSelectionMode,
+                                              isSelected: isSelected,
+                                              onLongPress: () {
+                                                if (!_isSelectionMode) {
+                                                  _enterSelectionMode(file);
                                                 } else {
-                                                  _handlePreview(file);
+                                                  _toggleFileSelection(file);
+                                                }
+                                              },
+                                              onTap: () {
+                                                if (_isSelectionMode) {
+                                                  _toggleFileSelection(file);
+                                                } else {
+                                                  if (file.isFolder) {
+                                                    _navigateToFolder(file);
+                                                  } else {
+                                                    _handlePreview(file);
+                                                  }
                                                 }
                                               },
                                               onActionSelected: (action) {

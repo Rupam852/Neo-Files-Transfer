@@ -6,6 +6,7 @@ import '../models/in_app_notification.dart';
 import 'auth_service.dart';
 
 class NotificationService extends ChangeNotifier {
+  static const String _keyAllNotifications = 'neo_notif_all_enabled';
   static const String _keyDownloadAlerts = 'neo_notif_download_alerts';
   static const String _keyUploadAlerts = 'neo_notif_upload_alerts';
   static const String _keySecurityAlerts = 'neo_notif_security_alerts';
@@ -19,6 +20,7 @@ class NotificationService extends ChangeNotifier {
   RealtimeChannel? _notificationChannel;
   Timer? _pollingTimer;
 
+  bool _allNotificationsEnabled = true;
   bool _downloadAlertsEnabled = true;
   bool _uploadAlertsEnabled = true;
   bool _securityAlertsEnabled = true;
@@ -38,6 +40,7 @@ class NotificationService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   int get unreadCount => _notifications.where((n) => !n.isRead).length;
 
+  bool get allNotificationsEnabled => _allNotificationsEnabled;
   bool get downloadAlertsEnabled => _downloadAlertsEnabled;
   bool get uploadAlertsEnabled => _uploadAlertsEnabled;
   bool get securityAlertsEnabled => _securityAlertsEnabled;
@@ -46,6 +49,7 @@ class NotificationService extends ChangeNotifier {
   Future<void> _loadNotificationPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      _allNotificationsEnabled = prefs.getBool(_keyAllNotifications) ?? true;
       _downloadAlertsEnabled = prefs.getBool(_keyDownloadAlerts) ?? true;
       _uploadAlertsEnabled = prefs.getBool(_keyUploadAlerts) ?? true;
       _securityAlertsEnabled = prefs.getBool(_keySecurityAlerts) ?? true;
@@ -54,6 +58,13 @@ class NotificationService extends ChangeNotifier {
     } catch (e) {
       debugPrint('[NotificationService] Error loading preferences: $e');
     }
+  }
+
+  Future<void> setAllNotifications(bool enabled) async {
+    _allNotificationsEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyAllNotifications, enabled);
+    notifyListeners();
   }
 
   Future<void> setDownloadAlerts(bool enabled) async {
@@ -186,11 +197,13 @@ class NotificationService extends ChangeNotifier {
           final isSecurity = type == 'security' || type == 'approval' || notif.title.toLowerCase().contains('security') || notif.title.toLowerCase().contains('access');
           final isUpdate = type == 'update' || notif.title.toLowerCase().contains('update') || notif.title.toLowerCase().contains('version');
 
-          bool shouldAlert = true;
-          if (isDownload && !_downloadAlertsEnabled) shouldAlert = false;
-          if (isUpload && !_uploadAlertsEnabled) shouldAlert = false;
-          if (isSecurity && !_securityAlertsEnabled) shouldAlert = false;
-          if (isUpdate && !_updateAlertsEnabled) shouldAlert = false;
+          bool shouldAlert = _allNotificationsEnabled;
+          if (_allNotificationsEnabled) {
+            if (isDownload && !_downloadAlertsEnabled) shouldAlert = false;
+            if (isUpload && !_uploadAlertsEnabled) shouldAlert = false;
+            if (isSecurity && !_securityAlertsEnabled) shouldAlert = false;
+            if (isUpdate && !_updateAlertsEnabled) shouldAlert = false;
+          }
 
           if (shouldAlert) {
             onNewNotification?.call(notif);

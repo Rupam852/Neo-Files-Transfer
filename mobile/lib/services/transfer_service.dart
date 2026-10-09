@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide Headers;
+import 'package:archive/archive_io.dart';
+import 'package:intl/intl.dart';
 import '../config.dart';
 import '../models/shared_file.dart';
 import 'api_service.dart';
@@ -34,6 +36,8 @@ class TransferTask {
   String? parentDriveFolderId;
   bool autoMakePublic;
   SharedFile? fileRecord;
+  List<SharedFile>? batchFiles;
+  bool isZipBatch;
   DateTime startTime;
   int lastBytes;
   DateTime lastTime;
@@ -57,6 +61,8 @@ class TransferTask {
     this.parentDriveFolderId,
     this.autoMakePublic = true,
     this.fileRecord,
+    this.batchFiles,
+    this.isZipBatch = false,
   })  : startTime = DateTime.now(),
         lastBytes = transferredBytes,
         lastTime = DateTime.now();
@@ -195,6 +201,32 @@ class TransferService with ChangeNotifier {
     }
   }
 
+  String _buildDownloadUrl(SharedFile file) {
+    final hash = file.uniqueShareHash;
+    if (AppConfig.cfWorkerUrl.isNotEmpty) {
+      final cleanWorker = AppConfig.cfWorkerUrl.endsWith('/')
+          ? AppConfig.cfWorkerUrl.substring(0, AppConfig.cfWorkerUrl.length - 1)
+          : AppConfig.cfWorkerUrl;
+      return hash != null && hash.isNotEmpty
+          ? '$cleanWorker?hash=$hash&skip_increment=true'
+          : '$cleanWorker?file_id=${file.id}&skip_increment=true';
+    } else if (AppConfig.proxyUrl.isNotEmpty) {
+      final cleanProxy = AppConfig.proxyUrl.endsWith('/')
+          ? AppConfig.proxyUrl.substring(0, AppConfig.proxyUrl.length - 1)
+          : AppConfig.proxyUrl;
+      return hash != null && hash.isNotEmpty
+          ? '$cleanProxy/download-file?hash=$hash&skip_increment=true'
+          : '$cleanProxy/download-file?file_id=${file.id}&skip_increment=true';
+    } else {
+      final cleanSb = AppConfig.supabaseUrl.endsWith('/')
+          ? AppConfig.supabaseUrl.substring(0, AppConfig.supabaseUrl.length - 1)
+          : AppConfig.supabaseUrl;
+      return hash != null && hash.isNotEmpty
+          ? '$cleanSb/functions/v1/download-file?hash=$hash&skip_increment=true'
+          : '$cleanSb/functions/v1/download-file?file_id=${file.id}&skip_increment=true';
+    }
+  }
+
   // --- START RESUMABLE DOWNLOAD ---
   Future<String> startDownload(SharedFile file) async {
     Directory? downloadsDir;
@@ -211,33 +243,7 @@ class TransferService with ChangeNotifier {
 
     final savePath = '${downloadsDir.path}/${file.fileName}';
     final taskId = 'dl_${file.id}_${DateTime.now().millisecondsSinceEpoch}';
-
-    // Build URL with skip_increment=true for self-download
-    String downloadUrl = '';
-    final hash = file.uniqueShareHash;
-
-    if (AppConfig.cfWorkerUrl.isNotEmpty) {
-      final cleanWorker = AppConfig.cfWorkerUrl.endsWith('/')
-          ? AppConfig.cfWorkerUrl.substring(0, AppConfig.cfWorkerUrl.length - 1)
-          : AppConfig.cfWorkerUrl;
-      downloadUrl = hash != null && hash.isNotEmpty
-          ? '$cleanWorker?hash=$hash&skip_increment=true'
-          : '$cleanWorker?file_id=${file.id}&skip_increment=true';
-    } else if (AppConfig.proxyUrl.isNotEmpty) {
-      final cleanProxy = AppConfig.proxyUrl.endsWith('/')
-          ? AppConfig.proxyUrl.substring(0, AppConfig.proxyUrl.length - 1)
-          : AppConfig.proxyUrl;
-      downloadUrl = hash != null && hash.isNotEmpty
-          ? '$cleanProxy/download-file?hash=$hash&skip_increment=true'
-          : '$cleanProxy/download-file?file_id=${file.id}&skip_increment=true';
-    } else {
-      final cleanSb = AppConfig.supabaseUrl.endsWith('/')
-          ? AppConfig.supabaseUrl.substring(0, AppConfig.supabaseUrl.length - 1)
-          : AppConfig.supabaseUrl;
-      downloadUrl = hash != null && hash.isNotEmpty
-          ? '$cleanSb/functions/v1/download-file?hash=$hash&skip_increment=true'
-          : '$cleanSb/functions/v1/download-file?file_id=${file.id}&skip_increment=true';
-    }
+    final downloadUrl = _buildDownloadUrl(file);
 
     final task = TransferTask(
       id: taskId,
@@ -255,6 +261,189 @@ class TransferService with ChangeNotifier {
 
     _executeDownload(task);
     return taskId;
+  }
+
+  // --- START BATCH DOWNLOAD AS ZIP ARCHIVE ---
+  Future<String> startBatchDownloadZip({
+    required List<SharedFile> files,
+    String? zipName,
+  }) async {
+    final validFiles = files.where((f) => !f.isFolder).toList();
+    if (validFiles.isEmpty) {
+      throw Exception('No downloadable files selected');
+    }
+
+    Directory? downloadsDir;
+    if (Platform.isAndroid) {
+      downloadsDir = Directory('/storage/emulated/0/Download');
+      if (!downloadsDir.existsSync()) {
+        downloadsDir = await getExternalStorageDirectory();
+      }
+    } else {
+      downloadsDir = await getApplicationDocumentsDirectory();
+    }
+
+    if (downloadsDir == null) throw Exception('Storage directory inaccessible');
+
+    final timeStampStr = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    final finalZipName = zipName?.isNotEmpty == true
+        ? (zipName!.endsWith('.zip') ? zipName : '$zipName.zip')
+        : 'NeoFiles_Batch_$timeStampStr.zip';
+
+    final savePath = '${downloadsDir.path}/$finalZipName';
+    final totalSize = validFiles.fold<int>(0, (sum, f) => sum + f.fileSize);
+    final taskId = 'zip_${DateTime.now().millisecondsSinceEpoch}';
+
+    final task = TransferTask(
+      id: taskId,
+      fileName: finalZipName,
+      totalBytes: totalSize,
+      type: TransferType.download,
+      status: TransferStatus.queued,
+      localPath: savePath,
+      batchFiles: validFiles,
+      isZipBatch: true,
+    );
+
+    _tasks.insert(0, task);
+    notifyListeners();
+
+    _executeBatchDownloadZip(task);
+    return taskId;
+  }
+
+  Future<void> _executeBatchDownloadZip(TransferTask task) async {
+    task.status = TransferStatus.running;
+    task.cancelToken = CancelToken();
+    task.error = null;
+    notifyListeners();
+    _updateNotification(task);
+
+    final dio = Dio();
+    final tempDir = await getTemporaryDirectory();
+    final stagingDir = Directory('${tempDir.path}/${task.id}');
+    if (!await stagingDir.exists()) {
+      await stagingDir.create(recursive: true);
+    }
+
+    final validFiles = task.batchFiles ?? [];
+    int overallReceived = 0;
+    final totalBytes = task.totalBytes;
+    task.lastTime = DateTime.now();
+    task.lastBytes = 0;
+
+    final List<File> downloadedTempFiles = [];
+
+    try {
+      for (int i = 0; i < validFiles.length; i++) {
+        if (task.cancelToken?.isCancelled == true) {
+          throw DioException(
+            requestOptions: RequestOptions(path: ''),
+            type: DioExceptionType.cancel,
+          );
+        }
+
+        final file = validFiles[i];
+        final url = _buildDownloadUrl(file);
+        final tempFilePath = '${stagingDir.path}/${file.fileName}';
+        final tempFile = File(tempFilePath);
+
+        final response = await dio.get<ResponseBody>(
+          url,
+          options: Options(responseType: ResponseType.stream),
+          cancelToken: task.cancelToken,
+        );
+
+        final sink = tempFile.openWrite();
+
+        await for (final chunk in response.data!.stream) {
+          sink.add(chunk);
+          overallReceived += chunk.length;
+          task.transferredBytes = overallReceived;
+
+          if (totalBytes > 0) {
+            task.progress = (overallReceived / totalBytes).clamp(0.0, 0.90);
+          }
+
+          final now = DateTime.now();
+          final ms = now.difference(task.lastTime).inMilliseconds;
+          if (ms >= 400) {
+            final diff = overallReceived - task.lastBytes;
+            if (diff > 0) {
+              final bps = diff / (ms / 1000.0);
+              if (bps >= 1024 * 1024) {
+                task.speed = '${(bps / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+              } else if (bps >= 1024) {
+                task.speed = '${(bps / 1024).toStringAsFixed(0)} KB/s';
+              }
+
+              if (totalBytes > overallReceived && bps > 0) {
+                final remainingSec = (totalBytes - overallReceived) / bps;
+                task.eta = remainingSec < 60
+                    ? '${remainingSec.toInt()}s remaining'
+                    : '${(remainingSec / 60).toInt()}m remaining';
+              }
+            }
+            task.lastTime = now;
+            task.lastBytes = overallReceived;
+            _updateNotification(task);
+            notifyListeners();
+          }
+        }
+
+        await sink.flush();
+        await sink.close();
+        downloadedTempFiles.add(tempFile);
+      }
+
+      task.speed = 'Packaging ZIP...';
+      task.progress = 0.95;
+      notifyListeners();
+      _updateNotification(task);
+
+      final encoder = ZipFileEncoder();
+      encoder.create(task.localPath!);
+      for (final f in downloadedTempFiles) {
+        encoder.addFile(f);
+      }
+      encoder.close();
+
+      try {
+        if (await stagingDir.exists()) {
+          await stagingDir.delete(recursive: true);
+        }
+      } catch (_) {}
+
+      task.status = TransferStatus.completed;
+      task.progress = 1.0;
+      task.transferredBytes = totalBytes;
+      task.speed = '';
+      task.eta = '';
+      notifyListeners();
+      _updateNotification(task);
+
+      if (Platform.isAndroid && task.localPath != null) {
+        try {
+          const platform = MethodChannel('com.neofiles.transfer/media_scanner');
+          await platform.invokeMethod('scanFile', {'path': task.localPath});
+        } catch (_) {}
+      }
+
+    } on DioException catch (e) {
+      if (CancelToken.isCancel(e) || task.status == TransferStatus.paused) {
+        task.status = TransferStatus.paused;
+      } else {
+        task.status = TransferStatus.failed;
+        task.error = e.message;
+      }
+      notifyListeners();
+      _updateNotification(task);
+    } catch (e) {
+      task.status = TransferStatus.failed;
+      task.error = e.toString();
+      notifyListeners();
+      _updateNotification(task);
+    }
   }
 
   Future<void> _executeDownload(TransferTask task) async {
@@ -608,7 +797,9 @@ class TransferService with ChangeNotifier {
     if (idx != -1) {
       final task = _tasks[idx];
       if (task.status == TransferStatus.paused || task.status == TransferStatus.failed) {
-        if (task.type == TransferType.download) {
+        if (task.isZipBatch) {
+          _executeBatchDownloadZip(task);
+        } else if (task.type == TransferType.download) {
           _executeDownload(task);
         } else {
           _executeUpload(task);

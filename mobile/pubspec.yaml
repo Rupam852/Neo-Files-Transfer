@@ -49,6 +49,7 @@ dependencies:
   # Network & API
   http: ^1.2.1
   dio: ^5.7.0
+  archive: ^3.6.1
 
   # Utilities & UI Elements
   provider: ^6.1.1

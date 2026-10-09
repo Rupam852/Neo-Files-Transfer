@@ -6,13 +6,21 @@ import '../models/shared_file.dart';
 class FileListItem extends StatelessWidget {
   final SharedFile file;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final Function(String) onActionSelected;
+  final bool isSelectionMode;
+  final bool isSelected;
+  final ValueChanged<bool?>? onSelectChanged;
 
   const FileListItem({
     Key? key,
     required this.file,
     required this.onTap,
+    this.onLongPress,
     required this.onActionSelected,
+    this.isSelectionMode = false,
+    this.isSelected = false,
+    this.onSelectChanged,
   }) : super(key: key);
 
   String _formatFileSize(int bytes) {
@@ -57,27 +65,41 @@ class FileListItem extends StatelessWidget {
     final formattedDate = DateFormat('MMM dd, yyyy').format(file.createdAt);
     final sizeStr = file.isFolder ? 'Folder' : _formatFileSize(file.fileSize);
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
       margin: const EdgeInsets.only(bottom: 12.0),
       decoration: BoxDecoration(
-        color: isLight ? Colors.white : const Color(0xFF0B1329).withOpacity(0.5),
+        color: isSelected
+            ? (isLight ? const Color(0xFFEEF2FF) : const Color(0xFF1E1B4B).withOpacity(0.5))
+            : (isLight ? Colors.white : const Color(0xFF0B1329).withOpacity(0.5)),
         borderRadius: BorderRadius.circular(16.0),
         border: Border.all(
-          color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.04),
-          width: 1.0,
+          color: isSelected
+              ? const Color(0xFF4F46E5)
+              : (isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.04)),
+          width: isSelected ? 1.8 : 1.0,
         ),
-        boxShadow: isLight
+        boxShadow: isSelected
             ? [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
+                  color: const Color(0xFF4F46E5).withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                )
               ]
-            : null,
+            : (isLight
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null),
       ),
       child: ListTile(
         onTap: onTap,
+        onLongPress: onLongPress,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
         leading: Container(
           width: 48,
@@ -171,7 +193,26 @@ class FileListItem extends StatelessWidget {
             ],
           ),
         ),
-        trailing: PopupMenuButton<String>(
+        trailing: isSelectionMode
+            ? AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF4F46E5)
+                        : (isLight ? const Color(0xFFCBD5E1) : Colors.white30),
+                    width: 2,
+                  ),
+                ),
+                child: isSelected
+                    ? const Icon(LucideIcons.check, color: Colors.white, size: 14)
+                    : null,
+              )
+            : PopupMenuButton<String>(
           color: isLight ? Colors.white : const Color(0xFF0F172A),
           elevation: 8,
           shape: RoundedRectangleBorder(
