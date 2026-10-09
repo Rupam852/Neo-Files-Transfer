@@ -753,32 +753,15 @@ export default function FilesPage({ onViewVersions }) {
     }
 
     let currentBatch = []
-    let remainingQueue = []
-    const uploadLimit = import.meta.env.VITE_PROXY_URL ? 250 * 1024 * 1024 : 100 * 1024 * 1024
-    const limitLabel = import.meta.env.VITE_PROXY_URL ? '250MB' : '100MB'
-    let currentBatchSize = 0
 
     for (const file of validFiles) {
-      if (file.size > uploadLimit) {
-        toast.error(`File ${file.name} exceeds ${limitLabel} limit and was skipped.`)
-        continue
-      }
-
       const item = {
         fileObj: file,
         dbParentId: currentFolder ? currentFolder.id : null,
         driveParentId: currentFolder ? currentFolder.google_drive_file_id : profile.drive_folder_id
       }
-
-      if (currentBatchSize + file.size <= uploadLimit) {
-        currentBatch.push(item)
-        currentBatchSize += file.size
-      } else {
-        remainingQueue.push(item)
-      }
+      currentBatch.push(item)
     }
-
-    setUploadQueue(prev => [...prev, ...remainingQueue])
 
     if (currentBatch.length > 0) {
       await uploadBatch(currentBatch)
@@ -1028,10 +1011,6 @@ export default function FilesPage({ onViewVersions }) {
       })
 
       let currentBatch = []
-      let remainingQueue = []
-      const uploadLimit = import.meta.env.VITE_PROXY_URL ? 250 * 1024 * 1024 : 100 * 1024 * 1024
-      const limitLabel = import.meta.env.VITE_PROXY_URL ? '250MB' : '100MB'
-      let currentBatchSize = 0
 
       for (const item of filesToUpload) {
         if (isCancelledRef.current) break
@@ -1039,20 +1018,8 @@ export default function FilesPage({ onViewVersions }) {
           continue
         }
 
-        if (item.fileObj.size > uploadLimit) {
-          toast.error(`File ${item.fileObj.name} exceeds ${limitLabel} and was skipped.`)
-          continue
-        }
-
-        if (currentBatchSize + item.fileObj.size <= uploadLimit) {
-          currentBatch.push(item)
-          currentBatchSize += item.fileObj.size
-        } else {
-          remainingQueue.push(item)
-        }
+        currentBatch.push(item)
       }
-
-      setUploadQueue(prev => [...prev, ...remainingQueue])
 
       if (currentBatch.length > 0) {
         await uploadBatch(currentBatch)

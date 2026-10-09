@@ -71,15 +71,6 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
     const selectedFile = e.target.files?.[0]
     if (!selectedFile) return
 
-    const proxyUrl = import.meta.env.VITE_PROXY_URL
-    const uploadLimit = proxyUrl ? 250 * 1024 * 1024 : 100 * 1024 * 1024
-    const limitLabel = proxyUrl ? '250MB' : '100MB'
-
-    if (selectedFile.size > uploadLimit) {
-      toast.error(`File size exceeds ${limitLabel} limit`)
-      return
-    }
-
     if (!profile?.drive_folder_id) {
       toast.error('Please configure Google Drive folder in Settings')
       return
