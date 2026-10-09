@@ -208,7 +208,7 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 animate-fade-in">
-      <div className="bg-dark-700/95 border border-dark-400/80 rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden backdrop-blur-xl transition-all">
+      <div className="bg-dark-700/95 border border-dark-400/80 rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] w-full max-w-xl h-[600px] max-h-[90vh] flex flex-col overflow-hidden backdrop-blur-xl transition-all">
         
         {/* Modern Header (Sticky / Shrink-0) */}
         <div className="shrink-0 relative px-6 pt-5 pb-4 border-b border-dark-400/60 bg-gradient-to-b from-dark-600/50 to-dark-700/80">
@@ -270,7 +270,7 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
         {/* Scrollable Modal Body */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 custom-scrollbar">
           {activeTab === 'direct' && (
-            <>
+            <div className="animate-fade-in space-y-4">
               {!file.unique_share_hash ? (
                 <div className="bg-gradient-to-b from-dark-600/80 to-dark-600/40 border border-dark-400/70 rounded-2xl p-6 text-center space-y-4">
                   <div className="w-14 h-14 bg-primary-500/10 border border-primary-500/20 rounded-2xl flex items-center justify-center mx-auto text-primary-400 shadow-lg shadow-primary-500/10">
@@ -463,12 +463,12 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
                   </div>
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {/* Tab 2: Custom Protected Links */}
           {activeTab === 'custom' && (
-            <div className="space-y-4">
+            <div className="animate-fade-in space-y-4">
               {/* Creator Form Card with solid padding */}
               <form onSubmit={handleCreateCustomLink} className="p-5 bg-dark-600/60 rounded-2xl border border-dark-400/70 space-y-4 shadow-sm">
                 <div className="flex items-center justify-between pb-3 border-b border-dark-400/50">
