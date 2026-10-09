@@ -372,7 +372,7 @@ serve(async (req) => {
     const browser = /chrome/i.test(userAgent) ? 'Chrome' : /firefox/i.test(userAgent) ? 'Firefox' : /safari/i.test(userAgent) ? 'Safari' : /edge/i.test(userAgent) ? 'Edge' : 'Browser'
     const os = /android/i.test(userAgent) ? 'Android' : /windows/i.test(userAgent) ? 'Windows' : /mac/i.test(userAgent) ? 'macOS' : /linux/i.test(userAgent) ? 'Linux' : /ios|iphone|ipad/i.test(userAgent) ? 'iOS' : 'OS'
 
-    // Increment download count and record download analytics log asynchronously if not skipped
+    // Increment download count, record analytics log, and dispatch push notification to owner
     if (!skipIncrement && !isInline) {
       (async () => {
         try {
@@ -384,8 +384,35 @@ serve(async (req) => {
             browser: browser,
             os: os,
           })
+
+          // Dispatch Owner Push Notification if owner has active device tokens
+          const { data: ownerTokens } = await supabaseAdmin
+            .from("user_fcm_tokens")
+            .select("fcm_token")
+            .eq("user_id", fileOwner.user_id)
+
+          if (ownerTokens && ownerTokens.length > 0) {
+            const funcUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/broadcast-notification`
+            await fetch(funcUrl, {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                title: "📥 File Downloaded",
+                body: `Someone just downloaded "${file.file_name}" (${deviceType} • ${os}).`,
+                targetType: "user",
+                target: fileOwner.user_id,
+                dataPayload: {
+                  type: "download_alert",
+                  file_id: file.id,
+                },
+              }),
+            })
+          }
         } catch (logErr) {
-          console.error("Failed to log download analytics in edge function:", logErr)
+          console.error("Failed to log download analytics or send FCM in edge function:", logErr)
         }
       })()
     }

@@ -143,27 +143,32 @@ serve(async (req) => {
       });
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    let isServiceRole = (token === serviceRoleKey);
+    let callingUserId = "system";
 
-    // Check if requester is an admin in admins table
-    const { data: adminRecord, error: adminErr } = await supabase
-      .from("admins")
-      .select("id, role")
-      .eq("user_id", user.id)
-      .single();
+    if (!isServiceRole) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      callingUserId = user.id;
 
-    if (adminErr || !adminRecord) {
-      return new Response(JSON.stringify({ error: "Forbidden: Admin privileges required" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Check if requester is an admin in admins table
+      const { data: adminRecord, error: adminErr } = await supabase
+        .from("admins")
+        .select("id, role")
+        .eq("user_id", user.id)
+        .single();
+
+      if (adminErr || !adminRecord) {
+        return new Response(JSON.stringify({ error: "Forbidden: Admin privileges required" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const {
@@ -252,17 +257,19 @@ serve(async (req) => {
     }
 
     // Log the broadcast in activity logs
-    await supabase.from("activity_logs").insert({
-      user_id: user.id,
-      action: "ADMIN_BROADCAST_SENT",
-      details: {
-        title,
-        body,
-        target,
-        targetType,
-        timestamp: new Date().toISOString(),
-      },
-    });
+    if (callingUserId !== "system") {
+      await supabase.from("activity_logs").insert({
+        user_id: callingUserId,
+        action: "ADMIN_BROADCAST_SENT",
+        details: {
+          title,
+          body,
+          target,
+          targetType,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
 
     return new Response(
       JSON.stringify({
