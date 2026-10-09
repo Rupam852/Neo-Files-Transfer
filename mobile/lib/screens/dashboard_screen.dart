@@ -1812,6 +1812,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   : filteredFiles.isEmpty
                                       ? _buildEmptyState(isLight)
                                       : ListView.builder(
+                                          key: PageStorageKey('my_files_list_${_currentFolder?.id ?? "root"}'),
                                           padding: const EdgeInsets.symmetric(horizontal: 20.0),
                                           itemCount: filteredFiles.length,
                                           itemBuilder: (context, index) {
@@ -2100,6 +2101,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return ListView.builder(
+      key: const PageStorageKey('shared_files_list_view'),
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
       itemCount: sharedFiles.length,
       itemBuilder: (context, index) {
@@ -2312,6 +2314,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return ListView.builder(
+      key: const PageStorageKey('trash_files_list_view'),
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
       itemCount: trashFiles.length,
       itemBuilder: (context, index) {

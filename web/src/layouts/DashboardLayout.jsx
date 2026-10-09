@@ -66,7 +66,14 @@ export default function DashboardLayout() {
     }
   })
 
+  const mainRef = useRef(null)
+  const tabScrollPositions = useRef({})
+
   const navigateTab = (tab, fileId = null, push = true) => {
+    // Save current scroll position before leaving tab
+    if (mainRef.current) {
+      tabScrollPositions.current[currentTab] = mainRef.current.scrollTop
+    }
     setCurrentTab(tab)
     setSelectedFileId(fileId)
     const targetUrl = tab === 'dashboard' ? '/dashboard' : `/dashboard/${tab}`
@@ -84,6 +91,19 @@ export default function DashboardLayout() {
       console.error('History API error:', e)
     }
   }
+
+  // Restore scroll position when switching tabs
+  useEffect(() => {
+    if (mainRef.current) {
+      const savedPos = tabScrollPositions.current[currentTab] || 0
+      const timer = setTimeout(() => {
+        if (mainRef.current) {
+          mainRef.current.scrollTop = savedPos
+        }
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [currentTab])
 
   useEffect(() => {
     // Restore and setup initial history state on mount
@@ -319,7 +339,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
+        <main ref={mainRef} className="flex-1 p-4 lg:p-6 overflow-auto">
           {currentTab === 'dashboard' && <DashboardPage onNavigate={(tab) => navigateTab(tab)} />}
           {currentTab === 'files' && <FilesPage onViewVersions={(fileId) => navigateTab('versions', fileId)} />}
           {currentTab === 'shared' && <SharedFilesPage />}
