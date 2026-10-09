@@ -53,37 +53,56 @@ class _AboutScreenState extends State<AboutScreen> {
     }
   }
 
-  void _handleUpiPayment() async {
+  Future<void> _handleUpiPayment() async {
     const upiId = 'expensetracker@ybl';
-    const upiUrl = 'upi://pay?pa=$upiId&pn=Rupam%20Bairagya&cu=INR';
+    final upiUri = Uri.parse(
+      'upi://pay?pa=$upiId&pn=Rupam%20Bairagya&cu=INR&tn=Support%20NeoFiles%20Transfer',
+    );
 
+    bool launched = false;
     try {
-      final uri = Uri.parse(upiUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        return;
+      if (await canLaunchUrl(upiUri)) {
+        launched = await launchUrl(
+          upiUri,
+          mode: LaunchMode.externalNonBrowserApplication,
+        );
       }
-    } catch (_) {}
+    } catch (_) {
+      launched = false;
+    }
 
-    // Fallback: Copy UPI ID to clipboard
-    await Clipboard.setData(const ClipboardData(text: upiId));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: const [
-              Icon(LucideIcons.checkCheck, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text('UPI ID copied: expensetracker@ybl'),
-              ),
-            ],
+    if (!launched) {
+      try {
+        launched = await launchUrl(
+          upiUri,
+          mode: LaunchMode.externalApplication,
+        );
+      } catch (_) {
+        launched = false;
+      }
+    }
+
+    if (!launched) {
+      // Fallback: Copy UPI ID to clipboard
+      await Clipboard.setData(const ClipboardData(text: upiId));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(LucideIcons.copy, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('No UPI app found. UPI ID copied: $upiId'),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF4F46E5),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          backgroundColor: const Color(0xFF10B981),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+        );
+      }
     }
   }
 
