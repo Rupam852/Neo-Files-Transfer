@@ -207,11 +207,11 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
   const directDownloadUrl = file?.unique_share_hash ? generateDirectDownloadUrl(file.unique_share_hash, file.is_folder, file.file_size) : ''
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 animate-fade-in">
       <div className="bg-dark-700/95 border border-dark-400/80 rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden backdrop-blur-xl transition-all">
         
-        {/* Modern Header */}
-        <div className="relative px-6 pt-5 pb-4 border-b border-dark-400/60 bg-gradient-to-b from-dark-600/50 to-transparent">
+        {/* Modern Header (Sticky / Shrink-0) */}
+        <div className="shrink-0 relative px-6 pt-5 pb-4 border-b border-dark-400/60 bg-gradient-to-b from-dark-600/50 to-dark-700/80">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-primary-600/30 via-primary-500/20 to-indigo-500/10 border border-primary-500/30 flex items-center justify-center text-primary-400 shrink-0 shadow-inner">
@@ -243,7 +243,7 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
           </div>
 
           {/* Segmented Tab Pill Bar */}
-          <div className="flex p-1 bg-dark-800/80 rounded-2xl mt-4 border border-dark-500/80 shadow-inner">
+          <div className="flex p-1 bg-dark-800/90 rounded-2xl mt-4 border border-dark-500/80 shadow-inner">
             <button
               onClick={() => setActiveTab('direct')}
               className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold transition-all duration-200 ${
@@ -268,7 +268,7 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
         </div>
 
         {/* Scrollable Modal Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 custom-scrollbar">
           {activeTab === 'direct' && (
             <>
               {!file.unique_share_hash ? (
@@ -335,11 +335,11 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
                   </div>
 
                   {/* 1. Web Download Page Card */}
-                  <div className="p-4 bg-dark-600/50 hover:bg-dark-600/70 border border-dark-400/70 rounded-2xl space-y-2.5 transition-all">
+                  <div className="p-4 sm:p-5 bg-dark-600/50 hover:bg-dark-600/70 border border-dark-400/70 rounded-2xl space-y-3 transition-all">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-indigo-500/15 text-indigo-400 flex items-center justify-center">
-                          <Globe size={13} />
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center">
+                          <Globe size={15} />
                         </div>
                         <div>
                           <span className="text-xs font-bold text-indigo-300 tracking-wide">
@@ -353,7 +353,7 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
 
                       <button
                         onClick={() => setShowQr(!showQr)}
-                        className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-semibold px-2 py-0.5 rounded-lg hover:bg-indigo-500/10 transition-colors"
+                        className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-semibold px-2.5 py-1 rounded-lg hover:bg-indigo-500/10 transition-colors"
                       >
                         <QrCode size={13} /> {showQr ? 'Hide QR' : 'Show QR'}
                       </button>
@@ -367,7 +367,7 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
                         className="bg-transparent text-xs text-gray-200 select-all font-mono outline-none flex-1 truncate pr-2"
                         value={webShareUrl}
                       />
-                      <div className="flex items-center gap-1 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => window.open(webShareUrl, '_blank')}
                           className="p-1.5 text-gray-400 hover:text-indigo-300 hover:bg-dark-500/80 rounded-lg transition-colors"
@@ -418,11 +418,11 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
                   )}
 
                   {/* 2. Direct Stream CDN Link Card */}
-                  <div className="p-4 bg-dark-600/50 hover:bg-dark-600/70 border border-dark-400/70 rounded-2xl space-y-2.5 transition-all">
+                  <div className="p-4 sm:p-5 bg-dark-600/50 hover:bg-dark-600/70 border border-dark-400/70 rounded-2xl space-y-3 transition-all">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-pink-500/15 text-pink-400 flex items-center justify-center">
-                          <Zap size={13} />
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-xl bg-pink-500/15 text-pink-400 flex items-center justify-center">
+                          <Zap size={15} />
                         </div>
                         <div>
                           <span className="text-xs font-bold text-pink-300 tracking-wide">
@@ -443,7 +443,7 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
                         className="bg-transparent text-xs text-gray-200 select-all font-mono outline-none flex-1 truncate pr-2"
                         value={directDownloadUrl}
                       />
-                      <div className="flex items-center gap-1 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => copyToClipboard(directDownloadUrl, 'direct')}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
@@ -469,16 +469,21 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
           {/* Tab 2: Custom Protected Links */}
           {activeTab === 'custom' && (
             <div className="space-y-4">
-              {/* Creator Form Card */}
-              <form onSubmit={handleCreateCustomLink} className="p-4.5 bg-dark-600/60 rounded-2xl border border-dark-400/70 space-y-3.5 shadow-sm">
-                <div className="flex items-center justify-between pb-2 border-b border-dark-400/40">
-                  <h4 className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Shield size={14} className="text-indigo-400" /> Create Protected Link
-                  </h4>
-                  <span className="text-[10px] text-gray-400">PIN, Expiration & 1-Time options</span>
+              {/* Creator Form Card with solid padding */}
+              <form onSubmit={handleCreateCustomLink} className="p-5 bg-dark-600/60 rounded-2xl border border-dark-400/70 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between pb-3 border-b border-dark-400/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                      <Shield size={13} />
+                    </div>
+                    <h4 className="text-xs font-bold text-indigo-300 tracking-wide">
+                      Create Protected Link
+                    </h4>
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-medium">PIN, Expiry & 1-Time options</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {/* Label / Note */}
                   <div>
                     <label className="text-[11px] text-gray-300 font-semibold block mb-1">Recipient / Label</label>
@@ -546,7 +551,7 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
                 </div>
 
                 {/* One time self destruct toggle */}
-                <div className="p-2.5 bg-dark-800/60 rounded-xl border border-dark-400/50 flex items-center justify-between">
+                <div className="p-3 bg-dark-800/70 rounded-xl border border-dark-400/60 flex items-center justify-between">
                   <label className="flex items-center gap-2.5 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -709,8 +714,8 @@ export default function ShareModal({ file, sharingEnabled, onClose, onFileUpdate
           )}
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-6 py-3.5 border-t border-dark-400/60 bg-dark-800/40 flex justify-end">
+        {/* Modal Footer (Sticky / Shrink-0) */}
+        <div className="shrink-0 px-6 py-3.5 border-t border-dark-400/60 bg-dark-800/70 flex justify-end">
           <button
             className="px-5 py-2 rounded-xl text-xs font-semibold bg-dark-500 hover:bg-dark-400 text-gray-200 border border-dark-300/60 transition-all active:scale-95 shadow-sm"
             onClick={onClose}
