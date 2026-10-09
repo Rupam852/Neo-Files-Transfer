@@ -271,6 +271,8 @@ class AuthService extends ChangeNotifier {
             profileData = UserProfile.fromJson(updated);
           }
         }
+      }
+
       _profile = profileData;
 
       // Sync FCM device token with authenticated user in Supabase

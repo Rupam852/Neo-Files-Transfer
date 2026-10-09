@@ -232,10 +232,10 @@ class FcmService {
 
     final notifId = message.hashCode & 0x7FFFFFFF;
     _localNotifs.show(
-      notifId,
-      title,
-      body,
-      NotificationDetails(android: androidDetails),
+      id: notifId,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(android: androidDetails),
       payload: data['type'] ?? data['action'] ?? 'fcm_general',
     );
   }
