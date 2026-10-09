@@ -1,0 +1,8 @@
+name = "neo-files-download"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Custom domain route if configured
+# routes = [
+#   { pattern = "download.neofilestransfer.site/*", zone_name = "neofilestransfer.site" }
+# ]
