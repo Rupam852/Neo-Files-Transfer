@@ -513,13 +513,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         continue;
       }
 
-      final uploadLimit = AppConfig.proxyUrl.isNotEmpty ? 250 * 1024 * 1024 : 100 * 1024 * 1024;
-      final limitLabel = AppConfig.proxyUrl.isNotEmpty ? '250MB' : '100MB';
-      if (picked.size > uploadLimit) {
-        _showWarningSnackBar('File ${picked.name} exceeds $limitLabel and was skipped.');
-        continue;
-      }
-
       final file = File(picked.path!);
       await transferService.startUpload(
         file: file,
@@ -705,10 +698,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         final len = await fileEntity.length();
-        final uploadLimit = AppConfig.proxyUrl.isNotEmpty ? 250 * 1024 * 1024 : 100 * 1024 * 1024;
-        if (len > uploadLimit) {
-          continue;
-        }
 
         // Get relative folder path of parent
         final relFilePath = getRelativePath(fileEntity.path);
