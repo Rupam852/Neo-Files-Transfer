@@ -1,0 +1,8 @@
+# Cloudflare / Netlify Headers configuration
+# 1. HTML is always fresh (no stale caching)
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# 2. Hashed static assets are cached for ultra-fast CDN delivery
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -41,6 +41,16 @@ class AuthService extends ChangeNotifier {
   }
 
   void _init() {
+    // Restore active session synchronously if present
+    final initialSession = _client.auth.currentSession;
+    if (initialSession != null) {
+      _user = initialSession.user;
+      loadProfile(initialSession.user);
+      _setupRealtimeListeners();
+    } else {
+      _isLoading = false;
+    }
+
     // Listen for auth state changes
     _client.auth.onAuthStateChange.listen((data) async {
       final session = data.session;
@@ -264,12 +274,25 @@ class AuthService extends ChangeNotifier {
 
       _profile = profileData;
 
-      // Check if user is Admin
-      final adminResponse = await _client
-          .from('admins')
-          .select()
-          .eq('user_id', authUser.id)
-          .maybeSingle();
+      // Check if user is Admin (check by user_id and fallback to email)
+      Map<String, dynamic>? adminResponse;
+      try {
+        adminResponse = await _client
+            .from('admins')
+            .select()
+            .eq('user_id', authUser.id)
+            .maybeSingle();
+
+        if (adminResponse == null && authUser.email != null) {
+          adminResponse = await _client
+              .from('admins')
+              .select()
+              .eq('email', authUser.email!.toLowerCase())
+              .maybeSingle();
+        }
+      } catch (e) {
+        debugPrint('Admin check query error: $e');
+      }
 
       _isAdmin = adminResponse != null;
 
@@ -292,21 +315,32 @@ class AuthService extends ChangeNotifier {
         debugPrint('Failed to fetch settings: $e');
       }
 
-      // Check if user is Paused (if not Admin)
+      // Check if user is Paused or Approved (if not Admin)
       if (!_isAdmin) {
-        final approvedResponse = await _client
-            .from('approved_users')
-            .select('id, is_paused')
-            .eq('email', authUser.email?.toLowerCase() ?? '')
-            .maybeSingle();
-
-        if (approvedResponse == null) {
-          // Check if there is a pending/rejected request in pending_registrations
-          final pendingReg = await _client
-              .from('pending_registrations')
-              .select('status')
+        Map<String, dynamic>? approvedResponse;
+        bool approvedQuerySuccess = false;
+        try {
+          approvedResponse = await _client
+              .from('approved_users')
+              .select('id, is_paused')
               .eq('email', authUser.email?.toLowerCase() ?? '')
               .maybeSingle();
+          approvedQuerySuccess = true;
+        } catch (e) {
+          debugPrint('Approved users check query error: $e');
+        }
+
+        // Only log out if query succeeded and user is definitely not approved
+        if (approvedQuerySuccess && approvedResponse == null) {
+          // Check if there is a pending/rejected request in pending_registrations
+          Map<String, dynamic>? pendingReg;
+          try {
+            pendingReg = await _client
+                .from('pending_registrations')
+                .select('status')
+                .eq('email', authUser.email?.toLowerCase() ?? '')
+                .maybeSingle();
+          } catch (_) {}
 
           String errMsg;
           if (pendingReg != null) {
@@ -336,7 +370,10 @@ class AuthService extends ChangeNotifier {
           notifyListeners();
           return;
         }
-        _isPaused = approvedResponse['is_paused'] == true;
+
+        if (approvedResponse != null) {
+          _isPaused = approvedResponse['is_paused'] == true;
+        }
         _loginError = null;
       } else {
         _isPaused = false;
