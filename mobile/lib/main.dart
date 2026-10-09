@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 import 'config.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
@@ -26,7 +29,25 @@ import 'screens/maintenance_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Supabase Client
+  // 1. Initialize Firebase first
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: 'AIzaSyAwSEViej7t93SjwJ8O3HjJz2woqXQkDPQ',
+          appId: '1:999795249319:android:05524b71050662ceaa4b82',
+          messagingSenderId: '999795249319',
+          projectId: 'neo-files-transfer-24881',
+          storageBucket: 'neo-files-transfer-24881.firebasestorage.app',
+        ),
+      );
+    }
+    await FcmService().init();
+  } catch (e) {
+    debugPrint('[main] Firebase initialization error: $e');
+  }
+
+  // 2. Initialize Supabase Client
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
@@ -36,15 +57,14 @@ void main() async {
     ),
   );
 
-  // Initialize Firebase Cloud Messaging (FCM)
+  // Sync token if user already authenticated
   try {
-    await FcmService().init();
     final uid = Supabase.instance.client.auth.currentUser?.id;
     if (uid != null) {
       unawaited(FcmService().syncUserToken(uid));
     }
   } catch (e) {
-    debugPrint('[main] FCM initialization error: $e');
+    debugPrint('[main] Post-init FCM sync error: $e');
   }
 
   runApp(const MyApp());

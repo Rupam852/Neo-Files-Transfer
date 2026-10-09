@@ -12,10 +12,20 @@ import '../screens/update_screen.dart';
 import '../widgets/transfer_manager_sheet.dart';
 import 'update_service.dart';
 
+const _firebaseOptions = FirebaseOptions(
+  apiKey: 'AIzaSyAwSEViej7t93SjwJ8O3HjJz2woqXQkDPQ',
+  appId: '1:999795249319:android:05524b71050662ceaa4b82',
+  messagingSenderId: '999795249319',
+  projectId: 'neo-files-transfer-24881',
+  storageBucket: 'neo-files-transfer-24881.firebasestorage.app',
+);
+
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
-    await Firebase.initializeApp();
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(options: _firebaseOptions);
+    }
   } catch (_) {}
   debugPrint('[FCM Background] Message received: ${message.messageId} | Data: ${message.data}');
 }
@@ -25,7 +35,7 @@ class FcmService {
   factory FcmService() => _instance;
   FcmService._internal();
 
-  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
+  FirebaseMessaging get _fcm => FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifs = FlutterLocalNotificationsPlugin();
   
   bool _isInitialized = false;
@@ -41,7 +51,10 @@ class FcmService {
     if (_isInitialized) return;
 
     try {
-      await Firebase.initializeApp();
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(options: _firebaseOptions);
+      }
+      await _fcm.setAutoInitEnabled(true);
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
       // 1. Request notification permissions (Android 13+ and iOS)
@@ -115,7 +128,7 @@ class FcmService {
   }
 
   // Bind and sync FCM token to the currently logged in user
-  Future<void> syncUserToken(String userId) async {
+  Future<Map<String, dynamic>> syncUserToken(String userId) async {
     _currentUserId = userId;
     try {
       if (!_isInitialized) {
@@ -149,6 +162,7 @@ class FcmService {
 
       // 2. Retry loop for getToken() in case Google Play Services is initializing on first launch
       String? token;
+      String? lastError;
       for (int attempt = 1; attempt <= 5; attempt++) {
         try {
           token = await _fcm.getToken();
@@ -156,35 +170,78 @@ class FcmService {
             break;
           }
         } catch (e) {
+          lastError = e.toString();
           debugPrint('[FCM] getToken attempt $attempt error: $e');
         }
-        await Future.delayed(const Duration(milliseconds: 1200));
+        await Future.delayed(const Duration(milliseconds: 1000));
       }
 
       if (token == null || token.isEmpty) {
-        debugPrint('[FCM] No token obtained after retries');
-        return;
+        debugPrint('[FCM] No token obtained after retries. Last error: $lastError');
+        return {
+          'success': false,
+          'error': lastError ?? 'FCM Token returned null. Please verify Google Play Services.',
+        };
       }
 
-      debugPrint('[FCM] Syncing token for user $userId on device $deviceId');
+      debugPrint('[FCM] Syncing token for user $userId on device $deviceId: $token');
 
-      await supabase.from('user_fcm_tokens').upsert({
-        'user_id': userId,
-        'device_id': deviceId,
-        'fcm_token': token,
-        'device_name': deviceName,
-        'platform': Platform.isAndroid ? 'android' : (Platform.isIOS ? 'ios' : 'other'),
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'user_id,device_id');
-
-      debugPrint('[FCM] Token successfully saved in user_fcm_tokens');
+      try {
+        await supabase.from('user_fcm_tokens').upsert({
+          'user_id': userId,
+          'device_id': deviceId,
+          'fcm_token': token,
+          'device_name': deviceName,
+          'platform': Platform.isAndroid ? 'android' : (Platform.isIOS ? 'ios' : 'other'),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        }, onConflict: 'user_id,device_id');
+        debugPrint('[FCM] Token successfully saved in user_fcm_tokens via upsert');
+      } catch (upsertErr) {
+        debugPrint('[FCM] Upsert failed, trying direct insert: $upsertErr');
+        try {
+          await supabase.from('user_fcm_tokens').delete().eq('user_id', userId).eq('device_id', deviceId);
+          await supabase.from('user_fcm_tokens').insert({
+            'user_id': userId,
+            'device_id': deviceId,
+            'fcm_token': token,
+            'device_name': deviceName,
+            'platform': Platform.isAndroid ? 'android' : (Platform.isIOS ? 'ios' : 'other'),
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          });
+          debugPrint('[FCM] Token successfully inserted via fallback delete+insert');
+        } catch (fallbackErr) {
+          debugPrint('[FCM] Fallback insert failed: $fallbackErr');
+          return {
+            'success': false,
+            'token': token,
+            'error': 'Database error: $fallbackErr',
+          };
+        }
+      }
 
       // Subscribe to user personal topic
       try {
         await _fcm.subscribeToTopic('user_$userId');
       } catch (_) {}
+
+      return {
+        'success': true,
+        'token': token,
+        'deviceId': deviceId,
+        'deviceName': deviceName,
+      };
     } catch (e) {
       debugPrint('[FCM] Error syncing user token: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<String?> getCurrentToken() async {
+    try {
+      if (!_isInitialized) await init();
+      return await _fcm.getToken();
+    } catch (_) {
+      return null;
     }
   }
 

@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../config.dart';
 import '../services/auth_service.dart';
 import '../services/update_service.dart';
+import '../services/fcm_service.dart';
 import '../widgets/notification_bell.dart';
 import 'update_screen.dart';
 
@@ -52,6 +53,16 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     });
     _loadAdminData();
     _setupRealtimeListeners();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        final auth = Provider.of<AuthService>(context, listen: false);
+        if (auth.currentUser != null) {
+          FcmService().syncUserToken(auth.currentUser!.id);
+        }
+      } catch (e) {
+        debugPrint('[AdminScreen] FCM sync error: $e');
+      }
+    });
   }
 
   @override

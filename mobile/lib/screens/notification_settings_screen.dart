@@ -12,8 +12,8 @@ class NotificationSettingsScreen extends StatelessWidget {
     final notifService = Provider.of<NotificationService>(context);
 
     final bgColor = isLight ? const Color(0xFFF8FAFC) : const Color(0xFF030712);
-    final cardBg = isLight ? Colors.white : const Color(0xFF0B1329).withValues(alpha: 0.6);
-    final cardBorder = isLight ? const Color(0xFFE2E8F0) : Colors.white.withValues(alpha: 0.06);
+    final cardBg = isLight ? Colors.white : const Color(0xFF0B1329).withOpacity(0.6);
+    final cardBorder = isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.06);
     final titleTextColor = isLight ? const Color(0xFF0F172A) : Colors.white;
     final subtitleTextColor = isLight ? const Color(0xFF64748B) : Colors.white60;
     final sectionHeaderColor = isLight ? const Color(0xFF94A3B8) : Colors.white38;
@@ -56,15 +56,15 @@ class NotificationSettingsScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20.0),
                 border: Border.all(
                   color: isAllEnabled
-                      ? const Color(0xFF6366F1).withValues(alpha: isLight ? 0.3 : 0.4)
+                      ? const Color(0xFF6366F1).withOpacity(isLight ? 0.3 : 0.4)
                       : cardBorder,
                   width: isAllEnabled ? 1.4 : 1.0,
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: isAllEnabled
-                        ? const Color(0xFF6366F1).withValues(alpha: isLight ? 0.08 : 0.18)
-                        : Colors.black.withValues(alpha: isLight ? 0.03 : 0.2),
+                        ? const Color(0xFF6366F1).withOpacity(isLight ? 0.08 : 0.18)
+                        : Colors.black.withOpacity(isLight ? 0.03 : 0.2),
                     blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
@@ -77,7 +77,7 @@ class NotificationSettingsScreen extends StatelessWidget {
                     height: 44,
                     decoration: BoxDecoration(
                       color: isAllEnabled
-                          ? const Color(0xFF6366F1).withValues(alpha: 0.15)
+                          ? const Color(0xFF6366F1).withOpacity(0.15)
                           : (isLight ? const Color(0xFFF1F5F9) : Colors.white10),
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -100,19 +100,18 @@ class NotificationSettingsScreen extends StatelessWidget {
                             color: titleTextColor,
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
+                            fontFamily: 'Space_Grotesk',
                           ),
                         ),
                         const SizedBox(height: 3),
                         Text(
                           isAllEnabled
-                              ? 'Notifications are currently active'
-                              : 'All app notifications are muted',
+                              ? 'Master switch active. Custom preferences apply below.'
+                              : 'All push notifications are currently muted.',
                           style: TextStyle(
-                            color: isAllEnabled
-                                ? (isLight ? const Color(0xFF4F46E5) : const Color(0xFF818CF8))
-                                : subtitleTextColor,
-                            fontSize: 12,
-                            fontWeight: isAllEnabled ? FontWeight.w600 : FontWeight.normal,
+                            color: subtitleTextColor,
+                            fontSize: 11.5,
+                            height: 1.3,
                           ),
                         ),
                       ],
@@ -126,141 +125,78 @@ class NotificationSettingsScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 28),
 
-            // Notification Categories Section Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'NOTIFICATION CATEGORIES',
-                  style: TextStyle(
-                    color: sectionHeaderColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                if (!isAllEnabled)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'MUTED',
-                      style: TextStyle(
-                        color: Colors.amber,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 24),
 
-            // Category Sub-Toggles with Animated Opacity
-            AnimatedOpacity(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-              opacity: isAllEnabled ? 1.0 : 0.38,
-              child: IgnorePointer(
-                ignoring: !isAllEnabled,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(20.0),
-                    border: Border.all(color: cardBorder),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: isLight ? 0.03 : 0.2),
-                        blurRadius: 12,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      _buildCategoryRow(
-                        context: context,
-                        icon: LucideIcons.download,
-                        iconColor: const Color(0xFF10B981),
-                        title: 'Download Alerts',
-                        subtitle: 'Notify when visitors download your shared files via link',
-                        value: notifService.downloadAlertsEnabled,
-                        onChanged: (val) => notifService.setDownloadAlerts(val),
-                        isLight: isLight,
-                      ),
-                      const Divider(height: 20),
-                      _buildCategoryRow(
-                        context: context,
-                        icon: LucideIcons.cloudUpload,
-                        iconColor: const Color(0xFF3B82F6),
-                        title: 'Upload Alerts',
-                        subtitle: 'Alerts when background file uploads are complete',
-                        value: notifService.uploadAlertsEnabled,
-                        onChanged: (val) => notifService.setUploadAlerts(val),
-                        isLight: isLight,
-                      ),
-                      const Divider(height: 20),
-                      _buildCategoryRow(
-                        context: context,
-                        icon: LucideIcons.shieldCheck,
-                        iconColor: const Color(0xFFF59E0B),
-                        title: 'Security & Login Alerts',
-                        subtitle: 'Notifications for new logins and permission changes',
-                        value: notifService.securityAlertsEnabled,
-                        onChanged: (val) => notifService.setSecurityAlerts(val),
-                        isLight: isLight,
-                      ),
-                      const Divider(height: 20),
-                      _buildCategoryRow(
-                        context: context,
-                        icon: LucideIcons.sparkles,
-                        iconColor: const Color(0xFFA855F7),
-                        title: 'App Updates & Releases',
-                        subtitle: 'Notices when new features or app updates are available',
-                        value: notifService.updateAlertsEnabled,
-                        onChanged: (val) => notifService.setUpdateAlerts(val),
-                        isLight: isLight,
-                      ),
-                    ],
-                  ),
+            // Notification Channels Section
+            Padding(
+              padding: const EdgeInsets.only(left: 4.0, bottom: 10.0),
+              child: Text(
+                'NOTIFICATION CATEGORIES',
+                style: TextStyle(
+                  color: sectionHeaderColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.1,
                 ),
               ),
             ),
 
-            if (!isAllEnabled) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: isLight ? 0.08 : 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(LucideIcons.info, color: Colors.amber, size: 16),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Master toggle is OFF. All notification categories are muted until enabled.',
-                        style: TextStyle(
-                          color: isLight ? Colors.amber.shade900 : Colors.amber.shade200,
-                          fontSize: 12,
-                          height: 1.35,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+            Container(
+              padding: const EdgeInsets.all(18.0),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(20.0),
+                border: Border.all(color: cardBorder),
               ),
-            ],
+              child: Column(
+                children: [
+                  _buildCategoryRow(
+                    context: context,
+                    icon: LucideIcons.download,
+                    iconColor: const Color(0xFF10B981),
+                    title: 'File Downloads',
+                    subtitle: 'Realtime alerts when your shared links are accessed or downloaded',
+                    value: notifService.downloadAlertsEnabled,
+                    onChanged: (val) => notifService.setDownloadAlerts(val),
+                    isLight: isLight,
+                  ),
+                  const Divider(height: 24, thickness: 0.5),
+                  _buildCategoryRow(
+                    context: context,
+                    icon: LucideIcons.uploadCloud,
+                    iconColor: Colors.blueAccent,
+                    title: 'Upload Alerts',
+                    subtitle: 'Background progress and file upload completion alerts',
+                    value: notifService.uploadAlertsEnabled,
+                    onChanged: (val) => notifService.setUploadAlerts(val),
+                    isLight: isLight,
+                  ),
+                  const Divider(height: 24, thickness: 0.5),
+                  _buildCategoryRow(
+                    context: context,
+                    icon: LucideIcons.sparkles,
+                    iconColor: Colors.purpleAccent,
+                    title: 'App Updates',
+                    subtitle: 'Alerts when a new APK or feature release is published',
+                    value: notifService.updateAlertsEnabled,
+                    onChanged: (val) => notifService.setUpdateAlerts(val),
+                    isLight: isLight,
+                  ),
+                  const Divider(height: 24, thickness: 0.5),
+                  _buildCategoryRow(
+                    context: context,
+                    icon: LucideIcons.shieldCheck,
+                    iconColor: Colors.amber,
+                    title: 'Security & Auth',
+                    subtitle: 'Account status updates, pause notices, and security alerts',
+                    value: notifService.securityAlertsEnabled,
+                    onChanged: (val) => notifService.setSecurityAlerts(val),
+                    isLight: isLight,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -286,7 +222,7 @@ class NotificationSettingsScreen extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
+            color: iconColor.withOpacity(0.12),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: iconColor, size: 18),

@@ -462,7 +462,14 @@ export default function AdminDashboardPage() {
         },
       })
 
-      if (error) throw error
+      if (error) {
+        let msg = error.message
+        try {
+          const body = await error.context?.json()
+          if (body?.error) msg = body.error
+        } catch (_) {}
+        throw new Error(msg)
+      }
       if (data?.error) throw new Error(data.error)
 
       toast.success(`Push notification sent successfully! (${data?.sentCount ?? 1} sent)`)

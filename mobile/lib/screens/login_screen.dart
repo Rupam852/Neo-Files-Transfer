@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import '../services/fcm_service.dart';
 import 'registration_screen.dart';
 import '../widgets/glass_container.dart';
 
@@ -20,6 +21,9 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       await authService.signInWithGoogle();
+      if (authService.currentUser != null) {
+        FcmService().syncUserToken(authService.currentUser!.id);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

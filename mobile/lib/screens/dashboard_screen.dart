@@ -31,6 +31,7 @@ import '../widgets/share_file_dialog.dart';
 import '../widgets/media_preview_dialog.dart';
 import '../widgets/notification_bell.dart';
 import '../services/transfer_service.dart';
+import '../services/fcm_service.dart';
 import '../widgets/transfer_manager_sheet.dart';
 import '../widgets/floating_transfer_bar.dart';
 import '../widgets/folder_picker_dialog.dart';
@@ -80,6 +81,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshFiles();
+      try {
+        final authService = Provider.of<AuthService>(context, listen: false);
+        if (authService.currentUser != null) {
+          FcmService().syncUserToken(authService.currentUser!.id);
+        }
+      } catch (e) {
+        debugPrint('[DashboardScreen] Error syncing FCM token: $e');
+      }
+
       try {
         final notifService = Provider.of<NotificationService>(context, listen: false);
         notifService.onNewNotification = (notif) {
@@ -496,7 +506,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
-    final result = await FilePicker.platform.pickFiles(allowMultiple: true);
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      allowCompression: false,
+    );
     if (result == null || result.files.isEmpty) return;
 
     if (!mounted) return;
