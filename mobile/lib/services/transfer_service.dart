@@ -678,6 +678,10 @@ class TransferService with ChangeNotifier {
         parentDbFolderId: task.parentDbFolderId,
         parentDriveFolderId: task.parentDriveFolderId,
         cancelToken: task.cancelToken!,
+        existingUploadUrl: task.resumableSessionUrl,
+        onSessionUrlObtained: (sessionUrl) {
+          task.resumableSessionUrl = sessionUrl;
+        },
         onProgress: (pct, [speed]) {
           task.progress = pct;
           task.transferredBytes = (pct * task.totalBytes).toInt();
@@ -700,7 +704,11 @@ class TransferService with ChangeNotifier {
       notifyListeners();
       _updateNotification(task);
     } on DioException catch (e) {
-      if (CancelToken.isCancel(e) || task.status == TransferStatus.paused) {
+      if (task.status == TransferStatus.cancelled) {
+        final notifId = task.id.hashCode & 0x7FFFFFFF;
+        _notificationsPlugin.cancel(id: notifId);
+        return;
+      } else if (CancelToken.isCancel(e) || task.status == TransferStatus.paused) {
         task.status = TransferStatus.paused;
       } else {
         task.status = TransferStatus.failed;
@@ -709,6 +717,11 @@ class TransferService with ChangeNotifier {
       notifyListeners();
       _updateNotification(task);
     } catch (e) {
+      if (task.status == TransferStatus.cancelled) {
+        final notifId = task.id.hashCode & 0x7FFFFFFF;
+        _notificationsPlugin.cancel(id: notifId);
+        return;
+      }
       task.status = TransferStatus.failed;
       task.error = e.toString();
       notifyListeners();
@@ -749,8 +762,9 @@ class TransferService with ChangeNotifier {
     if (idx != -1) {
       final task = _tasks[idx];
       task.status = TransferStatus.cancelled;
+      final notifId = task.id.hashCode & 0x7FFFFFFF;
       task.cancelToken?.cancel('Cancelled by user');
-      _updateNotification(task);
+      _notificationsPlugin.cancel(id: notifId);
       _tasks.removeAt(idx);
       notifyListeners();
     }

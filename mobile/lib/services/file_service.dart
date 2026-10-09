@@ -199,7 +199,7 @@ class FileService extends ChangeNotifier {
     return '${bytesPerSec.toStringAsFixed(0)} B/s';
   }
 
-  // Upload file (resumable connection with progress callback)
+  // Upload file (resumable connection with progress callback and true resumption)
   Future<SharedFile> uploadFile({
     required File file,
     required String fileName,
@@ -207,6 +207,8 @@ class FileService extends ChangeNotifier {
     required String? parentDriveFolderId,
     required void Function(double progress, [String? speed]) onProgress,
     required CancelToken cancelToken,
+    String? existingUploadUrl,
+    void Function(String sessionUrl)? onSessionUrlObtained,
   }) async {
     final userId = _authService.currentUser?.id;
     if (userId == null) throw Exception('User not logged in.');
@@ -243,94 +245,143 @@ class FileService extends ChangeNotifier {
       finalFileName = '${baseName} ($counter)$ext';
     }
 
-    // Step 1: Request resumable session from Google Drive
-    String googleToken = await _authService.getGoogleAccessToken() ?? '';
-    String uploadUrl = '';
-
+    final len = await file.length();
+    String uploadUrl = existingUploadUrl ?? '';
+    int startByte = 0;
     final dio = Dio();
 
-    Future<Response> startUploadSession(String token) async {
-      return await dio.post(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
-        data: {
-          'name': finalFileName,
-          'parents': [targetDriveFolderId]
-        },
+    // Check if existing session can be resumed via Google Drive 308 status check
+    if (uploadUrl.isNotEmpty) {
+      try {
+        final checkRes = await dio.put(
+          uploadUrl,
+          options: Options(
+            headers: {
+              'Content-Range': 'bytes */$len',
+            },
+            validateStatus: (status) => status == 308 || status == 200 || status == 201,
+          ),
+        );
+        if (checkRes.statusCode == 308) {
+          final rangeHeader = checkRes.headers.value('Range');
+          if (rangeHeader != null && rangeHeader.startsWith('bytes=')) {
+            final parts = rangeHeader.substring(6).split('-');
+            if (parts.length == 2) {
+              final lastByte = int.tryParse(parts[1]);
+              if (lastByte != null) {
+                startByte = lastByte + 1;
+              }
+            }
+          }
+        } else if (checkRes.statusCode == 200 || checkRes.statusCode == 201) {
+          startByte = len;
+        } else {
+          uploadUrl = '';
+          startByte = 0;
+        }
+      } catch (e) {
+        debugPrint('Resume check failed: $e, will start new session');
+        uploadUrl = '';
+        startByte = 0;
+      }
+    }
+
+    if (uploadUrl.isEmpty) {
+      // Step 1: Request resumable session from Google Drive
+      String googleToken = await _authService.getGoogleAccessToken() ?? '';
+
+      Future<Response> startUploadSession(String token) async {
+        return await dio.post(
+          'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+          data: {
+            'name': finalFileName,
+            'parents': [targetDriveFolderId]
+          },
+          options: Options(
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json; charset=UTF-8',
+              'X-Upload-Content-Type': 'application/octet-stream',
+            },
+          ),
+        );
+      }
+
+      try {
+        if (googleToken.isEmpty) {
+          googleToken = await _apiService.refreshGoogleAccessToken();
+        }
+
+        Response startSessionResponse;
+        try {
+          startSessionResponse = await startUploadSession(googleToken);
+        } on DioException catch (e) {
+          if (e.response?.statusCode == 401) {
+            googleToken = await _apiService.refreshGoogleAccessToken();
+            startSessionResponse = await startUploadSession(googleToken);
+          } else {
+            rethrow;
+          }
+        }
+
+        uploadUrl = startSessionResponse.headers.value('Location') ?? '';
+        if (uploadUrl.isEmpty) throw Exception('Google did not return upload URI.');
+        onSessionUrlObtained?.call(uploadUrl);
+      } catch (e) {
+        final errStr = e.toString().toLowerCase();
+        if (errStr.contains('403') || errStr.contains('401') || errStr.contains('permission') || errStr.contains('unauthorized')) {
+          _authService.setGoogleConnectionError(true);
+        }
+        throw Exception('Initiating Google upload session failed: $e');
+      }
+    }
+
+    // Step 2: Upload raw file stream via PUT request (from startByte)
+    dynamic driveData;
+    if (startByte < len) {
+      int lastSent = startByte;
+      int lastTime = DateTime.now().millisecondsSinceEpoch;
+      String currentSpeed = '';
+
+      final stream = file.openRead(startByte);
+      final response = await dio.put(
+        uploadUrl,
+        data: stream,
+        cancelToken: cancelToken,
         options: Options(
           headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json; charset=UTF-8',
-            'X-Upload-Content-Type': 'application/octet-stream',
+            'Content-Length': len - startByte,
+            'Content-Range': 'bytes $startByte-${len - 1}/$len',
           },
         ),
-      );
-    }
-
-    try {
-      if (googleToken.isEmpty) {
-        googleToken = await _apiService.refreshGoogleAccessToken();
-      }
-
-      Response startSessionResponse;
-      try {
-        startSessionResponse = await startUploadSession(googleToken);
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 401) {
-          googleToken = await _apiService.refreshGoogleAccessToken();
-          startSessionResponse = await startUploadSession(googleToken);
-        } else {
-          rethrow;
-        }
-      }
-
-      uploadUrl = startSessionResponse.headers.value('Location') ?? '';
-      if (uploadUrl.isEmpty) throw Exception('Google did not return upload URI.');
-    } catch (e) {
-      final errStr = e.toString().toLowerCase();
-      if (errStr.contains('403') || errStr.contains('401') || errStr.contains('permission') || errStr.contains('unauthorized')) {
-        _authService.setGoogleConnectionError(true);
-      }
-      throw Exception('Initiating Google upload session failed: $e');
-    }
-
-    // Step 2: Upload raw file stream via PUT request
-    final len = await file.length();
-    int lastSent = 0;
-    int lastTime = DateTime.now().millisecondsSinceEpoch;
-    String currentSpeed = '';
-
-    final response = await dio.put(
-      uploadUrl,
-      data: file.openRead(),
-      cancelToken: cancelToken,
-      options: Options(
-        headers: {
-          'Content-Length': len,
-        },
-      ),
-      onSendProgress: (sent, total) {
-        final now = DateTime.now().millisecondsSinceEpoch;
-        final timeDiff = (now - lastTime) / 1000.0;
-        if (timeDiff >= 0.25 || sent == total) {
-          final bytesDiff = sent - lastSent;
-          if (timeDiff > 0 && bytesDiff > 0) {
-            final speedBps = bytesDiff / timeDiff;
-            currentSpeed = _formatSpeed(speedBps);
+        onSendProgress: (sent, total) {
+          final totalSent = startByte + sent;
+          final now = DateTime.now().millisecondsSinceEpoch;
+          final timeDiff = (now - lastTime) / 1000.0;
+          if (timeDiff >= 0.25 || totalSent == len) {
+            final bytesDiff = totalSent - lastSent;
+            if (timeDiff > 0 && bytesDiff > 0) {
+              final speedBps = bytesDiff / timeDiff;
+              currentSpeed = _formatSpeed(speedBps);
+            }
+            lastSent = totalSent;
+            lastTime = now;
           }
-          lastSent = sent;
-          lastTime = now;
-        }
-        if (total > 0) {
-          onProgress(sent / total, currentSpeed);
-        }
-      },
-    );
+          if (len > 0) {
+            onProgress(totalSent / len, currentSpeed);
+          }
+        },
+      );
 
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Google Drive upload failed with status ${response.statusCode}');
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('Google Drive upload failed with status ${response.statusCode}');
+      }
+      driveData = response.data;
     }
 
-    final driveData = response.data;
+    if (driveData == null) {
+      throw Exception('Failed to obtain Google Drive file metadata upon upload completion.');
+    }
     final driveFileId = driveData['id'] as String;
 
     final isApk = finalFileName.toLowerCase().endsWith('.apk') || (driveData['mimeType'] as String? ?? '').contains('android.package-archive');
