@@ -73,6 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Action loading state (Rename, Share/Public, Private, Delete)
   bool _isActionLoading = false;
+  int _lastCompletedTransfersCount = 0;
 
   @override
   void initState() {
@@ -93,11 +94,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
       } catch (e) {
         debugPrint('[DashboardScreen] Could not bind NotificationService: $e');
       }
+
+      try {
+        final transferService = Provider.of<TransferService>(context, listen: false);
+        _lastCompletedTransfersCount = transferService.tasks.where((t) => t.status == TransferStatus.completed).length;
+        transferService.addListener(_onTransferServiceUpdated);
+      } catch (e) {
+        debugPrint('[DashboardScreen] Could not bind TransferService listener: $e');
+      }
     });
+  }
+
+  void _onTransferServiceUpdated() {
+    if (!mounted) return;
+    try {
+      final transferService = Provider.of<TransferService>(context, listen: false);
+      final completedCount = transferService.tasks.where((t) => t.status == TransferStatus.completed).length;
+      if (completedCount > _lastCompletedTransfersCount) {
+        _lastCompletedTransfersCount = completedCount;
+        _refreshFiles();
+      }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
+    try {
+      final transferService = Provider.of<TransferService>(context, listen: false);
+      transferService.removeListener(_onTransferServiceUpdated);
+    } catch (_) {}
     _searchController.dispose();
     _searchFocusNode.dispose();
     _renameController.dispose();
@@ -475,124 +500,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (result == null || result.files.isEmpty) return;
 
     final blockedExtensions = ['exe', 'bat', 'cmd', 'msi', 'scr'];
+    final transferService = Provider.of<TransferService>(context, listen: false);
 
-    final uploadNotifier = ValueNotifier<UploadProgressState>(
-      const UploadProgressState(fileName: 'Initializing upload...', progress: 0.0),
-    );
+    int queuedCount = 0;
+    for (int i = 0; i < result.files.length; i++) {
+      final picked = result.files[i];
+      if (picked.path == null) continue;
 
-    setState(() {
-      _isUploading = true;
-      _uploadingFileName = 'Initializing...';
-      _uploadProgress = 0.0;
-      _uploadCancelToken = CancelToken();
-    });
-
-    bool dialogOpen = true;
-    UploadProgressDialog.show(
-      context: context,
-      notifier: uploadNotifier,
-      onCancel: _handleCancelUpload,
-    ).then((_) {
-      dialogOpen = false;
-    });
-
-    try {
-      final fileService = Provider.of<FileService>(context, listen: false);
-      
-      int successCount = 0;
-      for (int i = 0; i < result.files.length; i++) {
-        final picked = result.files[i];
-        if (picked.path == null) continue;
-        
-        final ext = picked.name.split('.').last.toLowerCase();
-        if (blockedExtensions.contains(ext)) {
-          _showWarningSnackBar('File ${picked.name} has a blocked extension and was skipped.');
-          continue;
-        }
-
-        final uploadLimit = AppConfig.proxyUrl.isNotEmpty ? 250 * 1024 * 1024 : 100 * 1024 * 1024;
-        final limitLabel = AppConfig.proxyUrl.isNotEmpty ? '250MB' : '100MB';
-        if (picked.size > uploadLimit) {
-          _showWarningSnackBar('File ${picked.name} exceeds $limitLabel and was skipped.');
-          continue;
-        }
-
-        final file = File(picked.path!);
-        final currentFileDesc = result.files.length > 1
-            ? 'Uploading ${i + 1} of ${result.files.length}: ${picked.name}'
-            : 'Uploading ${picked.name}';
-
-        uploadNotifier.value = uploadNotifier.value.copyWith(
-          fileName: currentFileDesc,
-          progress: 0.0,
-          speed: '',
-        );
-
-        setState(() {
-          _uploadingFileName = currentFileDesc;
-          _uploadProgress = 0.0;
-          _uploadSpeed = '';
-        });
-
-        _lastUploadProgressUpdate = null;
-        await fileService.uploadFile(
-          file: file,
-          fileName: picked.name,
-          parentDbFolderId: _currentFolder?.id,
-          parentDriveFolderId: _currentFolder?.googleDriveFileId,
-          cancelToken: _uploadCancelToken!,
-          onProgress: (pct, [speed]) {
-            final now = DateTime.now();
-            if (_lastUploadProgressUpdate == null ||
-                now.difference(_lastUploadProgressUpdate!).inMilliseconds > 100 ||
-                pct == 1.0) {
-              _lastUploadProgressUpdate = now;
-              uploadNotifier.value = uploadNotifier.value.copyWith(
-                progress: pct,
-                speed: speed ?? '',
-              );
-              setState(() {
-                _uploadProgress = pct;
-                if (speed != null) _uploadSpeed = speed;
-              });
-            }
-          },
-        );
-        successCount++;
+      final ext = picked.name.split('.').last.toLowerCase();
+      if (blockedExtensions.contains(ext)) {
+        _showWarningSnackBar('File ${picked.name} has a blocked extension and was skipped.');
+        continue;
       }
 
-      if (dialogOpen && Navigator.canPop(context)) {
-        Navigator.pop(context);
-        dialogOpen = false;
+      final uploadLimit = AppConfig.proxyUrl.isNotEmpty ? 250 * 1024 * 1024 : 100 * 1024 * 1024;
+      final limitLabel = AppConfig.proxyUrl.isNotEmpty ? '250MB' : '100MB';
+      if (picked.size > uploadLimit) {
+        _showWarningSnackBar('File ${picked.name} exceeds $limitLabel and was skipped.');
+        continue;
       }
 
-      if (mounted && successCount > 0) {
-        _showUploadCompleteDialog(
-          title: 'Upload Successful',
-          message: successCount == 1
-              ? 'File uploaded successfully to your Google Drive!'
-              : '$successCount files uploaded successfully to your Google Drive!',
-        );
-      }
-      _refreshFiles();
-    } catch (e) {
-      if (dialogOpen && Navigator.canPop(context)) {
-        Navigator.pop(context);
-        dialogOpen = false;
-      }
-      final errorMsg = _formatError(e);
-      if (mounted) {
-        if (errorMsg.contains('cancel')) {
-          _showWarningSnackBar(errorMsg);
-        } else {
-          _showErrorSnackBar(errorMsg);
-        }
-      }
-    } finally {
-      setState(() {
-        _isUploading = false;
-        _uploadCancelToken = null;
-      });
+      final file = File(picked.path!);
+      await transferService.startUpload(
+        file: file,
+        fileName: picked.name,
+        parentDbFolderId: _currentFolder?.id,
+        parentDriveFolderId: _currentFolder?.googleDriveFileId,
+      );
+      queuedCount++;
+    }
+
+    if (mounted && queuedCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(LucideIcons.uploadCloud, color: Colors.white, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  queuedCount == 1
+                      ? 'Upload started in background!'
+                      : '$queuedCount files queued for background upload!',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF4F46E5),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          action: SnackBarAction(
+            label: 'View',
+            textColor: Colors.amberAccent,
+            onPressed: () => TransferManagerSheet.show(context),
+          ),
+        ),
+      );
     }
   }
 
