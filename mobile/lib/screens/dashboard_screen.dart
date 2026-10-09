@@ -499,10 +499,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final result = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (result == null || result.files.isEmpty) return;
 
+    if (mounted) {
+      TransferManagerSheet.show(context);
+    }
+
     final blockedExtensions = ['exe', 'bat', 'cmd', 'msi', 'scr'];
     final transferService = Provider.of<TransferService>(context, listen: false);
 
-    int queuedCount = 0;
     for (int i = 0; i < result.files.length; i++) {
       final picked = result.files[i];
       if (picked.path == null) continue;
@@ -514,19 +517,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       final file = File(picked.path!);
-      await transferService.startUpload(
+      transferService.startUpload(
         file: file,
         fileName: picked.name,
         parentDbFolderId: _currentFolder?.id,
         parentDriveFolderId: _currentFolder?.googleDriveFileId,
       );
-      queuedCount++;
-    }
-
-    if (mounted && queuedCount > 0) {
-      if (mounted) {
-        TransferManagerSheet.show(context);
-      }
     }
   }
 

@@ -166,8 +166,13 @@ class TransferManagerSheet extends StatelessWidget {
     Color statusColor;
     String statusLabel;
     if (isRunning) {
-      statusColor = const Color(0xFF10B981);
-      statusLabel = 'Running';
+      if (task.progress == 0.0 && task.speed.isEmpty) {
+        statusColor = const Color(0xFF818CF8);
+        statusLabel = isDl ? 'Connecting...' : 'Connecting to Drive...';
+      } else {
+        statusColor = const Color(0xFF10B981);
+        statusLabel = isDl ? 'Downloading' : 'Uploading';
+      }
     } else if (isPaused) {
       statusColor = const Color(0xFFF59E0B);
       statusLabel = 'Paused';
@@ -307,7 +312,7 @@ class TransferManagerSheet extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
-              value: task.progress,
+              value: (isRunning && task.progress == 0.0 && task.speed.isEmpty) ? null : task.progress,
               backgroundColor: isLight ? const Color(0xFFE2E8F0) : Colors.white12,
               valueColor: AlwaysStoppedAnimation<Color>(
                 isCompleted
