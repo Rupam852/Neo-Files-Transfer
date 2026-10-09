@@ -25,6 +25,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
   bool _isInitializing = false;
   bool _copied = false;
   bool _previewMode = false;
+  bool _showJsonPreview = false;
 
   @override
   void initState() {
@@ -73,7 +74,6 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
 
     final lines = text.split('\n');
     final formattedLines = lines.map((line) {
-      // If line starts with * or - or + followed by space, replace with • 
       if (RegExp(r'^\s*[\*\-\+]\s+').hasMatch(line)) {
         return line.replaceFirst(RegExp(r'^\s*[\*\-\+]\s+'), '• ');
       }
@@ -120,7 +120,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
 
   Future<void> _handleSaveVersion() async {
     final versionText = _versionController.text.trim();
-    final descText = _descriptionController.text; // Preserves newlines, bullet points, and emojis exactly
+    final descText = _descriptionController.text;
     if (versionText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a valid version string')),
@@ -152,7 +152,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save version and description: $e')),
+          SnackBar(content: Text('Failed to save: $e')),
         );
       }
     } finally {
@@ -174,7 +174,7 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to regenerate link: $e')),
+          SnackBar(content: Text('Failed to regenerate: $e')),
         );
       }
     } finally {
@@ -209,9 +209,14 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
           color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.08),
         ),
       ),
-      child: SingleChildScrollView(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.82,
+          maxWidth: 480,
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(18.0),
+          padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 16.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,8 +225,8 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
               Row(
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
                       color: const Color(0xFF10B981).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(10),
@@ -232,10 +237,10 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                     child: const Icon(
                       LucideIcons.smartphone,
                       color: Color(0xFF10B981),
-                      size: 20,
+                      size: 18,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -247,39 +252,35 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                               style: TextStyle(
                                 color: isLight ? const Color(0xFF0F172A) : Colors.white,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                fontSize: 15,
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF10B981).withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: const Color(0xFF10B981).withOpacity(0.3),
-                                ),
                               ),
                               child: Text(
                                 'APK',
                                 style: TextStyle(
                                   color: isLight ? const Color(0xFF059669) : const Color(0xFF6EE7B7),
-                                  fontSize: 9.5,
+                                  fontSize: 9,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 1),
                         Text(
                           _currentFile.fileName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: isLight ? Colors.grey.shade600 : Colors.grey.shade400,
-                            fontSize: 11.5,
+                            fontSize: 11,
                           ),
                         ),
                       ],
@@ -287,514 +288,493 @@ class _VersionApiDialogState extends State<VersionApiDialog> {
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: Icon(LucideIcons.x, color: isLight ? Colors.grey.shade700 : Colors.grey.shade400, size: 20),
+                    icon: Icon(LucideIcons.x, color: isLight ? Colors.grey.shade700 : Colors.grey.shade400, size: 18),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    splashRadius: 18,
                   ),
                 ],
-              ),
-              const SizedBox(height: 18),
-
-              // Editable Version Section
-              Text(
-                'APK VERSION (EDITABLE)',
-                style: TextStyle(
-                  color: isLight ? Colors.grey.shade700 : Colors.grey.shade300,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _versionController,
-                style: TextStyle(
-                  color: isLight ? const Color(0xFF059669) : const Color(0xFF6EE7B7),
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'monospace',
-                  fontSize: 14,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'e.g. v1.0.1',
-                  hintStyle: TextStyle(color: Colors.grey.shade500),
-                  filled: true,
-                  fillColor: isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 11),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(
-                      color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(
-                      color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'This version will be returned when your app calls the API endpoint.',
-                style: TextStyle(color: isLight ? Colors.grey.shade600 : Colors.grey.shade400, fontSize: 10.5),
-              ),
-              const SizedBox(height: 16),
-
-              // Editable Release Notes / Description Header (2-Row Layout to prevent overflow)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'RELEASE NOTES / DESCRIPTION',
-                    style: TextStyle(
-                      color: isLight ? Colors.grey.shade700 : Colors.grey.shade300,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  // Edit / Preview Toggle
-                  Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: isLight ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      children: [
-                        InkWell(
-                          onTap: () => setState(() => _previewMode = false),
-                          borderRadius: BorderRadius.circular(4),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                            decoration: BoxDecoration(
-                              color: !_previewMode ? const Color(0xFF4F46E5) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'Edit',
-                              style: TextStyle(
-                                color: !_previewMode ? Colors.white : (isLight ? Colors.grey.shade700 : Colors.grey.shade400),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () => setState(() => _previewMode = true),
-                          borderRadius: BorderRadius.circular(4),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                            decoration: BoxDecoration(
-                              color: _previewMode ? const Color(0xFF4F46E5) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'Preview',
-                              style: TextStyle(
-                                color: _previewMode ? Colors.white : (isLight ? Colors.grey.shade700 : Colors.grey.shade400),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              // Format Bullets Button Row
-              Align(
-                alignment: Alignment.centerRight,
-                child: InkWell(
-                  onTap: _formatBullets,
-                  borderRadius: BorderRadius.circular(6),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4F46E5).withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: const Color(0xFF4F46E5).withOpacity(0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(LucideIcons.sparkles, size: 11, color: Color(0xFF6366F1)),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Format Bullets (•)',
-                          style: TextStyle(
-                            color: isLight ? const Color(0xFF4F46E5) : const Color(0xFF818CF8),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              if (!_previewMode)
-                TextField(
-                  controller: _descriptionController,
-                  keyboardType: TextInputType.multiline,
-                  maxLines: null,
-                  minLines: 3,
-                  style: TextStyle(
-                    color: isLight ? const Color(0xFF0F172A) : Colors.white,
-                    fontSize: 12.5,
-                    height: 1.45,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: "🚀 What's new in this version:\n• Fast download engine\n• Bug fixes and UI improvements\n• Enjoy the new update!",
-                    hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-                    filled: true,
-                    fillColor: isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
-                    contentPadding: const EdgeInsets.all(12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(
-                        color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(
-                        color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
-                    ),
-                  ),
-                )
-              else
-                Container(
-                  width: double.infinity,
-                  constraints: const BoxConstraints(minHeight: 85),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isLight ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
-                    ),
-                  ),
-                  child: _descriptionController.text.trim().isEmpty
-                      ? Text(
-                          'No release notes entered yet.',
-                          style: TextStyle(
-                            color: Colors.grey.shade500,
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: _descriptionController.text.split('\n').map((line) {
-                            final trimmed = line.trim();
-                            if (trimmed.isEmpty) return const SizedBox(height: 6);
-                            if (trimmed.startsWith('•') ||
-                                trimmed.startsWith('*') ||
-                                trimmed.startsWith('-') ||
-                                trimmed.startsWith('+')) {
-                              final cleanLine = trimmed.replaceFirst(RegExp(r'^[\*\-\+•]\s*'), '');
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 5.0, left: 2.0),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('• ', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 13)),
-                                    Expanded(
-                                      child: Text(
-                                        cleanLine,
-                                        style: TextStyle(
-                                          color: isLight ? const Color(0xFF1E293B) : Colors.white,
-                                          fontSize: 12,
-                                          height: 1.35,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                            if (trimmed.startsWith('#') || (trimmed.startsWith('**') && trimmed.endsWith('**'))) {
-                              final cleanTitle = trimmed.replaceAll(RegExp(r'[#\*]'), '').trim();
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 4.0, bottom: 4.0),
-                                child: Text(
-                                  cleanTitle,
-                                  style: TextStyle(
-                                    color: isLight ? const Color(0xFF4F46E5) : const Color(0xFF818CF8),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12.5,
-                                  ),
-                                ),
-                              );
-                            }
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 4.0),
-                              child: Text(
-                                line,
-                                style: TextStyle(
-                                  color: isLight ? const Color(0xFF334155) : Colors.grey.shade300,
-                                  fontSize: 12,
-                                  height: 1.35,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                ),
-              const SizedBox(height: 4),
-              Text(
-                'Tip: Paste markdown notes with * or - then click "Format Bullets (•)" to clean instantly.',
-                style: TextStyle(color: isLight ? Colors.grey.shade600 : Colors.grey.shade400, fontSize: 10.5),
               ),
               const SizedBox(height: 12),
+              Divider(height: 1, color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.08)),
+              const SizedBox(height: 12),
 
-              // Save Version & Description Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _isSaving ? null : _handleSaveVersion,
-                  icon: _isSaving
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(LucideIcons.save, size: 15),
-                  label: Text(
-                    _isSaving ? 'Saving Changes...' : 'Save Version & Description',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4F46E5),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-
-              // Version API Link Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+              // Scrollable Body Content
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(LucideIcons.code, color: const Color(0xFF6366F1), size: 14),
-                      const SizedBox(width: 6),
-                      Text(
-                        'VERSION API LINK',
-                        style: TextStyle(
-                          color: isLight ? Colors.grey.shade700 : Colors.grey.shade300,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                  TextButton.icon(
-                    onPressed: _isRegenerating ? null : _handleRegenerateKey,
-                    icon: _isRegenerating
-                        ? const SizedBox(
-                            width: 10,
-                            height: 10,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1.5,
-                              color: Colors.grey,
+                      // Section 1: Compact Version API Link Box
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'VERSION API ENDPOINT',
+                            style: TextStyle(
+                              color: isLight ? Colors.grey.shade700 : Colors.grey.shade300,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
                             ),
-                          )
-                        : Icon(LucideIcons.refreshCw,
-                            color: isLight ? Colors.grey.shade700 : Colors.grey.shade400, size: 12),
-                    label: Text(
-                      'Regenerate',
-                      style: TextStyle(color: isLight ? Colors.grey.shade700 : Colors.grey.shade400, fontSize: 10.5),
-                    ),
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.08),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    if (_isInitializing) ...[
-                      const SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFF10B981),
-                        ),
+                          ),
+                          InkWell(
+                            onTap: _isRegenerating ? null : _handleRegenerateKey,
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              child: Row(
+                                children: [
+                                  _isRegenerating
+                                      ? const SizedBox(
+                                          width: 10,
+                                          height: 10,
+                                          child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.grey),
+                                        )
+                                      : Icon(LucideIcons.refreshCw, color: const Color(0xFF6366F1), size: 11),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Regenerate',
+                                    style: TextStyle(
+                                      color: isLight ? const Color(0xFF4F46E5) : const Color(0xFF818CF8),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                    ],
-                    Expanded(
-                      child: SelectableText(
-                        _isInitializing
-                            ? 'Generating secure API key...'
-                            : (apiUrl.isNotEmpty ? apiUrl : 'Generating link...'),
-                        style: TextStyle(
-                          color: isLight ? const Color(0xFF0F172A) : Colors.grey.shade300,
-                          fontSize: 11,
-                          fontFamily: 'monospace',
+                      const SizedBox(height: 6),
+                      // Sleek Combined Link & Copy Container
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.08),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: apiUrl.isNotEmpty ? _handleCopyLink : null,
-                  icon: Icon(_copied ? LucideIcons.check : LucideIcons.copy,
-                      size: 14),
-                  label: Text(_copied ? 'Copied to Clipboard' : 'Copy Version API Link',
-                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF059669),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-
-              // JSON Preview Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'API RESPONSE PREVIEW (JSON)',
-                    style: TextStyle(
-                      color: isLight ? Colors.grey.shade700 : Colors.grey.shade400,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () {
-                      final jsonMap = {
-                        "status": "success",
-                        "version": _currentFile.apkVersion ?? 'v1.0.1',
-                        "description": _currentFile.apkDescription ?? '',
-                        "file_name": _currentFile.fileName,
-                        "file_size": _currentFile.fileSize,
-                        "download_url": "${AppConfig.cfWorkerUrl}?hash=${_currentFile.uniqueShareHash ?? 'apk_share_link'}",
-                        "web_url": "${AppConfig.appUrl}/download/${_currentFile.uniqueShareHash ?? ''}",
-                        "sharing_status": _currentFile.sharingStatus,
-                        "created_at": _currentFile.createdAt.toIso8601String(),
-                        "updated_at": (_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String(),
-                      };
-                      final jsonText = const JsonEncoder.withIndent('  ').convert(jsonMap);
-                      Clipboard.setData(ClipboardData(text: jsonText));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Sample JSON response copied!')),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(4),
-                    child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                         child: Row(
                           children: [
-                            Icon(Icons.copy, size: 12, color: isLight ? Colors.grey.shade700 : Colors.grey.shade400),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Copy JSON',
-                              style: TextStyle(
-                                color: isLight ? Colors.grey.shade700 : Colors.grey.shade400,
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
+                            if (_isInitializing) ...[
+                              const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFF10B981)),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Expanded(
+                              child: Text(
+                                _isInitializing
+                                    ? 'Generating secure link...'
+                                    : (apiUrl.isNotEmpty ? apiUrl : 'Generating link...'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isLight ? const Color(0xFF0F172A) : Colors.grey.shade300,
+                                  fontSize: 11,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            ElevatedButton.icon(
+                              onPressed: apiUrl.isNotEmpty ? _handleCopyLink : null,
+                              icon: Icon(_copied ? LucideIcons.check : LucideIcons.copy, size: 12),
+                              label: Text(_copied ? 'Copied' : 'Copy', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF059669),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                elevation: 0,
                               ),
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(height: 14),
+
+                      // Section 2: Editable Version Field
+                      Text(
+                        'APK VERSION',
+                        style: TextStyle(
+                          color: isLight ? Colors.grey.shade700 : Colors.grey.shade300,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      TextField(
+                        controller: _versionController,
+                        style: TextStyle(
+                          color: isLight ? const Color(0xFF059669) : const Color(0xFF6EE7B7),
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                          fontSize: 13,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'e.g. v1.0.1',
+                          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                          filled: true,
+                          isDense: true,
+                          fillColor: isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                              color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                              color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Section 3: Release Notes Box
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'RELEASE NOTES / DESCRIPTION',
+                            style: TextStyle(
+                              color: isLight ? Colors.grey.shade700 : Colors.grey.shade300,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              // Format bullets button
+                              InkWell(
+                                onTap: _formatBullets,
+                                borderRadius: BorderRadius.circular(4),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF4F46E5).withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(LucideIcons.sparkles, size: 10, color: Color(0xFF6366F1)),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        'Format (•)',
+                                        style: TextStyle(
+                                          color: isLight ? const Color(0xFF4F46E5) : const Color(0xFF818CF8),
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              // Edit / Preview Toggle
+                              Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: isLight ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Row(
+                                  children: [
+                                    InkWell(
+                                      onTap: () => setState(() => _previewMode = false),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: !_previewMode ? const Color(0xFF4F46E5) : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                        child: Text(
+                                          'Edit',
+                                          style: TextStyle(
+                                            color: !_previewMode ? Colors.white : (isLight ? Colors.grey.shade700 : Colors.grey.shade400),
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    InkWell(
+                                      onTap: () => setState(() => _previewMode = true),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: _previewMode ? const Color(0xFF4F46E5) : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                        child: Text(
+                                          'Preview',
+                                          style: TextStyle(
+                                            color: _previewMode ? Colors.white : (isLight ? Colors.grey.shade700 : Colors.grey.shade400),
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+
+                      // Compact Scrollable Description Box (height ~85px)
+                      Container(
+                        height: 85,
+                        decoration: BoxDecoration(
+                          color: isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.1),
+                          ),
+                        ),
+                        child: !_previewMode
+                            ? TextField(
+                                controller: _descriptionController,
+                                keyboardType: TextInputType.multiline,
+                                maxLines: null,
+                                expands: true,
+                                style: TextStyle(
+                                  color: isLight ? const Color(0xFF0F172A) : Colors.white,
+                                  fontSize: 12,
+                                  height: 1.35,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: "🚀 What's new:\n• Fast download engine\n• Bug fixes and UI improvements",
+                                  hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                                  contentPadding: const EdgeInsets.all(8),
+                                  border: InputBorder.none,
+                                ),
+                              )
+                            : SingleChildScrollView(
+                                padding: const EdgeInsets.all(8),
+                                child: _descriptionController.text.trim().isEmpty
+                                    ? Text(
+                                        'No release notes entered yet.',
+                                        style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontStyle: FontStyle.italic),
+                                      )
+                                    : Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: _descriptionController.text.split('\n').map((line) {
+                                          final trimmed = line.trim();
+                                          if (trimmed.isEmpty) return const SizedBox(height: 3);
+                                          return Padding(
+                                            padding: const EdgeInsets.only(bottom: 2.0),
+                                            child: Text(
+                                              trimmed,
+                                              style: TextStyle(
+                                                color: isLight ? const Color(0xFF1E293B) : Colors.white,
+                                                fontSize: 11,
+                                                height: 1.3,
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                              ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Save Button (Compact)
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSaving ? null : _handleSaveVersion,
+                          icon: _isSaving
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white),
+                                )
+                              : const Icon(LucideIcons.save, size: 13),
+                          label: Text(
+                            _isSaving ? 'Saving Changes...' : 'Save Version & Notes',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4F46E5),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 9),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Section 4: Collapsible / Compact JSON Preview
+                      InkWell(
+                        onTap: () => setState(() => _showJsonPreview = !_showJsonPreview),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isLight ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B).withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.06),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    _showJsonPreview ? LucideIcons.chevronDown : LucideIcons.chevronRight,
+                                    size: 14,
+                                    color: const Color(0xFF10B981),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Live JSON Response Preview',
+                                    style: TextStyle(
+                                      color: isLight ? const Color(0xFF0F172A) : Colors.white,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (_showJsonPreview)
+                                InkWell(
+                                  onTap: () {
+                                    final jsonMap = {
+                                      "status": "success",
+                                      "version": _currentFile.apkVersion ?? 'v1.0.1',
+                                      "description": _currentFile.apkDescription ?? '',
+                                      "file_name": _currentFile.fileName,
+                                      "file_size": _currentFile.fileSize,
+                                      "download_url": "${AppConfig.cfWorkerUrl}?hash=${_currentFile.uniqueShareHash ?? 'apk_share_link'}",
+                                      "web_url": "${AppConfig.appUrl}/download/${_currentFile.uniqueShareHash ?? ''}",
+                                      "sharing_status": _currentFile.sharingStatus,
+                                      "created_at": _currentFile.createdAt.toIso8601String(),
+                                      "updated_at": (_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String(),
+                                    };
+                                    final jsonText = const JsonEncoder.withIndent('  ').convert(jsonMap);
+                                    Clipboard.setData(ClipboardData(text: jsonText));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Sample JSON response copied!')),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                    child: Row(
+                                      children: [
+                                        Icon(LucideIcons.copy, size: 10, color: isLight ? Colors.grey.shade700 : Colors.grey.shade400),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          'Copy JSON',
+                                          style: TextStyle(
+                                            color: isLight ? Colors.grey.shade700 : Colors.grey.shade400,
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      if (_showJsonPreview) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          width: double.infinity,
+                          height: 100,
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isLight ? const Color(0xFFF8FAFC) : const Color(0xFF030712),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.06),
+                            ),
+                          ),
+                          child: SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: SelectableText(
+                                const JsonEncoder.withIndent('  ').convert({
+                                  "status": "success",
+                                  "version": _currentFile.apkVersion ?? 'v1.0.1',
+                                  "description": _currentFile.apkDescription ?? '',
+                                  "file_name": _currentFile.fileName,
+                                  "file_size": _currentFile.fileSize,
+                                  "download_url": "${AppConfig.cfWorkerUrl}?hash=${_currentFile.uniqueShareHash ?? 'apk_share_link'}",
+                                  "web_url": "${AppConfig.appUrl}/download/${_currentFile.uniqueShareHash ?? ''}",
+                                  "sharing_status": _currentFile.sharingStatus,
+                                  "created_at": _currentFile.createdAt.toIso8601String(),
+                                  "updated_at": (_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String(),
+                                }),
+                                style: TextStyle(
+                                  color: isLight ? const Color(0xFF059669) : const Color(0xFF34D399).withOpacity(0.9),
+                                  fontSize: 10,
+                                  fontFamily: 'monospace',
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
+                ),
               ),
+
+              const SizedBox(height: 8),
+              Divider(height: 1, color: isLight ? const Color(0xFFE2E8F0) : Colors.white.withOpacity(0.08)),
               const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isLight ? const Color(0xFFF8FAFC) : const Color(0xFF030712),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.06),
-                  ),
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SelectableText(
-                    const JsonEncoder.withIndent('  ').convert({
-                      "status": "success",
-                      "version": _currentFile.apkVersion ?? 'v1.0.1',
-                      "description": _currentFile.apkDescription ?? '',
-                      "file_name": _currentFile.fileName,
-                      "file_size": _currentFile.fileSize,
-                      "download_url": "${AppConfig.cfWorkerUrl}?hash=${_currentFile.uniqueShareHash ?? 'apk_share_link'}",
-                      "web_url": "${AppConfig.appUrl}/download/${_currentFile.uniqueShareHash ?? ''}",
-                      "sharing_status": _currentFile.sharingStatus,
-                      "created_at": _currentFile.createdAt.toIso8601String(),
-                      "updated_at": (_currentFile.modifiedAt ?? _currentFile.createdAt).toIso8601String(),
-                    }),
-                    style: TextStyle(
-                      color: isLight ? const Color(0xFF059669) : const Color(0xFF34D399).withOpacity(0.9),
-                      fontSize: 10.5,
-                      fontFamily: 'monospace',
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Close', style: TextStyle(color: isLight ? Colors.grey.shade700 : Colors.grey.shade400)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    'Close',
+                    style: TextStyle(
+                      color: isLight ? Colors.grey.shade700 : Colors.grey.shade400,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
               ),
             ],
