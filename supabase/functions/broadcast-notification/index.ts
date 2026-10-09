@@ -143,6 +143,7 @@ serve(async (req) => {
       });
     }
 
+    const token = authHeader.replace("Bearer ", "");
     let isServiceRole = (token === serviceRoleKey);
     let callingUserId = "system";
 
