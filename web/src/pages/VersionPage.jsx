@@ -86,6 +86,7 @@ export default function VersionPage({ fileId: propFileId, onBack }) {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
       const googleToken = localStorage.getItem('google_provider_token') || session?.provider_token || ''
+      const proxyUrl = import.meta.env.VITE_PROXY_URL || 'https://api.neofilestransfer.site'
 
       const result = await new Promise((resolve, reject) => {
         if (proxyUrl) {

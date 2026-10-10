@@ -500,7 +500,7 @@ export default function FilesPage({ onViewVersions }) {
 
       try {
         const uniqueName = getUniqueFileName(file.name, files)
-        const proxyUrl = import.meta.env.VITE_PROXY_URL
+        const proxyUrl = import.meta.env.VITE_PROXY_URL || 'https://api.neofilestransfer.site'
         let result
 
         if (proxyUrl) {
