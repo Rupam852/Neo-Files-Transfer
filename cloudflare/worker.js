@@ -35,7 +35,8 @@ export default {
     const pathname = url.pathname.replace(/\/+$/, "")
     const hash = url.searchParams.get("hash")
     const isStream = url.searchParams.get("stream") === "true"
-    const skipIncrement = url.searchParams.get("skip_increment") === "true"
+    const isPreview = isStream || url.searchParams.get("preview") === "true" || url.searchParams.get("inline") === "true"
+    const skipIncrement = url.searchParams.get("skip_increment") === "true" || isPreview
 
     const sbUrl = env?.SUPABASE_URL || SUPABASE_URL
     const sbKey = env?.SUPABASE_SERVICE_ROLE_KEY || env?.SUPABASE_KEY || SUPABASE_KEY
@@ -246,7 +247,7 @@ export default {
 
       // 4. Build high-performance streaming response headers
       const resHeaders = new Headers(driveRes.headers)
-      resHeaders.set("Content-Disposition", `attachment; filename="${encodeURIComponent(file.file_name)}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`)
+      resHeaders.set("Content-Disposition", `${isPreview ? "inline" : "attachment"}; filename="${encodeURIComponent(file.file_name)}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`)
       resHeaders.set("Content-Type", file.mime_type || driveRes.headers.get("content-type") || "application/octet-stream")
       resHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate")
 

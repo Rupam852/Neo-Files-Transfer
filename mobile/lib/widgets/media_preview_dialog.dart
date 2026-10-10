@@ -65,26 +65,47 @@ class _MediaPreviewDialogState extends State<MediaPreviewDialog> {
   }
 
   String _getStreamUrl() {
-    final hash = widget.file.uniqueShareHash ?? '';
-    if (hash.isNotEmpty) {
-      if (AppConfig.cfWorkerUrl.isNotEmpty) {
-        return '${AppConfig.cfWorkerUrl}?hash=$hash&stream=true';
+    final cleanProxy = AppConfig.proxyUrl.endsWith('/')
+        ? AppConfig.proxyUrl.substring(0, AppConfig.proxyUrl.length - 1)
+        : AppConfig.proxyUrl;
+
+    if (cleanProxy.isNotEmpty) {
+      if (widget.file.id.isNotEmpty) {
+        return '$cleanProxy/download-file?file_id=${widget.file.id}&preview=true&inline=true&skip_increment=true';
       }
-      if (AppConfig.proxyUrl.isNotEmpty) {
-        return '${AppConfig.proxyUrl}/download-file?hash=$hash&preview=true&inline=true';
+      final hash = widget.file.uniqueShareHash ?? '';
+      if (hash.isNotEmpty) {
+        return '$cleanProxy/download-file?hash=$hash&preview=true&inline=true&skip_increment=true';
       }
     }
-    if (AppConfig.cfWorkerUrl.isNotEmpty && widget.file.id.isNotEmpty) {
-      return '${AppConfig.cfWorkerUrl}?file_id=${widget.file.id}&stream=true';
+
+    final cleanWorker = AppConfig.cfWorkerUrl.endsWith('/')
+        ? AppConfig.cfWorkerUrl.substring(0, AppConfig.cfWorkerUrl.length - 1)
+        : AppConfig.cfWorkerUrl;
+
+    if (cleanWorker.isNotEmpty) {
+      if (widget.file.id.isNotEmpty) {
+        return '$cleanWorker?file_id=${widget.file.id}&preview=true&inline=true&skip_increment=true';
+      }
+      final hash = widget.file.uniqueShareHash ?? '';
+      if (hash.isNotEmpty) {
+        return '$cleanWorker?hash=$hash&preview=true&inline=true&skip_increment=true';
+      }
     }
-    if (AppConfig.proxyUrl.isNotEmpty && widget.file.id.isNotEmpty) {
-      return '${AppConfig.proxyUrl}/download-file?file_id=${widget.file.id}&preview=true&inline=true';
+
+    final cleanSb = AppConfig.supabaseUrl.endsWith('/')
+        ? AppConfig.supabaseUrl.substring(0, AppConfig.supabaseUrl.length - 1)
+        : AppConfig.supabaseUrl;
+
+    if (widget.file.id.isNotEmpty) {
+      return '$cleanSb/functions/v1/download-file?file_id=${widget.file.id}&preview=true&inline=true&skip_increment=true';
     }
+
     return 'https://drive.google.com/uc?id=${widget.file.googleDriveFileId}&export=download';
   }
 
   String _getGoogleDriveViewUrl() {
-    return 'https://drive.google.com/file/d/${widget.file.googleDriveFileId}/view';
+    return 'https://drive.google.com/file/d/${widget.file.googleDriveFileId}/preview';
   }
 
   Future<void> _loadTextContent() async {
@@ -95,9 +116,15 @@ class _MediaPreviewDialogState extends State<MediaPreviewDialog> {
 
     try {
       final streamUrl = _getStreamUrl();
-      final response = await http.get(Uri.parse(streamUrl)).timeout(
+      final client = http.Client();
+      final request = http.Request('GET', Uri.parse(streamUrl));
+      request.followRedirects = true;
+      request.maxRedirects = 5;
+      final streamedResponse = await client.send(request).timeout(
         const Duration(seconds: 15),
       );
+      final response = await http.Response.fromStream(streamedResponse);
+      client.close();
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         String decoded = '';
@@ -565,24 +592,35 @@ class _MediaPreviewDialogState extends State<MediaPreviewDialog> {
                               style: TextStyle(color: subColor, fontSize: 11.5),
                             ),
                             const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.center,
                               children: [
                                 ElevatedButton.icon(
                                   onPressed: () => _launchUrl(driveViewUrl),
                                   icon: const Icon(LucideIcons.externalLink, size: 14),
-                                  label: const Text('Open in Google Drive', style: TextStyle(fontSize: 12)),
+                                  label: const Text('Google Drive Preview', style: TextStyle(fontSize: 12)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFFDC2626),
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
+                                  onPressed: () => _launchUrl('https://docs.google.com/viewer?url=${Uri.encodeComponent(streamUrl)}'),
+                                  icon: const Icon(LucideIcons.fileText, size: 14),
+                                  label: const Text('Docs Viewer', style: TextStyle(fontSize: 12)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFDC2626),
+                                    side: const BorderSide(color: Color(0xFFDC2626)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
                                 OutlinedButton.icon(
                                   onPressed: () => _launchUrl(streamUrl),
                                   icon: const Icon(LucideIcons.globe, size: 14),
-                                  label: const Text('Browser View', style: TextStyle(fontSize: 12)),
+                                  label: const Text('Direct Stream', style: TextStyle(fontSize: 12)),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: const Color(0xFFDC2626),
                                     side: const BorderSide(color: Color(0xFFDC2626)),
