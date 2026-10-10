@@ -7,6 +7,8 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'config.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
@@ -57,6 +59,9 @@ void main() async {
     ),
   );
 
+  // 3. Pre-load SharedPreferences synchronously before first frame
+  final prefs = await SharedPreferences.getInstance();
+
   // Sync token if user already authenticated
   try {
     final uid = Supabase.instance.client.auth.currentUser?.id;
@@ -67,11 +72,12 @@ void main() async {
     debugPrint('[main] Post-init FCM sync error: $e');
   }
 
-  runApp(const MyApp());
+  runApp(MyApp(prefs: prefs));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  final SharedPreferences prefs;
+  const MyApp({Key? key, required this.prefs}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -81,13 +87,13 @@ class MyApp extends StatelessWidget {
           create: (_) => ThemeService(),
         ),
         ChangeNotifierProvider<SecurityService>(
-          create: (_) => SecurityService(),
+          create: (_) => SecurityService(prefs),
         ),
         ChangeNotifierProvider<ShareReceiverService>(
           create: (_) => ShareReceiverService(),
         ),
         ChangeNotifierProvider<AuthService>(
-          create: (_) => AuthService(),
+          create: (_) => AuthService(prefs),
         ),
         ProxyProvider<AuthService, ApiService>(
           update: (_, auth, __) => ApiService(auth),
@@ -268,7 +274,7 @@ class _HomeRouteResolverState extends State<HomeRouteResolver> {
       return const AppLockScreen();
     }
 
-    if (auth.isLoading) {
+    if (auth.isLoading && auth.currentUser == null) {
       return const Scaffold(
         backgroundColor: Color(0xFF030712),
         body: Center(

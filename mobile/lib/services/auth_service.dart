@@ -37,7 +37,21 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  AuthService() {
+  static const String _keyCachedAdmin = 'neo_cached_is_admin';
+  static const String _keyCachedPaused = 'neo_cached_is_paused';
+  static const String _keyCachedMaintenance = 'neo_cached_is_maintenance';
+
+  AuthService([SharedPreferences? prefs]) {
+    if (prefs != null) {
+      _isAdmin = prefs.getBool(_keyCachedAdmin) ?? false;
+      _isPaused = prefs.getBool(_keyCachedPaused) ?? false;
+      _isUnderMaintenance = prefs.getBool(_keyCachedMaintenance) ?? false;
+    }
+    final initialSession = _client.auth.currentSession;
+    if (initialSession != null) {
+      _user = initialSession.user;
+      _isLoading = false; // User is already logged in, do NOT block the screen!
+    }
     _init();
   }
 
@@ -57,6 +71,8 @@ class AuthService extends ChangeNotifier {
 
       if (session != null) {
         _user = session.user;
+        _isLoading = false;
+        notifyListeners();
         await loadProfile(session.user);
         _setupRealtimeListeners();
       } else {
@@ -216,9 +232,10 @@ class AuthService extends ChangeNotifier {
     bool isFreshSignIn = false,
   ]) async {
     if (_isProfileLoading) return;
-    _isProfileLoading = true;
-    _isLoading = true;
-    notifyListeners();
+    if (_profile == null && _user == null) {
+      _isLoading = true;
+      notifyListeners();
+    }
 
     try {
       // Step 1: Fetch user profile
@@ -403,6 +420,12 @@ class AuthService extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error loading profile: $e');
     } finally {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_keyCachedAdmin, _isAdmin);
+        await prefs.setBool(_keyCachedPaused, _isPaused);
+        await prefs.setBool(_keyCachedMaintenance, _isUnderMaintenance);
+      } catch (_) {}
       _isProfileLoading = false;
       _isLoading = false;
       notifyListeners();

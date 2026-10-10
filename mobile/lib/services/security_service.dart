@@ -11,8 +11,24 @@ class SecurityService extends ChangeNotifier {
   bool _isLocked = false;
   bool _isAuthenticating = false;
 
-  SecurityService() {
-    _loadPreferences();
+  SecurityService([SharedPreferences? prefs]) {
+    if (prefs != null) {
+      _initSync(prefs);
+    } else {
+      _loadPreferences();
+    }
+  }
+
+  void _initSync(SharedPreferences prefs) {
+    _isAppLockEnabled = prefs.getBool(_keyAppLockEnabled) ?? false;
+    if (_isAppLockEnabled) {
+      _isLocked = true;
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (_isLocked && !_isAuthenticating) {
+          authenticate();
+        }
+      });
+    }
   }
 
   bool get isAppLockEnabled => _isAppLockEnabled;
@@ -22,21 +38,21 @@ class SecurityService extends ChangeNotifier {
   Future<void> _loadPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _isAppLockEnabled = prefs.getBool(_keyAppLockEnabled) ?? false;
-      
-      // If app lock is enabled, lock app on fresh launch (after being closed from background)
-      if (_isAppLockEnabled) {
-        _isLocked = true;
-      }
-      notifyListeners();
-      
-      if (_isLocked) {
-        // Automatically prompt authentication once UI is ready on cold start
-        Future.delayed(const Duration(milliseconds: 350), () {
-          if (_isLocked && !_isAuthenticating) {
-            authenticate();
-          }
-        });
+      final enabled = prefs.getBool(_keyAppLockEnabled) ?? false;
+      if (enabled != _isAppLockEnabled) {
+        _isAppLockEnabled = enabled;
+        if (_isAppLockEnabled) {
+          _isLocked = true;
+        }
+        notifyListeners();
+        
+        if (_isLocked) {
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (_isLocked && !_isAuthenticating) {
+              authenticate();
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint('[SecurityService] Error loading preferences: $e');
