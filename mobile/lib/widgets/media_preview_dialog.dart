@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
+import 'package:audioplayers/audioplayers.dart';
+import 'package:video_player/video_player.dart';
 import '../models/shared_file.dart';
 import '../config.dart';
 
@@ -26,18 +28,68 @@ class _MediaPreviewDialogState extends State<MediaPreviewDialog> {
   bool _isLoadingText = false;
   String? _textError;
 
+  // Audio player state
+  AudioPlayer? _audioPlayer;
+  PlayerState _audioState = PlayerState.stopped;
+  Duration _audioDuration = Duration.zero;
+  Duration _audioPosition = Duration.zero;
+  bool _isAudioLoading = false;
+  String? _audioError;
+
+  // Video player state
+  VideoPlayerController? _videoController;
+  bool _isVideoInitialized = false;
+  bool _isVideoLoading = false;
+  String? _videoError;
+  bool _showVideoControls = true;
+  bool _isVideoMuted = false;
+
   @override
   void initState() {
     super.initState();
     if (_isTextOrCodeFile()) {
       _loadTextContent();
+    } else if (_isAudioFile()) {
+      _initAudioPlayer();
+    } else if (_isVideoFile()) {
+      _initVideoPlayer();
     }
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer?.stop();
+    _audioPlayer?.dispose();
+    _videoController?.dispose();
+    super.dispose();
   }
 
   String _getFileExtension() {
     final name = widget.file.fileName;
     if (!name.contains('.')) return '';
     return name.split('.').last.toLowerCase();
+  }
+
+  bool _isVideoFile() {
+    final ext = _getFileExtension();
+    final mime = widget.file.mimeType.toLowerCase();
+    return ['mp4', 'mkv', 'mov', 'avi', 'webm', '3gp', 'flv', 'm4v'].contains(ext) || mime.startsWith('video/');
+  }
+
+  bool _isAudioFile() {
+    final ext = _getFileExtension();
+    final mime = widget.file.mimeType.toLowerCase();
+    return ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'opus', 'wma'].contains(ext) || mime.startsWith('audio/');
+  }
+
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    if (d.inHours > 0) {
+      final h = d.inHours.toString();
+      return '$h:$m:$s';
+    }
+    return '$m:$s';
   }
 
   bool _isTextOrCodeFile() {
@@ -155,6 +207,142 @@ class _MediaPreviewDialogState extends State<MediaPreviewDialog> {
         });
       }
     }
+  }
+
+  Future<void> _initAudioPlayer() async {
+    if (_audioPlayer != null) return;
+    setState(() {
+      _isAudioLoading = true;
+      _audioError = null;
+    });
+
+    try {
+      final streamUrl = _getStreamUrl();
+      final player = AudioPlayer();
+      _audioPlayer = player;
+
+      player.onPlayerStateChanged.listen((state) {
+        if (mounted) setState(() => _audioState = state);
+      });
+
+      player.onDurationChanged.listen((dur) {
+        if (mounted) setState(() => _audioDuration = dur);
+      });
+
+      player.onPositionChanged.listen((pos) {
+        if (mounted) setState(() => _audioPosition = pos);
+      });
+
+      player.onPlayerComplete.listen((_) {
+        if (mounted) {
+          setState(() {
+            _audioState = PlayerState.completed;
+            _audioPosition = Duration.zero;
+          });
+        }
+      });
+
+      await player.setSource(UrlSource(streamUrl));
+      if (mounted) {
+        setState(() => _isAudioLoading = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isAudioLoading = false;
+          _audioError = 'Could not load audio in-app ($e)';
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleAudioPlay() async {
+    if (_audioPlayer == null) {
+      await _initAudioPlayer();
+      return;
+    }
+    try {
+      if (_audioState == PlayerState.playing) {
+        await _audioPlayer!.pause();
+      } else {
+        if (_audioState == PlayerState.completed) {
+          await _audioPlayer!.seek(Duration.zero);
+        }
+        await _audioPlayer!.resume();
+      }
+    } catch (e) {
+      debugPrint('[AudioPlayer] Toggle play error: $e');
+    }
+  }
+
+  Future<void> _seekAudioRelative(int seconds) async {
+    if (_audioPlayer == null) return;
+    final cur = _audioPosition.inSeconds;
+    final total = _audioDuration.inSeconds;
+    final target = (cur + seconds).clamp(0, total > 0 ? total : 0);
+    await _audioPlayer!.seek(Duration(seconds: target));
+  }
+
+  Future<void> _initVideoPlayer() async {
+    if (_videoController != null) return;
+    setState(() {
+      _isVideoLoading = true;
+      _videoError = null;
+    });
+
+    try {
+      final streamUrl = _getStreamUrl();
+      final controller = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
+      _videoController = controller;
+
+      await controller.initialize();
+      controller.addListener(() {
+        if (mounted) setState(() {});
+      });
+
+      if (mounted) {
+        setState(() {
+          _isVideoInitialized = true;
+          _isVideoLoading = false;
+        });
+        await controller.play();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isVideoLoading = false;
+          _videoError = 'In-app playback failed ($e)';
+        });
+      }
+    }
+  }
+
+  void _toggleVideoPlay() {
+    if (_videoController == null || !_isVideoInitialized) return;
+    if (_videoController!.value.isPlaying) {
+      _videoController!.pause();
+    } else {
+      if (_videoController!.value.position >= _videoController!.value.duration) {
+        _videoController!.seekTo(Duration.zero);
+      }
+      _videoController!.play();
+    }
+    setState(() {});
+  }
+
+  void _seekVideoRelative(int seconds) {
+    if (_videoController == null || !_isVideoInitialized) return;
+    final cur = _videoController!.value.position.inSeconds;
+    final total = _videoController!.value.duration.inSeconds;
+    final target = (cur + seconds).clamp(0, total);
+    _videoController!.seekTo(Duration(seconds: target));
+  }
+
+  void _toggleVideoMute() {
+    if (_videoController == null) return;
+    _isVideoMuted = !_isVideoMuted;
+    _videoController!.setVolume(_isVideoMuted ? 0.0 : 1.0);
+    setState(() {});
   }
 
   Future<void> _launchUrl(String url) async {
@@ -355,73 +543,223 @@ class _MediaPreviewDialogState extends State<MediaPreviewDialog> {
                       Text('Pinch to zoom & drag to pan', style: TextStyle(color: subColor, fontSize: 11)),
                     ]
 
-                    // --- 2. VIDEO PREVIEW ---
+                    // --- 2. VIDEO PREVIEW (IN-APP PLAYER) ---
                     else if (isVideo) ...[
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: cardBg,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color: Colors.purple.withOpacity(0.15),
-                                shape: BoxShape.circle,
+                      if (_isVideoLoading) ...[
+                        Container(
+                          height: 240,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isLight ? const Color(0xFFF1F5F9) : const Color(0xFF030712),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const CircularProgressIndicator(color: Color(0xFF7C3AED)),
+                              const SizedBox(height: 14),
+                              Text(
+                                'Connecting video stream...',
+                                style: TextStyle(color: subColor, fontSize: 12),
                               ),
-                              child: const Icon(LucideIcons.playCircle, color: Colors.purpleAccent, size: 36),
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              'High-Speed Streamable Video',
-                              style: TextStyle(color: titleColor, fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Watch instantly via external media player, Google Drive, or browser.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: subColor, fontSize: 11.5),
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            ],
+                          ),
+                        ),
+                      ] else if (_videoError != null || _videoController == null || !_isVideoInitialized) ...[
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: cardBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: Colors.purple.withOpacity(0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(LucideIcons.alertCircle, color: Colors.purpleAccent, size: 30),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'In-App Video Stream Notice',
+                                style: TextStyle(color: titleColor, fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _videoError ?? 'Stream could not be decoded by device hardware. Watch directly via external player.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: subColor, fontSize: 11.5),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: () => _launchUrl(streamUrl),
+                                    icon: const Icon(LucideIcons.externalLink, size: 14),
+                                    label: const Text('Play via Chrome / VLC', style: TextStyle(fontSize: 12)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF7C3AED),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  OutlinedButton.icon(
+                                    onPressed: () => _launchUrl(driveViewUrl),
+                                    icon: const Icon(LucideIcons.play, size: 14),
+                                    label: const Text('Google Drive', style: TextStyle(fontSize: 12)),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF7C3AED),
+                                      side: const BorderSide(color: Color(0xFF7C3AED)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            color: Colors.black,
+                            child: Stack(
+                              alignment: Alignment.center,
                               children: [
-                                ElevatedButton.icon(
-                                  onPressed: () => _launchUrl(streamUrl),
-                                  icon: const Icon(LucideIcons.play, size: 14),
-                                  label: const Text('Play Video Stream', style: TextStyle(fontSize: 12)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF7C3AED),
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _showVideoControls = !_showVideoControls;
+                                    });
+                                  },
+                                  child: AspectRatio(
+                                    aspectRatio: _videoController!.value.aspectRatio > 0
+                                        ? _videoController!.value.aspectRatio
+                                        : 16 / 9,
+                                    child: VideoPlayer(_videoController!),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                OutlinedButton.icon(
-                                  onPressed: () => _launchUrl(driveViewUrl),
-                                  icon: const Icon(LucideIcons.externalLink, size: 14),
-                                  label: const Text('Google Drive', style: TextStyle(fontSize: 12)),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFF7C3AED),
-                                    side: const BorderSide(color: Color(0xFF7C3AED)),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                // Center Play/Pause button
+                                if (_showVideoControls || !_videoController!.value.isPlaying)
+                                  GestureDetector(
+                                    onTap: _toggleVideoPlay,
+                                    child: Container(
+                                      width: 52,
+                                      height: 52,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withOpacity(0.55),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                      ),
+                                      child: Icon(
+                                        _videoController!.value.isPlaying ? LucideIcons.pause : LucideIcons.play,
+                                        color: Colors.white,
+                                        size: 26,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                // Bottom overlay bar
+                                if (_showVideoControls || !_videoController!.value.isPlaying)
+                                  Positioned(
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.bottomCenter,
+                                          end: Alignment.topCenter,
+                                          colors: [
+                                            Colors.black.withOpacity(0.85),
+                                            Colors.transparent,
+                                          ],
+                                        ),
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          VideoProgressIndicator(
+                                            _videoController!,
+                                            allowScrubbing: true,
+                                            padding: const EdgeInsets.symmetric(vertical: 4),
+                                            colors: const VideoProgressColors(
+                                              playedColor: Color(0xFF7C3AED),
+                                              bufferedColor: Colors.white24,
+                                              backgroundColor: Colors.white12,
+                                            ),
+                                          ),
+                                          Row(
+                                            children: [
+                                              GestureDetector(
+                                                onTap: _toggleVideoPlay,
+                                                child: Icon(
+                                                  _videoController!.value.isPlaying ? LucideIcons.pause : LucideIcons.play,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              GestureDetector(
+                                                onTap: () => _seekVideoRelative(-10),
+                                                child: const Icon(LucideIcons.rotateCcw, color: Colors.white70, size: 14),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              GestureDetector(
+                                                onTap: () => _seekVideoRelative(10),
+                                                child: const Icon(LucideIcons.rotateCw, color: Colors.white70, size: 14),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Text(
+                                                '${_formatDuration(_videoController!.value.position)} / ${_formatDuration(_videoController!.value.duration)}',
+                                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                              ),
+                                              const Spacer(),
+                                              GestureDetector(
+                                                onTap: _toggleVideoMute,
+                                                child: Icon(
+                                                  _isVideoMuted ? LucideIcons.volumeX : LucideIcons.volume2,
+                                                  color: Colors.white70,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                               ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton.icon(
+                              onPressed: () => _launchUrl(streamUrl),
+                              icon: const Icon(LucideIcons.externalLink, size: 12),
+                              label: const Text('Open External (VLC/Chrome)', style: TextStyle(fontSize: 11)),
+                              style: TextButton.styleFrom(foregroundColor: const Color(0xFF7C3AED)),
                             ),
                           ],
                         ),
-                      ),
+                      ],
                     ]
 
-                    // --- 3. AUDIO PREVIEW ---
+                    // --- 3. AUDIO PREVIEW (IN-APP PLAYER) ---
                     else if (isAudio) ...[
                       Container(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: cardBg,
                           borderRadius: BorderRadius.circular(16),
@@ -429,50 +767,174 @@ class _MediaPreviewDialogState extends State<MediaPreviewDialog> {
                         ),
                         child: Column(
                           children: [
+                            // Album Art / Disc Icon
                             Container(
-                              width: 64,
-                              height: 64,
+                              width: 72,
+                              height: 72,
                               decoration: BoxDecoration(
-                                color: Colors.cyan.withOpacity(0.15),
                                 shape: BoxShape.circle,
+                                color: const Color(0xFF0891B2).withOpacity(0.15),
+                                border: Border.all(
+                                  color: _audioState == PlayerState.playing
+                                      ? const Color(0xFF06B6D4)
+                                      : Colors.transparent,
+                                  width: 2,
+                                ),
                               ),
-                              child: const Icon(LucideIcons.music, color: Colors.cyan, size: 36),
+                              child: const Icon(
+                                LucideIcons.music,
+                                color: Color(0xFF06B6D4),
+                                size: 34,
+                              ),
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 12),
                             Text(
-                              'Lossless Audio Track',
-                              style: TextStyle(color: titleColor, fontWeight: FontWeight.bold, fontSize: 14),
+                              file.fileName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: titleColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Stream lossless audio with instant playback.',
+                              _isAudioLoading
+                                  ? 'Loading audio stream...'
+                                  : _audioError != null
+                                      ? _audioError!
+                                      : 'In-App Lossless Audio Stream',
                               textAlign: TextAlign.center,
-                              style: TextStyle(color: subColor, fontSize: 11.5),
+                              style: TextStyle(
+                                color: _audioError != null ? Colors.redAccent : subColor,
+                                fontSize: 11,
+                              ),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
+
+                            // Progress Slider
+                            SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                                trackHeight: 3.5,
+                                activeTrackColor: const Color(0xFF06B6D4),
+                                inactiveTrackColor: isLight ? Colors.grey.shade300 : Colors.white12,
+                                thumbColor: const Color(0xFF06B6D4),
+                              ),
+                              child: Slider(
+                                min: 0.0,
+                                max: _audioDuration.inMilliseconds > 0
+                                    ? _audioDuration.inMilliseconds.toDouble()
+                                    : 1.0,
+                                value: _audioPosition.inMilliseconds
+                                    .clamp(
+                                      0,
+                                      _audioDuration.inMilliseconds > 0
+                                          ? _audioDuration.inMilliseconds
+                                          : 1,
+                                    )
+                                    .toDouble(),
+                                onChanged: (val) {
+                                  _audioPlayer?.seek(Duration(milliseconds: val.toInt()));
+                                },
+                              ),
+                            ),
+
+                            // Duration Labels
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    _formatDuration(_audioPosition),
+                                    style: TextStyle(color: subColor, fontSize: 11),
+                                  ),
+                                  Text(
+                                    _formatDuration(_audioDuration),
+                                    style: TextStyle(color: subColor, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Controls Row
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                ElevatedButton.icon(
-                                  onPressed: () => _launchUrl(streamUrl),
-                                  icon: const Icon(LucideIcons.play, size: 14),
-                                  label: const Text('Play Audio', style: TextStyle(fontSize: 12)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF0891B2),
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                IconButton(
+                                  onPressed: () => _seekAudioRelative(-10),
+                                  icon: const Icon(LucideIcons.rotateCcw, size: 20),
+                                  color: subColor,
+                                  tooltip: 'Rewind 10s',
+                                ),
+                                const SizedBox(width: 14),
+                                GestureDetector(
+                                  onTap: _isAudioLoading ? null : _toggleAudioPlay,
+                                  child: Container(
+                                    width: 52,
+                                    height: 52,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: const LinearGradient(
+                                        colors: [Color(0xFF06B6D4), Color(0xFF3B82F6)],
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF06B6D4).withOpacity(0.35),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: _isAudioLoading
+                                        ? const Center(
+                                            child: SizedBox(
+                                              width: 22,
+                                              height: 22,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.2,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          )
+                                        : Icon(
+                                            _audioState == PlayerState.playing
+                                                ? LucideIcons.pause
+                                                : LucideIcons.play,
+                                            color: Colors.white,
+                                            size: 24,
+                                          ),
                                   ),
                                 ),
+                                const SizedBox(width: 14),
+                                IconButton(
+                                  onPressed: () => _seekAudioRelative(10),
+                                  icon: const Icon(LucideIcons.rotateCw, size: 20),
+                                  color: subColor,
+                                  tooltip: 'Forward 10s',
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                TextButton.icon(
+                                  onPressed: () => _launchUrl(streamUrl),
+                                  icon: const Icon(LucideIcons.externalLink, size: 12),
+                                  label: const Text('Open External', style: TextStyle(fontSize: 11)),
+                                  style: TextButton.styleFrom(foregroundColor: const Color(0xFF0891B2)),
+                                ),
                                 const SizedBox(width: 8),
-                                OutlinedButton.icon(
+                                TextButton.icon(
                                   onPressed: () => _launchUrl(driveViewUrl),
-                                  icon: const Icon(LucideIcons.externalLink, size: 14),
-                                  label: const Text('Drive Player', style: TextStyle(fontSize: 12)),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFF0891B2),
-                                    side: const BorderSide(color: Color(0xFF0891B2)),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
+                                  icon: const Icon(LucideIcons.play, size: 12),
+                                  label: const Text('Drive Player', style: TextStyle(fontSize: 11)),
+                                  style: TextButton.styleFrom(foregroundColor: const Color(0xFF0891B2)),
                                 ),
                               ],
                             ),

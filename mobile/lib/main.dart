@@ -31,18 +31,10 @@ import 'screens/maintenance_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Initialize Firebase first
+  // 1. Initialize Firebase first (reads automatically from google-services.json)
   try {
     if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: const FirebaseOptions(
-          apiKey: 'AIzaSyAwSEViej7t93SjwJ8O3HjJz2woqXQkDPQ',
-          appId: '1:999795249319:android:05524b71050662ceaa4b82',
-          messagingSenderId: '999795249319',
-          projectId: 'neo-files-transfer-24881',
-          storageBucket: 'neo-files-transfer-24881.firebasestorage.app',
-        ),
-      );
+      await Firebase.initializeApp();
     }
     await FcmService().init();
   } catch (e) {

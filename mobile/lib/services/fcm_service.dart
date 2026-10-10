@@ -12,19 +12,11 @@ import '../screens/update_screen.dart';
 import '../widgets/transfer_manager_sheet.dart';
 import 'update_service.dart';
 
-const _firebaseOptions = FirebaseOptions(
-  apiKey: 'AIzaSyAwSEViej7t93SjwJ8O3HjJz2woqXQkDPQ',
-  appId: '1:999795249319:android:05524b71050662ceaa4b82',
-  messagingSenderId: '999795249319',
-  projectId: 'neo-files-transfer-24881',
-  storageBucket: 'neo-files-transfer-24881.firebasestorage.app',
-);
-
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(options: _firebaseOptions);
+      await Firebase.initializeApp();
     }
   } catch (_) {}
   debugPrint('[FCM Background] Message received: ${message.messageId} | Data: ${message.data}');
@@ -52,7 +44,7 @@ class FcmService {
 
     try {
       if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(options: _firebaseOptions);
+        await Firebase.initializeApp();
       }
       await _fcm.setAutoInitEnabled(true);
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);

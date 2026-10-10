@@ -66,6 +66,8 @@ dependencies:
   flutter_local_notifications: ^22.3.1
   package_info_plus: ^9.0.1
   local_auth: ^2.3.0
+  video_player: ^2.14.1
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   flutter_test:
