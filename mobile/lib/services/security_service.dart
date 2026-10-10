@@ -13,6 +13,7 @@ class SecurityService extends ChangeNotifier with WidgetsBindingObserver {
   bool _isLocked = false;
   bool _isAuthenticating = false;
   DateTime? _pausedTimestamp;
+  DateTime? _lastAuthTimestamp;
 
   SecurityService() {
     WidgetsBinding.instance.addObserver(this);
@@ -37,7 +38,11 @@ class SecurityService extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
       
       if (_isLocked) {
-        authenticate();
+        Future.delayed(const Duration(milliseconds: 350), () {
+          if (_isLocked && !_isAuthenticating) {
+            authenticate();
+          }
+        });
       }
     } catch (e) {
       debugPrint('[SecurityService] Error loading preferences: $e');
@@ -48,15 +53,29 @@ class SecurityService extends ChangeNotifier with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!_isAppLockEnabled) return;
 
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    // CRITICAL FIX: The biometric dialog itself causes Android to trigger
+    // inactive/paused states. If authentication is currently in progress,
+    // ignore lifecycle changes completely so we don't enter an infinite re-lock loop.
+    if (_isAuthenticating) return;
+
+    if (state == AppLifecycleState.paused) {
       _pausedTimestamp = DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
+      // Grace period: ignore resumed events triggered immediately after completing auth
+      if (_lastAuthTimestamp != null &&
+          DateTime.now().difference(_lastAuthTimestamp!).inSeconds < 3) {
+        _pausedTimestamp = null;
+        return;
+      }
+
       if (_pausedTimestamp != null && !_isLocked) {
         final elapsed = DateTime.now().difference(_pausedTimestamp!).inSeconds;
         if (elapsed >= _lockTimeoutSeconds) {
           _isLocked = true;
+          _pausedTimestamp = null;
           notifyListeners();
           authenticate();
+          return;
         }
       }
       _pausedTimestamp = null;
@@ -91,6 +110,8 @@ class SecurityService extends ChangeNotifier with WidgetsBindingObserver {
 
       if (didAuthenticate) {
         _isLocked = false;
+        _pausedTimestamp = null;
+        _lastAuthTimestamp = DateTime.now();
       }
       return didAuthenticate;
     } catch (e) {
@@ -107,13 +128,15 @@ class SecurityService extends ChangeNotifier with WidgetsBindingObserver {
       // Must authenticate successfully before turning on App Lock
       final success = await authenticate();
       if (!success) return false;
+      _isLocked = false;
+      _pausedTimestamp = null;
+      _lastAuthTimestamp = DateTime.now();
+    } else {
+      _isLocked = false;
+      _pausedTimestamp = null;
     }
 
     _isAppLockEnabled = enabled;
-    if (!enabled) {
-      _isLocked = false;
-    }
-    
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyAppLockEnabled, enabled);
     notifyListeners();

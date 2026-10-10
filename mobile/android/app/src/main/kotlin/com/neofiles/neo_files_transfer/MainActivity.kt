@@ -1,8 +1,11 @@
 package com.neofiles.neo_files_transfer
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Intent
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import io.flutter.embedding.android.FlutterFragmentActivity
@@ -24,7 +27,28 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        createNotificationChannel()
         handleIntent(intent)
+    }
+
+    // Create notification channel at NATIVE level so it ALWAYS exists
+    // even when app is closed/killed and FCM delivers a background message.
+    // Without this, Android silently drops heads-up notifications.
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "neo_push_notifications",
+                "NeoFiles Alerts & Updates",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "File download alerts, account updates and system notifications"
+                enableVibration(true)
+                setShowBadge(true)
+                enableLights(true)
+            }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager?.createNotificationChannel(channel)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

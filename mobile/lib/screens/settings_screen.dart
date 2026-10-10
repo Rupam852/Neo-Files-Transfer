@@ -11,6 +11,7 @@ import '../services/notification_service.dart';
 import 'update_screen.dart';
 import 'notification_settings_screen.dart';
 import 'about_screen.dart';
+import '../widgets/logout_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -150,48 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showSignOutDialog(AuthService authService) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isLight ? Colors.white : const Color(0xFF0F172A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Logout Session',
-          style: TextStyle(
-            color: isLight ? const Color(0xFF0F172A) : Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to sign out of your session?',
-          style: TextStyle(
-            color: isLight ? const Color(0xFF475569) : Colors.white70,
-            fontSize: 13,
-            height: 1.5,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: isLight ? const Color(0xFF64748B) : Colors.white60)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Close settings screen
-              authService.signOut();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
+    LogoutDialog.show(context, authService);
   }
 
   @override

@@ -41,15 +41,32 @@ class AuthService extends ChangeNotifier {
     _init();
   }
 
-  void _init() {
-    // Restore active session synchronously if present
-    final initialSession = _client.auth.currentSession;
-    if (initialSession != null) {
-      _user = initialSession.user;
-      loadProfile(initialSession.user);
-      _setupRealtimeListeners();
-    } else {
+  void _init() async {
+    // Restore active session with automatic refresh if expired overnight
+    try {
+      var session = _client.auth.currentSession;
+      if (session != null && session.isExpired) {
+        debugPrint('[Auth] Session expired on cold start, attempting refresh...');
+        try {
+          final refreshRes = await _client.auth.refreshSession();
+          session = refreshRes.session ?? _client.auth.currentSession;
+        } catch (refreshErr) {
+          debugPrint('[Auth] Failed to refresh expired session: $refreshErr');
+        }
+      }
+
+      if (session != null) {
+        _user = session.user;
+        await loadProfile(session.user);
+        _setupRealtimeListeners();
+      } else {
+        _isLoading = false;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[Auth] Init error: $e');
       _isLoading = false;
+      notifyListeners();
     }
 
     // Listen for auth state changes
@@ -428,14 +445,20 @@ class AuthService extends ChangeNotifier {
     final oldUserId = _user?.id;
     _clearRealtimeListeners();
     try {
-      await FcmService().unbindUserToken(oldUserId);
+      await FcmService().unbindUserToken(oldUserId).timeout(const Duration(seconds: 3));
     } catch (e) {
       debugPrint('[AuthService] Error unbinding FCM token on signOut: $e');
     }
-    await _client.auth.signOut();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('google_provider_token');
-    await prefs.remove('google_refresh_token');
+    try {
+      await _client.auth.signOut().timeout(const Duration(seconds: 4));
+    } catch (e) {
+      debugPrint('[AuthService] Error calling Supabase signOut: $e');
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('google_provider_token');
+      await prefs.remove('google_refresh_token');
+    } catch (_) {}
     _user = null;
     _profile = null;
     _isAdmin = false;

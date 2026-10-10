@@ -183,8 +183,8 @@ class TransferManagerSheet extends StatelessWidget {
       statusColor = const Color(0xFFEF4444);
       statusLabel = 'Failed';
     } else {
-      statusColor = Colors.grey;
-      statusLabel = 'Queued';
+      statusColor = const Color(0xFF818CF8);
+      statusLabel = isDl ? 'Preparing download...' : 'Preparing upload...';
     }
 
     return Container(
@@ -312,7 +312,9 @@ class TransferManagerSheet extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
-              value: (isRunning && task.progress == 0.0 && task.speed.isEmpty) ? null : task.progress,
+              value: (task.status == TransferStatus.queued || (isRunning && task.progress == 0.0 && task.speed.isEmpty))
+                  ? null
+                  : task.progress,
               backgroundColor: isLight ? const Color(0xFFE2E8F0) : Colors.white12,
               valueColor: AlwaysStoppedAnimation<Color>(
                 isCompleted

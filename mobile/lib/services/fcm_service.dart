@@ -76,12 +76,25 @@ class FcmService {
         sound: true,
       );
 
-      // 3. Setup Android Notification Channel
+      // 3. Setup Android Local Notifications Plugin
+      const initializationSettingsAndroid =
+          AndroidInitializationSettings('@mipmap/launcher_icon');
+      const initializationSettings =
+          InitializationSettings(android: initializationSettingsAndroid);
+      await _localNotifs.initialize(
+        settings: initializationSettings,
+        onDidReceiveNotificationResponse: (response) {
+          if (response.payload != null) {
+            _handleNotificationAction({'type': response.payload});
+          }
+        },
+      );
+
       const androidChannel = AndroidNotificationChannel(
         _fcmChannelId,
         _fcmChannelName,
         description: _fcmChannelDesc,
-        importance: Importance.high,
+        importance: Importance.max,
         playSound: true,
       );
 
@@ -299,10 +312,13 @@ class FcmService {
       _fcmChannelId,
       _fcmChannelName,
       channelDescription: _fcmChannelDesc,
-      importance: Importance.high,
-      priority: Priority.high,
+      importance: Importance.max,
+      priority: Priority.max,
       icon: '@mipmap/launcher_icon',
       color: const Color(0xFF4F46E5),
+      playSound: true,
+      enableVibration: true,
+      ticker: 'NeoFiles Alert',
     );
 
     final notifId = message.hashCode & 0x7FFFFFFF;

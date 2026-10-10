@@ -11,6 +11,7 @@ import '../services/auth_service.dart';
 import '../services/update_service.dart';
 import '../services/fcm_service.dart';
 import '../widgets/notification_bell.dart';
+import '../widgets/logout_dialog.dart';
 import 'update_screen.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -587,39 +588,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   }
 
   Future<void> _showLogoutDialog(BuildContext context) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Logout Session', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-        content: const Text(
-          'Are you sure you want to sign out of your session?',
-          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      if (mounted) {
-        final authService = Provider.of<AuthService>(context, listen: false);
-        await authService.signOut();
-      }
-    }
+    final authService = Provider.of<AuthService>(context, listen: false);
+    LogoutDialog.show(context, authService);
   }
 
   Widget? _buildDrawer() {

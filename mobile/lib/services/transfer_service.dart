@@ -20,7 +20,7 @@ enum TransferStatus { queued, running, paused, completed, failed, cancelled }
 class TransferTask {
   final String id;
   final String fileName;
-  final int totalBytes;
+  int totalBytes;
   int transferredBytes;
   final TransferType type;
   TransferStatus status;
@@ -67,7 +67,7 @@ class TransferTask {
         lastBytes = transferredBytes,
         lastTime = DateTime.now();
 
-  String get formattedTotalSize => _formatBytes(totalBytes);
+  String get formattedTotalSize => totalBytes <= 0 ? 'Preparing...' : _formatBytes(totalBytes);
   String get formattedTransferredSize => _formatBytes(transferredBytes);
 
   static String _formatBytes(int bytes) {
@@ -623,6 +623,8 @@ class TransferService with ChangeNotifier {
   }
 
   // --- START RESUMABLE UPLOAD ---
+  // Root-cause fix: insert task IMMEDIATELY before await file.length()
+  // so TransferManagerSheet shows the task card instantly on file pick.
   Future<String> startUpload({
     required File file,
     String? fileName,
@@ -631,13 +633,13 @@ class TransferService with ChangeNotifier {
     bool autoMakePublic = true,
   }) async {
     final finalFileName = fileName ?? file.path.split(Platform.pathSeparator).last;
-    final len = await file.length();
     final taskId = 'up_${DateTime.now().millisecondsSinceEpoch}_${finalFileName.hashCode.abs()}';
 
+    // Insert task immediately with size=0 so bottom sheet updates INSTANTLY
     final task = TransferTask(
       id: taskId,
       fileName: finalFileName,
-      totalBytes: len,
+      totalBytes: 0,
       type: TransferType.upload,
       status: TransferStatus.queued,
       localPath: file.path,
@@ -647,7 +649,14 @@ class TransferService with ChangeNotifier {
     );
 
     _tasks.insert(0, task);
-    notifyListeners();
+    notifyListeners(); // ← UI updates immediately, sheet opens with task visible
+
+    // Resolve file size in background (does NOT delay UI)
+    try {
+      final len = await file.length();
+      task.totalBytes = len;
+      notifyListeners();
+    } catch (_) {}
 
     _executeUpload(task);
     return taskId;
