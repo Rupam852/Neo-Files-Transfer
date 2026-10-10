@@ -308,32 +308,45 @@ serve(async (req) => {
     let finalResults = [];
 
     if (targetType === "user") {
-      const { data: tokens, error: tokenErr } = await supabase
+      // 1. Dispatch to user's dedicated personal topic (guarantees delivery across all active devices)
+      const userTopic = target.startsWith("user_") ? target : `user_${target}`;
+      try {
+        const topicRes = await sendFcmMessage({
+          projectId: fcmProjectId,
+          accessToken,
+          target: userTopic,
+          targetType: "topic",
+          title,
+          body,
+          dataPayload,
+        });
+        finalResults.push(topicRes);
+      } catch (topicErr) {
+        console.error("Failed to send to user topic:", userTopic, topicErr);
+      }
+
+      // 2. Also send to individual registered device tokens if available in user_fcm_tokens
+      const { data: tokens } = await supabase
         .from("user_fcm_tokens")
         .select("fcm_token")
         .eq("user_id", target);
 
-      if (tokenErr || !tokens || tokens.length === 0) {
-        return new Response(JSON.stringify({ message: "No active device tokens found for this user", sentCount: 0 }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      for (const t of tokens) {
-        try {
-          const res = await sendFcmMessage({
-            projectId: fcmProjectId,
-            accessToken,
-            target: t.fcm_token,
-            targetType: "token",
-            title,
-            body,
-            dataPayload,
-          });
-          finalResults.push(res);
-        } catch (e) {
-          console.error("Failed to send to token:", t.fcm_token, e);
+      if (tokens && tokens.length > 0) {
+        for (const t of tokens) {
+          try {
+            const res = await sendFcmMessage({
+              projectId: fcmProjectId,
+              accessToken,
+              target: t.fcm_token,
+              targetType: "token",
+              title,
+              body,
+              dataPayload,
+            });
+            finalResults.push(res);
+          } catch (e) {
+            console.error("Failed to send to token:", t.fcm_token, e);
+          }
         }
       }
     } else {
