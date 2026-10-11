@@ -5,7 +5,7 @@ import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import '../models/user_profile.dart';
 import 'fcm_service.dart';
 
-class AuthService extends ChangeNotifier {
+class AuthService extends ChangeNotifier with WidgetsBindingObserver {
   final SupabaseClient _client = Supabase.instance.client;
   User? _user;
   UserProfile? _profile;
@@ -42,6 +42,7 @@ class AuthService extends ChangeNotifier {
   static const String _keyCachedMaintenance = 'neo_cached_is_maintenance';
 
   AuthService([SharedPreferences? prefs]) {
+    WidgetsBinding.instance.addObserver(this);
     if (prefs != null) {
       _isAdmin = prefs.getBool(_keyCachedAdmin) ?? false;
       _isPaused = prefs.getBool(_keyCachedPaused) ?? false;
@@ -53,6 +54,47 @@ class AuthService extends ChangeNotifier {
       _isLoading = false; // User is already logged in, do NOT block the screen!
     }
     _init();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _clearRealtimeListeners();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _handleAppResume();
+    }
+  }
+
+  Future<void> _handleAppResume() async {
+    try {
+      var session = _client.auth.currentSession;
+      if (session != null) {
+        final expiresAt = session.expiresAt;
+        final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+        final isNearExpiry = expiresAt != null && (expiresAt - now < 300);
+        if (session.isExpired || isNearExpiry) {
+          debugPrint('[Auth] Resumed from background: Session expired or near expiry, refreshing...');
+          try {
+            final refreshRes = await _client.auth.refreshSession();
+            session = refreshRes.session ?? _client.auth.currentSession;
+            if (session != null) {
+              _user = session.user;
+              notifyListeners();
+              await loadProfile(session.user);
+            }
+          } catch (e) {
+            debugPrint('[Auth] Error refreshing session on resume: $e');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[Auth] Resume handler error: $e');
+    }
   }
 
   void _init() async {
@@ -314,6 +356,7 @@ class AuthService extends ChangeNotifier {
 
       // Check if user is Admin (check by user_id and fallback to email)
       Map<String, dynamic>? adminResponse;
+      bool adminQuerySuccess = false;
       try {
         adminResponse = await _client
             .from('admins')
@@ -328,11 +371,16 @@ class AuthService extends ChangeNotifier {
               .eq('email', authUser.email!.toLowerCase())
               .maybeSingle();
         }
+        adminQuerySuccess = true;
       } catch (e) {
         debugPrint('Admin check query error: $e');
       }
 
-      _isAdmin = adminResponse != null;
+      // Only update _isAdmin if the query actually succeeded.
+      // If the query errored (e.g. temporary network offline), maintain previous/cached _isAdmin!
+      if (adminQuerySuccess) {
+        _isAdmin = adminResponse != null;
+      }
 
       // Fetch maintenance mode setting
       try {
@@ -368,8 +416,9 @@ class AuthService extends ChangeNotifier {
           debugPrint('Approved users check query error: $e');
         }
 
-        // Only log out if query succeeded and user is definitely not approved
-        if (approvedQuerySuccess && approvedResponse == null) {
+        // Only log out if BOTH admin check definitely succeeded and approved check definitely succeeded,
+        // confirming user is neither an admin nor in approved list.
+        if (adminQuerySuccess && approvedQuerySuccess && approvedResponse == null) {
           // Check if there is a pending/rejected request in pending_registrations
           Map<String, dynamic>? pendingReg;
           try {
@@ -392,9 +441,9 @@ class AuthService extends ChangeNotifier {
             errMsg = 'Access denied. Please submit a registration request first.';
           }
 
-          // Sign out but preserve error
+          // Sign out locally but preserve error
           _clearRealtimeListeners();
-          await _client.auth.signOut();
+          await _client.auth.signOut(scope: SignOutScope.local);
           final prefs = await SharedPreferences.getInstance();
           await prefs.remove('google_provider_token');
           await prefs.remove('google_refresh_token');
@@ -473,7 +522,7 @@ class AuthService extends ChangeNotifier {
       debugPrint('[AuthService] Error unbinding FCM token on signOut: $e');
     }
     try {
-      await _client.auth.signOut().timeout(const Duration(seconds: 4));
+      await _client.auth.signOut(scope: SignOutScope.local).timeout(const Duration(seconds: 4));
     } catch (e) {
       debugPrint('[AuthService] Error calling Supabase signOut: $e');
     }

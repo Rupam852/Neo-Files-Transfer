@@ -39,7 +39,7 @@ export function AuthProvider({ children }) {
         if (isSessionTimedOut()) {
           console.log('Web session expired due to 1 hour of inactivity.')
           localStorage.removeItem('neo_last_active_time')
-          await supabase.auth.signOut()
+          await supabase.auth.signOut({ scope: 'local' })
           setUser(null)
           setLoading(false)
           return
@@ -318,7 +318,7 @@ export function AuthProvider({ children }) {
 
         if (!approvedData) {
           // If not approved and not admin, revoke session
-          await supabase.auth.signOut()
+          await supabase.auth.signOut({ scope: 'local' })
           setUser(null)
           setProfile(null)
           setIsAdmin(false)
@@ -361,7 +361,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('google_refresh_token')
     } catch (e) {}
 
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
     setUser(null)
     setProfile(null)
     setIsAdmin(false)

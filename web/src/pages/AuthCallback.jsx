@@ -61,7 +61,7 @@ export default function AuthCallback() {
           console.error('Error fetching registration status:', e)
         }
 
-        await supabase.auth.signOut()
+        await supabase.auth.signOut({ scope: 'local' })
         toast.error(errorMessage)
         navigate('/login', { replace: true, state: { error: errorMessage } })
         return
